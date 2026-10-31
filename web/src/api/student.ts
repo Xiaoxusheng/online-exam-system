@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { AttemptState, MyExam, MyScore, ScoreRecordDetail, SubmitResult } from '../types'
+import type { AttemptState, MyExam, MyScore, ScoreAppeal, ScoreRecordDetail, SubmitResult } from '../types'
 
 export function listMyExams(): Promise<MyExam[]> {
   return apiRequest<MyExam[]>('/my/exams')
@@ -34,4 +34,15 @@ export function listMyScores(): Promise<MyScore[]> {
 
 export function getMyScoreRecord(attemptId: string): Promise<ScoreRecordDetail> {
   return apiRequest<ScoreRecordDetail>(`/my/scores/${attemptId}`)
+}
+
+export function createScoreAppeal(attemptId: string, reason: string, questionId?: string): Promise<ScoreAppeal> {
+  return apiRequest<ScoreAppeal>(`/my/scores/${attemptId}/appeals`, {
+    method: 'POST',
+    body: JSON.stringify({ reason, question_id: questionId ?? '' }),
+  })
+}
+
+export function listMyAppeals(): Promise<ScoreAppeal[]> {
+  return apiRequest<ScoreAppeal[]>('/my/appeals')
 }

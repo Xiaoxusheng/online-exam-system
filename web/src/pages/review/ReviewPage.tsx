@@ -134,7 +134,13 @@ export default function ReviewPage() {
         />
       </Card>
 
-      <ReviewDrawer taskId={taskId} onClose={() => setTaskId(null)} />
+      <ReviewDrawer
+        key={taskId ?? 'closed'}
+        taskId={taskId}
+        status={tab}
+        onClose={() => setTaskId(null)}
+        onNavigate={(nextId) => setTaskId(nextId)}
+      />
     </div>
   )
 }

@@ -1,13 +1,24 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { App, Button, Card, Descriptions, Drawer, Input, Select, Table, Tag, Tooltip } from 'antd'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { App, Button, Card, Descriptions, Drawer, Input, InputNumber, Select, Space, Table, Tabs, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { ReloadOutlined, SearchOutlined, SendOutlined } from '@ant-design/icons'
+import { HistoryOutlined, DownloadOutlined, ReloadOutlined, SearchOutlined, SendOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
-import { getScoreRecord, listScores, publishScores, type ScoreListParams } from '../../api/score'
+import AppealsPanel from './AppealsPanel'
+import {
+  adjustScore,
+  exportScores,
+  getScoreRecord,
+  listAppeals,
+  listScoreAdjustments,
+  listScores,
+  publishScores,
+  type ScoreListParams,
+} from '../../api/score'
 import { listExams } from '../../api/exam'
 import { queryKeys } from '../../api/queryKeys'
+import { useAuthStore } from '../../stores/auth'
 import { formatDateTime, formatScore } from '../../utils/format'
 import { attemptStatusLabels, questionTypeLabel, scoreStatusLabels, statusOf } from '../../utils/labels'
 import { errorText } from '../../utils/errors'
@@ -65,9 +76,14 @@ const scoreColumns = (onOpen: (row: ScoreListItem) => void): ColumnsType<ScoreLi
 
 export default function ScoresPage() {
   const { message, modal } = App.useApp()
+  const queryClient = useQueryClient()
+  const role = useAuthStore((state) => state.user?.role)
+  const canAdjust = role === 'exam_admin' || role === 'org_admin'
   const [draft, setDraft] = useState<Omit<ScoreListParams, 'page' | 'page_size'>>({})
   const [query, setQuery] = useState<ScoreListParams>({ page: 1, page_size: 20 })
   const [detailAttempt, setDetailAttempt] = useState<string | null>(null)
+  const [overrides, setOverrides] = useState<Record<string, number>>({})
+  const [reason, setReason] = useState('')
 
   const examsQuery = useQuery({
     queryKey: queryKeys.exams({ page: 1, page_size: 100 }),
@@ -88,6 +104,83 @@ export default function ScoresPage() {
     },
     onError: (error) => message.error(errorText(error)),
   })
+
+  const exportMutation = useMutation({
+    mutationFn: (examId: string) => exportScores(examId),
+    onSuccess: () => message.success('已开始下载成绩表'),
+    onError: (error) => message.error(errorText(error)),
+  })
+
+  function confirmExport() {
+    if (!draft.exam_id) {
+      message.warning('导出前请先选择考试')
+      return
+    }
+    const exam = (examsQuery.data?.items ?? []).find((item) => item.id === draft.exam_id)
+    modal.confirm({
+      title: `导出《${exam?.title ?? '本场考试'}》成绩？`,
+      content: '导出 Excel 包含考生姓名、账号、校区班级、准考证号与逐行水印，用于教学管理。导出动作会写入审计日志。',
+      okText: '确认导出',
+      cancelText: '取消',
+      onOk: () => exportMutation.mutate(draft.exam_id as string),
+    })
+  }
+
+  const historyQuery = useQuery({
+    queryKey: queryKeys.scoreAdjustments(detailAttempt ?? ''),
+    queryFn: () => listScoreAdjustments(detailAttempt ?? ''),
+    enabled: Boolean(detailAttempt) && canAdjust,
+  })
+
+  const appealsSummary = useQuery({
+    queryKey: queryKeys.appeals({ status: 'pending', page: 1, page_size: 1 }),
+    queryFn: () => listAppeals({ status: 'pending', page: 1, page_size: 1 }),
+    enabled: role === 'exam_admin' || role === 'org_admin',
+  })
+
+  const adjustMutation = useMutation({
+    mutationFn: (payload: { attemptId: string; reason: string; items: { question_id: string; score: number }[] }) =>
+      adjustScore(payload.attemptId, payload.reason, payload.items),
+    onSuccess: (data) => {
+      message.success(`已更正为 ${formatScore(data.after_total, 2)} 分，考生会收到通知`)
+      setOverrides({})
+      setReason('')
+      queryClient.invalidateQueries({ queryKey: ['score'] })
+      queryClient.invalidateQueries({ queryKey: ['appeal'] })
+    },
+    onError: (error) => message.error(errorText(error)),
+  })
+
+  function openDetail(row: ScoreListItem) {
+    setDetailAttempt(row.attempt_id)
+    setOverrides({})
+    setReason('')
+  }
+
+  function confirmAdjust() {
+    if (!record) return
+    const items = Object.entries(overrides).map(([questionId, score]) => ({ question_id: questionId, score }))
+    if (items.length === 0) {
+      message.warning('请先修改至少一道题目的得分')
+      return
+    }
+    if (!reason.trim()) {
+      message.warning('请填写更正原因')
+      return
+    }
+    const nextTotal = record.detail.questions.reduce(
+      (sum, item) => sum + (overrides[item.question_id] ?? item.score),
+      0,
+    )
+    modal.confirm({
+      title: '确认提交成绩更正？',
+      content: `本次将修改 ${items.length} 道题，总分由 ${formatScore(record.total, 2)} 变更为 ${formatScore(nextTotal, 2)} 分。`
+        + '系统会保留原分数快照与更正记录，并向考生发送站内通知。',
+      okText: '确认更正',
+      cancelText: '再想想',
+      onOk: () => adjustMutation.mutate({ attemptId: record.attempt_id, reason: reason.trim(), items }),
+    })
+  }
 
   function apply() {
     setQuery({ ...draft, page: 1, page_size: scoresQuery.data?.pagination.page_size ?? 20 })
@@ -110,22 +203,10 @@ export default function ScoresPage() {
 
   const examOptions = (examsQuery.data?.items ?? []).map((exam) => ({ value: exam.id, label: exam.title }))
   const record = recordQuery.data
+  const pendingCount = appealsSummary.data?.pagination.total ?? 0
 
-  return (
-    <div>
-      <PageHeader
-        title="成绩管理"
-        subtitle="答卷判分完成后按考试发布；考生只能看到已发布的成绩。"
-        extra={
-          <Tooltip title="按考试发布，请先在筛选中选择考试">
-            <Button type="primary" icon={<SendOutlined />} onClick={confirmPublish} loading={publishMutation.isPending}>
-              发布成绩
-            </Button>
-          </Tooltip>
-        }
-      />
-
-      <Card className="panel-card" variant="borderless">
+  const listCard = (
+    <Card className="panel-card" variant="borderless">
         <div className="filter-bar">
           <Select
             allowClear
@@ -176,7 +257,7 @@ export default function ScoresPage() {
           rowKey="attempt_id"
           size="middle"
           loading={scoresQuery.isPending}
-          columns={scoreColumns((row) => setDetailAttempt(row.attempt_id))}
+          columns={scoreColumns(openDetail)}
           dataSource={scoresQuery.data?.items ?? []}
           scroll={{ x: 980 }}
           pagination={{
@@ -189,11 +270,48 @@ export default function ScoresPage() {
           }}
           locale={{ emptyText: scoresQuery.isError ? ' ' : '还没有可管理的成绩（考生交卷后生成）' }}
         />
-      </Card>
+    </Card>
+  )
+
+  const tabItems = [
+    { key: 'list', label: '成绩列表', children: listCard },
+    ...(role === 'exam_admin' || role === 'org_admin'
+      ? [
+          {
+            key: 'appeals',
+            label: pendingCount > 0 ? `申诉管理 (${pendingCount})` : '申诉管理',
+            children: <AppealsPanel />,
+          },
+        ]
+      : []),
+  ]
+
+  return (
+    <div>
+      <PageHeader
+        title="成绩管理"
+        subtitle="答卷判分完成后按考试发布；考生只能看到已发布的成绩，更正与申诉全程留痕。"
+        extra={
+          <Space>
+            <Tooltip title="按考试导出 Excel，含逐行水印">
+              <Button icon={<DownloadOutlined />} loading={exportMutation.isPending} onClick={confirmExport}>
+                导出成绩
+              </Button>
+            </Tooltip>
+            <Tooltip title="按考试发布，请先在筛选中选择考试">
+              <Button type="primary" icon={<SendOutlined />} onClick={confirmPublish} loading={publishMutation.isPending}>
+                发布成绩
+              </Button>
+            </Tooltip>
+          </Space>
+        }
+      />
+
+      <Tabs items={tabItems} />
 
       <Drawer
         open={Boolean(detailAttempt)}
-        width={720}
+        width={760}
         destroyOnHidden
         title={record ? `成绩明细 · ${record.user_name}` : '成绩明细'}
         onClose={() => setDetailAttempt(null)}
@@ -232,7 +350,32 @@ export default function ScoresPage() {
                     </div>
                   ),
                 },
-                { title: '得分', dataIndex: 'score', width: 90, render: (value: number) => formatScore(value, 2) },
+                {
+                  title: '得分',
+                  dataIndex: 'score',
+                  width: 128,
+                  render: (value: number, item) =>
+                    canAdjust ? (
+                      <InputNumber
+                        size="small"
+                        min={0}
+                        max={item.max_score}
+                        step={0.5}
+                        value={overrides[item.question_id] ?? value}
+                        onChange={(next) => {
+                          if (next === null) {
+                            const copy = { ...overrides }
+                            delete copy[item.question_id]
+                            setOverrides(copy)
+                            return
+                          }
+                          setOverrides({ ...overrides, [item.question_id]: Number(next) })
+                        }}
+                      />
+                    ) : (
+                      formatScore(value, 2)
+                    ),
+                },
                 { title: '满分', dataIndex: 'max_score', width: 90, render: (value: number) => formatScore(value, 1) },
                 {
                   title: '判分方式',
@@ -249,6 +392,86 @@ export default function ScoresPage() {
                 },
               ]}
             />
+
+            {canAdjust && (
+              <div className="adjust-box">
+                <div className="adjust-head">
+                  <span className="cell-title">成绩更正</span>
+                  <span className="cell-meta">修改上方得分后提交，系统保留原分数与操作人</span>
+                </div>
+                <Input.TextArea
+                  rows={2}
+                  maxLength={200}
+                  showCount
+                  placeholder="更正原因（必填）：例如 阅卷漏给分、题目作废全员给分"
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                />
+                <Space>
+                  <Button type="primary" loading={adjustMutation.isPending} onClick={confirmAdjust}>
+                    提交更正
+                  </Button>
+                  {Object.keys(overrides).length > 0 && (
+                    <Button
+                      type="link"
+                      onClick={() => {
+                        setOverrides({})
+                        setReason('')
+                      }}
+                    >
+                      清空修改
+                    </Button>
+                  )}
+                </Space>
+              </div>
+            )}
+
+            {canAdjust && (
+              <Card
+                className="panel-card inner-card"
+                variant="borderless"
+                size="small"
+                title={
+                  <span>
+                    <HistoryOutlined /> 更正记录
+                  </span>
+                }
+              >
+                <Table
+                  rowKey="id"
+                  size="small"
+                  loading={historyQuery.isPending}
+                  dataSource={historyQuery.data ?? []}
+                  pagination={false}
+                  columns={[
+                    { title: '时间', dataIndex: 'created_at', width: 160, render: (value: string) => formatDateTime(value) },
+                    {
+                      title: '分数变化',
+                      key: 'delta',
+                      width: 150,
+                      render: (_value, item) => (
+                        <span className="adjust-delta">
+                          {formatScore(item.before_total, 2)} → {formatScore(item.after_total, 2)}
+                        </span>
+                      ),
+                    },
+                    { title: '原因', dataIndex: 'reason', ellipsis: true },
+                    {
+                      title: '逐题',
+                      key: 'items',
+                      width: 150,
+                      render: (_value, item) => (
+                        <span className="cell-meta">
+                          {item.items.map((row) => `${row.question_id.slice(0, 6)}：${formatScore(row.before, 1)}→${formatScore(row.after, 1)}`).join('，')}
+                        </span>
+                      ),
+                    },
+                    { title: '操作人', dataIndex: 'operator_name', width: 110 },
+                  ]}
+                  locale={{ emptyText: '暂无更正记录' }}
+                />
+              </Card>
+            )}
           </>
         )}
       </Drawer>

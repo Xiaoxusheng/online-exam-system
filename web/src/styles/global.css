@@ -2230,3 +2230,307 @@ body {
     grid-template-columns: 108px minmax(0, 1fr);
   }
 }
+
+/* ---------- v1.0 Excel 导入 ---------- */
+.import-flow {
+  display: grid;
+  gap: 4px;
+}
+.import-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.import-fields {
+  display: grid;
+  width: 100%;
+  gap: 0;
+}
+.drop-zone {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 28px 20px;
+  text-align: center;
+  background: #f7f9fc;
+  border: 1px dashed #cdd5e0;
+  border-radius: 10px;
+  transition: border-color 180ms var(--app-ease), background 180ms var(--app-ease);
+}
+.drop-zone:hover {
+  background: #f1f5fb;
+  border-color: #3370ff;
+}
+.drop-icon {
+  font-size: 28px;
+  color: #3370ff;
+}
+.drop-text {
+  max-width: 100%;
+  font-size: 13px;
+  color: #4e5969;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.report-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0;
+}
+.report-metric {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  background: #f7f9fc;
+  border: 1px solid #e9edf3;
+  border-radius: 8px;
+  animation: metric-in 320ms var(--app-ease) both;
+}
+.report-metric-label {
+  font-size: 12px;
+  color: #8a94a6;
+}
+.report-metric-value {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #1d2129;
+}
+.report-metric.good .report-metric-value {
+  color: #00a870;
+}
+.report-metric.warn .report-metric-value {
+  color: #d25f00;
+}
+.report-metric.bad .report-metric-value {
+  color: #d54941;
+}
+@keyframes metric-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.import-report .ant-alert {
+  align-items: flex-start;
+}
+[data-theme='dark'] .drop-zone {
+  background: #161c27;
+  border-color: #2d3646;
+}
+[data-theme='dark'] .drop-zone:hover {
+  border-color: #4c8dff;
+}
+[data-theme='dark'] .drop-text {
+  color: #a9b4c7;
+}
+[data-theme='dark'] .report-metric {
+  background: #1a2130;
+  border-color: #232a38;
+}
+[data-theme='dark'] .report-metric-value {
+  color: #e6ebf5;
+}
+
+@media (max-width: 720px) {
+  .report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- v1.0 题目 / 知识点分析 ---------- */
+.rate-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+}
+.rate-fill {
+  flex: none;
+  max-width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  transition: width 480ms var(--app-ease);
+}
+.rate-fill.blue {
+  background: linear-gradient(90deg, #4c8dff, #3370ff);
+}
+.rate-fill.green {
+  background: linear-gradient(90deg, #45cd9a, #00a870);
+}
+.rate-text {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #4e5969;
+}
+.option-bars {
+  display: grid;
+  gap: 4px;
+}
+.option-bar {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background 160ms var(--app-ease);
+}
+.option-bar:hover {
+  background: #f2f4f7;
+}
+.option-bar.is-correct .option-key {
+  color: #00a870;
+  font-weight: 600;
+}
+.option-key {
+  font-size: 12px;
+  color: #4e5969;
+}
+.option-track {
+  display: block;
+  height: 6px;
+  background: #e9edf3;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.option-fill {
+  display: block;
+  height: 100%;
+  background: #a8c3ff;
+  border-radius: 999px;
+  transition: width 520ms var(--app-ease);
+}
+.option-bar.is-correct .option-fill {
+  background: #00a870;
+}
+.option-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #4e5969;
+  text-align: right;
+}
+.trend-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.trend-col {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  width: 34px;
+}
+.trend-bar {
+  width: 20px;
+  background: linear-gradient(180deg, #7aa7ff, #3370ff);
+  border-radius: 4px 4px 2px 2px;
+  transition: height 420ms var(--app-ease);
+}
+.trend-label {
+  font-size: 11px;
+  color: #8a94a6;
+  max-width: 34px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.weak-items {
+  display: grid;
+  gap: 2px;
+}
+.weak-item {
+  font-size: 13px;
+  color: #4e5969;
+}
+.analytics-tabs > .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+/* ---------- v1.0 成绩更正与申诉 ---------- */
+.adjust-box {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: #f7f9fc;
+  border: 1px solid #e9edf3;
+  border-radius: 10px;
+}
+.adjust-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.adjust-delta {
+  font-variant-numeric: tabular-nums;
+  color: #d25f00;
+}
+.appeal-context {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: #f7f9fc;
+  border-radius: 10px;
+}
+.appeal-context-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 13px;
+}
+.appeal-context-label {
+  color: #8a94a6;
+}
+.review-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.review-nav-position {
+  font-size: 12px;
+  color: #8a94a6;
+  font-variant-numeric: tabular-nums;
+}
+.review-next-button {
+  margin-top: 6px;
+}
+.tpl-body {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.inner-card {
+  margin-top: 16px;
+  background: #fafbfd;
+}
+
+[data-theme='dark'] .option-bar:hover {
+  background: #1a2130;
+}
+[data-theme='dark'] .option-track {
+  background: #232a38;
+}
+[data-theme='dark'] .adjust-box,
+[data-theme='dark'] .appeal-context,
+[data-theme='dark'] .inner-card {
+  background: #161c27;
+  border-color: #232a38;
+}
+[data-theme='dark'] .weak-item,
+[data-theme='dark'] .rate-text {
+  color: #c9d2e3;
+}
+
+@media (max-width: 900px) {
+  .option-bars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .trend-spark {
+    flex-wrap: wrap;
+  }
+}

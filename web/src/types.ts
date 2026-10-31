@@ -374,6 +374,118 @@ export interface ExamAnalytics {
   distribution: ScoreBucket[]
 }
 
+export interface ItemOption {
+  key: string
+  count: number
+  correct: boolean
+}
+
+export interface ItemAnalysis {
+  question_id: string
+  type: string
+  stem: string
+  knowledge_point: string
+  difficulty: string
+  max_score: number
+  answered: number
+  skipped: number
+  correct: number
+  correct_rate: number
+  score_rate: number
+  discrimination: number
+  subjective: boolean
+  options: ItemOption[]
+}
+
+export interface ExamItemAnalytics {
+  exam_id: string
+  exam_title: string
+  participants: number
+  sample_note: string
+  items: ItemAnalysis[]
+}
+
+export interface KnowledgeTrend {
+  exam_id: string
+  exam_title: string
+  score_rate: number
+  answers: number
+}
+
+export interface KnowledgePointStat {
+  name: string
+  items: number
+  answers: number
+  correct: number
+  score_rate: number
+  correct_rate: number
+  level: string
+  trend: KnowledgeTrend[]
+}
+
+export interface KnowledgeAnalytics {
+  scope: string
+  exams: number
+  participants: number
+  points: KnowledgePointStat[]
+}
+
+export interface AdjustmentItem {
+  question_id: string
+  before: number
+  after: number
+  max_score: number
+}
+
+export interface ScoreAdjustment {
+  id: string
+  attempt_id: string
+  before_total: number
+  after_total: number
+  reason: string
+  items: AdjustmentItem[]
+  operator_id: string
+  operator_name: string
+  created_at: string
+}
+
+export interface ScoreAppeal {
+  id: string
+  attempt_id: string
+  exam_id: string
+  exam_title: string
+  question_id: string
+  user_id: string
+  user_name: string
+  total: number
+  reason: string
+  status: string
+  handle_note: string
+  handler_name: string
+  handled_at: string | null
+  created_at: string
+}
+
+export interface ReviewQueue {
+  position: number
+  total: number
+  prev_id: string
+  next_id: string
+}
+
+export interface NotificationLog {
+  id: string
+  user_name: string
+  user_account: string
+  channel: string
+  title: string
+  content: string
+  status: string
+  source_type: string
+  sent_at: string | null
+  created_at: string
+}
+
 export interface ProctorRoom {
   exam_id: string
   title: string

@@ -1,5 +1,11 @@
 import { apiListRequest, apiRequest, toQuery } from './client'
-import type { AuditLog, ListResult, NotificationTemplate, SystemOverview } from '../types'
+import type {
+  AuditLog,
+  ListResult,
+  NotificationLog,
+  NotificationTemplate,
+  SystemOverview,
+} from '../types'
 
 export interface AuditLogParams {
   action?: string
@@ -21,4 +27,28 @@ export function getSystemOverview(): Promise<SystemOverview> {
 
 export function listNotificationTemplates(): Promise<NotificationTemplate[]> {
   return apiRequest<NotificationTemplate[]>('/notification-templates')
+}
+
+export interface NotificationTemplatePatch {
+  title_tpl?: string
+  content_tpl?: string
+  enabled?: boolean
+}
+
+export function updateNotificationTemplate(id: string, patch: NotificationTemplatePatch): Promise<NotificationTemplate> {
+  return apiRequest<NotificationTemplate>(`/notification-templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  })
+}
+
+export interface NotificationLogParams {
+  status?: string
+  keyword?: string
+  page?: number
+  page_size?: number
+}
+
+export function listNotificationLogs(params: NotificationLogParams = {}): Promise<ListResult<NotificationLog>> {
+  return apiListRequest<NotificationLog>(`/notification-logs${toQuery(params)}`)
 }

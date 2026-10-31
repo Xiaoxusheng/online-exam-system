@@ -82,7 +82,7 @@ export async function refreshSession(): Promise<boolean> {
 async function send(path: string, init: RequestInit = {}, retried = false): Promise<Response> {
   const headers = new Headers(init.headers)
   const token = useAuthStore.getState().token
-  if (init.body && !headers.has('Content-Type')) {
+  if (init.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
   if (token) {
@@ -152,4 +152,40 @@ export function apiSocketUrl(path: string): string {
   const url = new URL(`${target}/api/v1${path}`)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   return url.toString()
+}
+
+/** POST a multipart form (Excel import). The browser owns the Content-Type boundary. */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  const response = await send(path, { method: 'POST', body: form })
+  const payload = (await response.json()) as ApiEnvelope<T>
+  return payload.data
+}
+
+/** GET a binary attachment and hand it to the browser as a download. */
+export async function apiDownload(path: string, fallbackName: string): Promise<void> {
+  const response = await send(path, { method: 'GET' })
+  const name = dispositionName(response.headers.get('Content-Disposition')) ?? fallbackName
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = name
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
+function dispositionName(header: string | null): string | null {
+  if (!header) return null
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1])
+    } catch {
+      return null
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header)
+  return plain?.[1] ?? null
 }

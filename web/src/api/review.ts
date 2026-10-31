@@ -1,5 +1,5 @@
 import { apiListRequest, apiRequest, toQuery } from './client'
-import type { ListResult, ReviewSubmitResult, ReviewTask, ReviewTaskDetail } from '../types'
+import type { ListResult, ReviewQueue, ReviewSubmitResult, ReviewTask, ReviewTaskDetail } from '../types'
 
 export interface ReviewListParams {
   status?: string
@@ -21,4 +21,9 @@ export function submitReview(id: string, score: number, comment: string): Promis
     method: 'POST',
     body: JSON.stringify({ score, comment }),
   })
+}
+
+/** Position and neighbours of a task inside the queue the reviewer is currently browsing. */
+export function getReviewQueue(id: string, params: Omit<ReviewListParams, 'page' | 'page_size'> = {}): Promise<ReviewQueue> {
+  return apiRequest<ReviewQueue>(`/review-tasks/${id}/neighbors${toQuery(params)}`)
 }

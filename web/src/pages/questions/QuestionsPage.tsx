@@ -2,11 +2,19 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Button, Card, Form, Input, Modal, Select, Space, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { DownloadOutlined, ImportOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
 import QuestionEditor from './QuestionEditor'
-import { createBank, listBanks, listQuestions, publishQuestion, type QuestionListParams } from '../../api/question'
+import QuestionImportModal from '../../components/QuestionImportModal'
+import {
+  createBank,
+  exportQuestions,
+  listBanks,
+  listQuestions,
+  publishQuestion,
+  type QuestionListParams,
+} from '../../api/question'
 import { queryKeys } from '../../api/queryKeys'
 import { useAuthStore } from '../../stores/auth'
 import { difficultyLabel, questionStatusLabels, questionTypeLabel, statusOf } from '../../utils/labels'
@@ -41,6 +49,7 @@ export default function QuestionsPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<Question | null>(null)
   const [bankOpen, setBankOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [bankForm] = Form.useForm<{ name: string; scope?: string }>()
 
   const banksQuery = useQuery({ queryKey: queryKeys.banks, queryFn: listBanks })
@@ -66,6 +75,19 @@ export default function QuestionsPage() {
       queryClient.invalidateQueries({ queryKey: ['question'] })
       message.success('题目已发布，可被试卷引用')
     },
+    onError: (error) => message.error(errorText(error)),
+  })
+
+  const exportMutation = useMutation({
+    mutationFn: () =>
+      exportQuestions({
+        bank_id: query.bank_id,
+        type: query.type,
+        difficulty: query.difficulty,
+        status: query.status,
+        keyword: query.keyword,
+      }),
+    onSuccess: () => message.success('已开始下载题目文件'),
     onError: (error) => message.error(errorText(error)),
   })
 
@@ -149,6 +171,12 @@ export default function QuestionsPage() {
         subtitle="维护题目、知识点与版本；已发布题目修改后会生成新版本，不影响历史试卷。"
         extra={
           <Space>
+            <Button icon={<DownloadOutlined />} loading={exportMutation.isPending} onClick={() => exportMutation.mutate()}>
+              导出
+            </Button>
+            <Button icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>
+              批量导入
+            </Button>
             <Button icon={<PlusOutlined />} onClick={() => setBankOpen(true)}>
               新建题库
             </Button>
@@ -267,6 +295,16 @@ export default function QuestionsPage() {
         onClose={() => {
           setEditorOpen(false)
           setEditing(null)
+        }}
+      />
+
+      <QuestionImportModal
+        open={importOpen}
+        banks={banksQuery.data ?? []}
+        onClose={() => setImportOpen(false)}
+        onImported={() => {
+          queryClient.invalidateQueries({ queryKey: ['question', 'list'] })
+          queryClient.invalidateQueries({ queryKey: queryKeys.banks })
         }}
       />
 

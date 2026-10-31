@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Alert, Button, Descriptions, Drawer, Input, InputNumber, Space, Spin, Tag } from 'antd'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import type { ReviewSubmitResult } from '../../types'
 import QueryError from '../../components/QueryError'
 import { CandidateAnswer, QuestionContent, ReferenceAnswer } from '../../components/QuestionView'
-import { getReviewTask, submitReview } from '../../api/review'
+import { getReviewQueue, getReviewTask, submitReview } from '../../api/review'
 import { queryKeys } from '../../api/queryKeys'
 import { formatScore } from '../../utils/format'
 import { errorText } from '../../utils/errors'
@@ -13,7 +14,15 @@ import { questionTypeLabel } from '../../utils/labels'
 
 const roundNames: Record<number, string> = { 1: '一评', 2: '二评', 3: '仲裁' }
 
-export default function ReviewDrawer({ taskId, onClose }: { taskId: string | null; onClose: () => void }) {
+interface Props {
+  taskId: string | null
+  /** Same status filter as the surrounding list so 上一份/下一份 follows what the reviewer sees. */
+  status: string
+  onClose: () => void
+  onNavigate: (taskId: string) => void
+}
+
+export default function ReviewDrawer({ taskId, status, onClose, onNavigate }: Props) {
   const queryClient = useQueryClient()
   const [score, setScore] = useState<number | null>(null)
   const [comment, setComment] = useState('')
@@ -25,12 +34,21 @@ export default function ReviewDrawer({ taskId, onClose }: { taskId: string | nul
     enabled: Boolean(taskId),
   })
 
+  const queueQuery = useQuery({
+    queryKey: queryKeys.reviewQueue(taskId ?? '', { status }),
+    queryFn: () => getReviewQueue(taskId ?? '', { status }),
+    enabled: Boolean(taskId),
+    staleTime: 30_000,
+  })
+  const queue = queueQuery.data
+
   const mutation = useMutation({
     mutationFn: (values: { score: number; comment: string }) => submitReview(taskId ?? '', values.score, values.comment),
     onSuccess: (data) => {
       setResult(data)
       queryClient.invalidateQueries({ queryKey: ['review'] })
       queryClient.invalidateQueries({ queryKey: ['score'] })
+      queryClient.invalidateQueries({ queryKey: ['notification'] })
     },
   })
 
@@ -38,6 +56,11 @@ export default function ReviewDrawer({ taskId, onClose }: { taskId: string | nul
     setScore(null)
     setComment('')
     setResult(null)
+  }
+
+  function goTo(nextTaskId: string) {
+    reset()
+    onNavigate(nextTaskId)
   }
 
   const detail = detailQuery.data
@@ -54,6 +77,20 @@ export default function ReviewDrawer({ taskId, onClose }: { taskId: string | nul
         reset()
         onClose()
       }}
+      footer={
+        <div className="review-nav">
+          <Button icon={<LeftOutlined />} disabled={!queue?.prev_id} onClick={() => queue?.prev_id && goTo(queue.prev_id)}>
+            上一份
+          </Button>
+          <span className="review-nav-position">
+            {queue && queue.total > 0 ? `第 ${queue.position} / ${queue.total} 份${status === 'pending' ? '（待办队列）' : ''}` : '队列位置未知'}
+          </span>
+          <Button disabled={!queue?.next_id} onClick={() => queue?.next_id && goTo(queue.next_id)}>
+            下一份
+            <RightOutlined />
+          </Button>
+        </div>
+      }
       extra={
         result ? (
           <Button onClick={() => { reset(); onClose() }}>完成</Button>
@@ -215,6 +252,13 @@ export default function ReviewDrawer({ taskId, onClose }: { taskId: string | nul
                 该答卷仍有 {result.pending_review} 题待阅卷；当前总分 {formatScore(result.attempt_total, 2)} 分。
               </p>
               {result.next_task_id && <p>下一轮任务已自动分配给其他阅卷教师。</p>}
+              {queue?.next_id ? (
+                <Button type="primary" size="small" className="review-next-button" onClick={() => goTo(queue.next_id)}>
+                  继续批阅下一份
+                </Button>
+              ) : (
+                <p className="cell-meta">当前队列已经没有下一份了。</p>
+              )}
             </>
           }
         />

@@ -105,6 +105,76 @@ check(Boolean(refreshed.token) && refreshed.token !== 'expired-on-purpose', 'the
   tokenPrefix: String(refreshed.token).slice(0, 12),
 })
 
+// --------------------------------------------------------------- v1.0 功能巡检（导入导出 / 分析 / 更正 / 批阅）
+await page.goto(`${BASE}/questions`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(1200)
+await page.click('button:has-text("批量导入")')
+await page.waitForTimeout(700)
+check((await page.locator('.drop-zone').count()) === 1, '题库页可打开批量导入弹窗')
+const templateDownload = page.waitForEvent('download', { timeout: 15_000 })
+await page.click('button:has-text("下载模板")')
+const downloaded = await templateDownload.catch(() => null)
+check(Boolean(downloaded) && downloaded.suggestedFilename().includes('题目导入模板'), '模板下载带中文文件名', {
+  name: downloaded?.suggestedFilename?.(),
+})
+await page.keyboard.press('Escape')
+await page.waitForTimeout(400)
+const exportButton = await page.locator('button:has-text("导出")').count()
+check(exportButton > 0, '题库页提供导出入口')
+
+await page.goto(`${BASE}/analytics`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(1800)
+const examSelected = (await page.locator('.analytics-tabs').count()) > 0
+check(examSelected, '数据分析页渲染页签工作区')
+if (examSelected) {
+  await page.click('.analytics-tabs .ant-tabs-tab:has-text("题目分析")')
+  await page.waitForTimeout(1400)
+  const itemRows = await page.locator('.analytics-tabs .ant-tabs-tabpane-active .ant-table-row').count()
+  check(itemRows > 0, '题目分析列出逐题统计', { itemRows })
+  check((await page.locator('.analytics-tabs .ant-tabs-tabpane-active .rate-bar').count()) > 0, '题目分析渲染正确率/得分率进度条')
+  await page.click('.analytics-tabs .ant-tabs-tab:has-text("知识点分析")')
+  await page.waitForTimeout(1400)
+  const knowledgeRows = await page.locator('.analytics-tabs .ant-tabs-tabpane-active .ant-table-row').count()
+  check(knowledgeRows > 0, '知识点分析列出掌握度', { knowledgeRows })
+  check((await page.locator('.analytics-tabs .ant-tabs-tabpane-active .ant-tag').count()) > 0, '知识点显示掌握度标签')
+}
+
+await page.goto(`${BASE}/scores`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(1500)
+const scoreRow = page.locator('.ant-table-row').first()
+if (await scoreRow.count()) {
+  await scoreRow.locator('button:has-text("明细")').click()
+  await page.waitForTimeout(1300)
+  check((await page.locator('.adjust-box').count()) === 1, '成绩明细抽屉提供更正面板')
+  check((await page.locator('.ant-drawer .ant-table-row').count()) > 0, '成绩明细列出逐题得分')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+}
+check((await page.locator('.ant-tabs-tab:has-text("申诉管理")').count()) === 1, '成绩管理提供申诉处理页签')
+await page.click('.ant-tabs-tab:has-text("申诉管理")')
+await page.waitForTimeout(1200)
+check((await page.locator('.ant-tabs-tabpane-active .ant-table').count()) > 0, '申诉列表正常渲染')
+
+await page.goto(`${BASE}/review`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(1500)
+const reviewRow = page.locator('.ant-table-row').first()
+if (await reviewRow.count()) {
+  await reviewRow.locator('button').last().click()
+  await page.waitForTimeout(1400)
+  check((await page.locator('.review-nav').count()) === 1, '阅卷抽屉提供连续批阅导航')
+  const position = await page.locator('.review-nav-position').innerText().catch(() => '')
+  check(position.includes('第'), '阅卷抽屉显示队列位置', { position })
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+}
+
+await page.goto(`${BASE}/system/notifications`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(1400)
+check((await page.locator('button:has-text("编辑")').count()) > 0, '通知模板支持编辑')
+await page.click('.ant-tabs-tab:has-text("发送记录")')
+await page.waitForTimeout(1400)
+check((await page.locator('.ant-tabs-tabpane-active .ant-table-row').count()) > 0, '发送记录列出投递台账')
+
 // Logout must end the session and return to the login screen.
 await page.click('.user-chip')
 await page.waitForTimeout(400)

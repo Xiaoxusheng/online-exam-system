@@ -1,4 +1,4 @@
-import { apiListRequest, apiRequest, toQuery } from './client'
+import { apiDownload, apiListRequest, apiRequest, apiUpload, toQuery } from './client'
 import type { ListResult, Question, QuestionBank } from '../types'
 
 export interface QuestionListParams {
@@ -50,4 +50,37 @@ export function updateQuestion(id: string, input: QuestionPatch): Promise<Questi
 
 export function publishQuestion(id: string): Promise<Question> {
   return apiRequest<Question>(`/questions/${id}/publish`, { method: 'POST' })
+}
+
+export interface ImportReportRow {
+  line: number
+  stem: string
+  status: string
+  message: string
+}
+
+export interface ImportResult {
+  bank_id: string
+  bank_name: string
+  total: number
+  created: number
+  published: number
+  skipped: number
+  failed: number
+  report: ImportReportRow[]
+}
+
+export function downloadQuestionTemplate(): Promise<void> {
+  return apiDownload('/questions/import-template', '题目导入模板.xlsx')
+}
+
+export function exportQuestions(params: Omit<QuestionListParams, 'page' | 'page_size'> = {}): Promise<void> {
+  return apiDownload(`/questions/export${toQuery(params)}`, '题目导出.xlsx')
+}
+
+export function importQuestions(bankId: string, file: File): Promise<ImportResult> {
+  const form = new FormData()
+  form.append('bank_id', bankId)
+  form.append('file', file, file.name)
+  return apiUpload<ImportResult>('/questions/import', form)
 }

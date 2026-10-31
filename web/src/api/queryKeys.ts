@@ -25,12 +25,18 @@ export const queryKeys = {
   attempt: (attemptId: string) => ['student', 'attempt', attemptId] as const,
   myScores: ['student', 'my-scores'] as const,
 
-  reviewTasks: (params: KeyParams) => ['review', 'list', params] as const,
-  reviewTask: (taskId: string) => ['review', 'detail', taskId] as const,
-
   scores: (params: KeyParams) => ['score', 'list', params] as const,
   scoreRecord: (attemptId: string) => ['score', 'record', attemptId] as const,
+  scoreAdjustments: (attemptId: string) => ['score', 'adjustments', attemptId] as const,
   analytics: (examId: string) => ['score', 'analytics', examId] as const,
+  itemAnalytics: (examId: string) => ['score', 'analytics', examId, 'items'] as const,
+  knowledgeAnalytics: (examId?: string) => ['analytics', 'knowledge', examId ?? 'all'] as const,
+  appeals: (params: KeyParams) => ['appeal', 'list', params] as const,
+  myAppeals: ['appeal', 'mine'] as const,
+
+  reviewTasks: (params: KeyParams) => ['review', 'list', params] as const,
+  reviewTask: (taskId: string) => ['review', 'detail', taskId] as const,
+  reviewQueue: (taskId: string, params: KeyParams) => ['review', 'queue', taskId, params] as const,
 
   proctorRooms: ['proctor', 'rooms'] as const,
   proctorOverview: (examId: string) => ['proctor', 'overview', examId] as const,
@@ -38,6 +44,7 @@ export const queryKeys = {
 
   notifications: (params: KeyParams) => ['notification', 'list', params] as const,
   notificationTemplates: ['notification', 'templates'] as const,
+  notificationLogs: (params: KeyParams) => ['notification', 'logs', params] as const,
 
   auditLogs: (params: KeyParams) => ['system', 'audit-logs', params] as const,
   systemOverview: ['system', 'overview'] as const,
