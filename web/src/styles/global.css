@@ -735,6 +735,64 @@ body {
   color: var(--app-text-tertiary);
 }
 
+.cell-ellipsis {
+  display: block;
+  max-width: 460px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Question authoring ---------- */
+
+.option-editor,
+.blank-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.option-row {
+  display: flex;
+  align-items: baseline;
+}
+
+.blank-row,
+.case-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--app-border-soft);
+  border-radius: var(--app-radius);
+}
+
+.case-row > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.option-key {
+  min-width: 40px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--app-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.drawer-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 0 0;
+  margin-top: 8px;
+  background: var(--app-surface);
+  border-top: 1px solid var(--app-border-soft);
+}
+
 .soft-tag.ant-tag {
   margin-inline-end: 0;
   padding: 1px 8px;
