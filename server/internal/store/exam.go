@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -273,7 +274,12 @@ func (s *Store) PublishExam(ctx context.Context, orgID, examID string) (Exam, er
 	notice := fmt.Sprintf("考试时间 %s 至 %s，限时 %d 分钟，请按时参加。",
 		startAt.Format("2006-01-02 15:04"), endAt.Format("2006-01-02 15:04"), duration)
 	if err := notifyMany(ctx, tx, orgID, candidates,
-		fmt.Sprintf("考试发布：%s", examTitle), notice, "exam_publish", examID); err != nil {
+		fmt.Sprintf("考试发布：%s", examTitle), notice, "exam_publish", examID, map[string]string{
+			"exam":     examTitle,
+			"start_at": startAt.Format("2006-01-02 15:04"),
+			"end_at":   endAt.Format("2006-01-02 15:04"),
+			"duration": strconv.Itoa(duration),
+		}); err != nil {
 		return Exam{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {

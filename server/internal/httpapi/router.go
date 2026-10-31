@@ -68,6 +68,8 @@ func (a *API) Router() http.Handler {
 				r.Get("/roles", a.handleRoles)
 				r.Get("/audit-logs", a.handleListAuditLogs)
 				r.Get("/notification-templates", a.handleListNotificationTemplates)
+				r.Put("/notification-templates/{id}", a.handleUpdateNotificationTemplate)
+				r.Get("/notification-logs", a.handleListNotificationLogs)
 				r.Get("/system/overview", a.handleSystemOverview)
 			})
 
@@ -90,6 +92,9 @@ func (a *API) Router() http.Handler {
 				r.Post("/question-banks", a.handleCreateQuestionBank)
 				r.Get("/questions", a.handleListQuestions)
 				r.Post("/questions", a.handleCreateQuestion)
+				r.Get("/questions/export", a.handleQuestionExport)
+				r.Get("/questions/import-template", a.handleQuestionImportTemplate)
+				r.Post("/questions/import", a.handleQuestionImport)
 				r.Get("/questions/{id}", a.handleGetQuestion)
 				r.Put("/questions/{id}", a.handleUpdateQuestion)
 				r.With(a.requireRoles("teacher")).Post("/questions/{id}/publish", a.handlePublishQuestion)
@@ -127,6 +132,8 @@ func (a *API) Router() http.Handler {
 				r.Post("/attempts/{id}/events", a.handleCreateProctorEvent)
 				r.Get("/my/scores", a.handleMyScores)
 				r.Get("/my/scores/{attemptId}", a.handleMyScoreRecord)
+				r.Post("/my/scores/{attemptId}/appeals", a.handleCreateAppeal)
+				r.Get("/my/appeals", a.handleMyAppeals)
 			})
 
 			// Proctoring. Proctors are limited to the exams they are assigned to.
@@ -143,16 +150,28 @@ func (a *API) Router() http.Handler {
 				r.Use(a.requireRoles("reviewer", "exam_admin"))
 				r.Get("/review-tasks", a.handleListReviewTasks)
 				r.Get("/review-tasks/{id}", a.handleGetReviewTask)
+				r.Get("/review-tasks/{id}/neighbors", a.handleReviewTaskNeighbors)
 				r.Post("/review-tasks/{id}/submit", a.handleSubmitReview)
 			})
 
-			// Scores & analytics.
+			// Score corrections and candidate appeals.
 			r.Group(func(r chi.Router) {
 				r.Use(a.requireRoles("exam_admin", "teacher"))
 				r.Get("/scores", a.handleListScores)
+				r.Get("/scores/export", a.handleScoreExport)
 				r.Get("/scores/{attemptId}", a.handleGetScore)
+				r.Get("/scores/{attemptId}/adjustments", a.handleListScoreAdjustments)
 				r.Get("/analytics/exams/{examId}", a.handleExamAnalytics)
+				r.Get("/analytics/exams/{examId}/items", a.handleExamItemAnalytics)
+				r.Get("/analytics/knowledge-points", a.handleKnowledgeAnalytics)
 				r.With(a.requireRoles("exam_admin")).Post("/scores/publish", a.handlePublishScores)
+				r.With(a.requireRoles("exam_admin")).Post("/scores/{attemptId}/adjust", a.handleAdjustScore)
+			})
+
+			r.Group(func(r chi.Router) {
+				r.Use(a.requireRoles("exam_admin"))
+				r.Get("/appeals", a.handleListAppeals)
+				r.Post("/appeals/{id}/handle", a.handleHandleAppeal)
 			})
 		})
 	})

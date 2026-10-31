@@ -55,6 +55,32 @@ func (a *API) handleGetReviewTask(w http.ResponseWriter, r *http.Request) {
 	data(w, http.StatusOK, task)
 }
 
+// handleReviewTaskNeighbors returns the previous/next task of the queue the reviewer is browsing,
+// which is what powers 上一份/下一份 in the grading drawer.
+func (a *API) handleReviewTaskNeighbors(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	taskID, ok := parseUUIDParam(w, pathParam(r, "id"), "阅卷任务 ID")
+	if !ok {
+		return
+	}
+	filter := store.ReviewFilter{
+		Status:     strings.TrimSpace(r.URL.Query().Get("status")),
+		ExamID:     strings.TrimSpace(r.URL.Query().Get("exam_id")),
+		ReviewerID: reviewScope(claims),
+	}
+	if filter.ExamID != "" {
+		if _, ok := parseUUIDParam(w, filter.ExamID, "exam_id"); !ok {
+			return
+		}
+	}
+	queue, err := a.store.ReviewTaskNeighbors(r.Context(), claims.OrgID, filter, taskID)
+	if err != nil {
+		a.storeError(w, r, err, "阅卷任务不存在")
+		return
+	}
+	data(w, http.StatusOK, queue)
+}
+
 type submitReviewRequest struct {
 	Score   *float64 `json:"score"`
 	Comment string   `json:"comment"`

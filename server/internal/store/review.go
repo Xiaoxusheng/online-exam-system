@@ -126,7 +126,11 @@ func isAnonymousReview(rulesRaw []byte) bool {
 	return parsed.AnonymousReview == nil || *parsed.AnonymousReview
 }
 
-func (s *Store) ListReviewTasks(ctx context.Context, orgID string, f ReviewFilter) ([]ReviewTask, int64, error) {
+// reviewQueueOrder must stay identical for the list and the neighbour lookup: tasks created in
+// one transaction share created_at, so without the id tiebreaker the two queries disagree.
+const reviewQueueOrder = `ORDER BY rt.created_at, rt.round, rt.id`
+
+func reviewTaskWhere(orgID string, f ReviewFilter) (string, []any) {
 	where := []string{"e.org_id = $1"}
 	args := []any{orgID}
 	if f.Status != "" {
@@ -142,8 +146,6 @@ func (s *Store) ListReviewTasks(ctx context.Context, orgID string, f ReviewFilte
 		args = append(args, f.ReviewerID)
 		where = append(where, fmt.Sprintf("(rt.reviewer_id = $%d::uuid OR rt.reviewer_id IS NULL)", len(args)))
 	}
-	whereSQL := strings.Join(where, " AND ")
-
 	base := `
 		FROM review_tasks rt
 		JOIN attempts a ON a.id = rt.attempt_id
@@ -151,7 +153,12 @@ func (s *Store) ListReviewTasks(ctx context.Context, orgID string, f ReviewFilte
 		JOIN users u ON u.id = a.user_id
 		JOIN questions q ON q.id = rt.question_id
 		LEFT JOIN users ru ON ru.id = rt.reviewer_id
-		WHERE ` + whereSQL
+		WHERE ` + strings.Join(where, " AND ")
+	return base, args
+}
+
+func (s *Store) ListReviewTasks(ctx context.Context, orgID string, f ReviewFilter) ([]ReviewTask, int64, error) {
+	base, args := reviewTaskWhere(orgID, f)
 
 	var total int64
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) `+base, args...).Scan(&total); err != nil {
@@ -164,7 +171,7 @@ func (s *Store) ListReviewTasks(ctx context.Context, orgID string, f ReviewFilte
 			rt.question_id::text, q.type, rt.round::int, rt.status, COALESCE(rt.reviewer_id::text, ''),
 			COALESCE(ru.name, ''), rt.score::float8, rt.comment, rt.created_at, rt.updated_at, e.rules
 		`+base+`
-		ORDER BY rt.created_at, rt.round
+		`+reviewQueueOrder+`
 		LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list review tasks: %w", err)
@@ -191,6 +198,57 @@ func (s *Store) ListReviewTasks(ctx context.Context, orgID string, f ReviewFilte
 
 // GetReviewTaskDetail loads one task with every review round of the same question.
 // reviewerID restricts plain reviewers to their own (or claimable) tasks; pass "" for administrators.
+// ReviewQueue is the sequential position of one task inside the queue a reviewer is browsing,
+// which lets the drawer offer 上一份/下一份 without re-fetching the whole list.
+type ReviewQueue struct {
+	Position int    `json:"position"`
+	Total    int    `json:"total"`
+	PrevID   string `json:"prev_id"`
+	NextID   string `json:"next_id"`
+}
+
+func (s *Store) ReviewTaskNeighbors(ctx context.Context, orgID string, f ReviewFilter, taskID string) (ReviewQueue, error) {
+	base, args := reviewTaskWhere(orgID, f)
+	args = append(args, reviewQueueScanLimit)
+	rows, err := s.pool.Query(ctx, `SELECT rt.id::text `+base+`
+		`+reviewQueueOrder+`
+		LIMIT $`+fmt.Sprint(len(args)), args...)
+	if err != nil {
+		return ReviewQueue{}, fmt.Errorf("load review queue: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make([]string, 0, 64)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return ReviewQueue{}, fmt.Errorf("scan review queue: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return ReviewQueue{}, fmt.Errorf("iterate review queue: %w", err)
+	}
+
+	queue := ReviewQueue{Total: len(ids)}
+	for index, id := range ids {
+		if id != taskID {
+			continue
+		}
+		queue.Position = index + 1
+		if index > 0 {
+			queue.PrevID = ids[index-1]
+		}
+		if index+1 < len(ids) {
+			queue.NextID = ids[index+1]
+		}
+		return queue, nil
+	}
+	return ReviewQueue{}, ErrNotFound
+}
+
+const reviewQueueScanLimit = 2000
+
 func (s *Store) GetReviewTaskDetail(ctx context.Context, orgID, taskID, reviewerID string) (ReviewTaskDetail, error) {
 	var detail ReviewTaskDetail
 	var rulesRaw []byte

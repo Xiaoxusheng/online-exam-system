@@ -235,7 +235,9 @@ func (s *Store) PublishScores(ctx context.Context, orgID, examID string) (int64,
 	}
 	for _, item := range published {
 		content := fmt.Sprintf("《%s》成绩已公布，得分 %.2f 分。", examTitle, item.total)
-		if _, err := notifyUser(ctx, tx, orgID, item.userID, "成绩发布", content, "score_publish", examID); err != nil {
+		if _, err := notifyUser(ctx, tx, orgID, item.userID, "成绩发布", content, "score_publish", examID, map[string]string{
+			"exam": examTitle, "total": fmt.Sprintf("%.2f", item.total),
+		}); err != nil {
 			return 0, err
 		}
 	}
