@@ -30,6 +30,8 @@ export interface User {
 export interface LoginResult {
   token: string
   expires_at: string
+  refresh_token: string
+  refresh_expires_at: string
   user: User
 }
 

@@ -1,6 +1,6 @@
 import { queryClient } from '../app/queryClient'
 import { useAuthStore } from '../stores/auth'
-import type { ListResult, Pagination } from '../types'
+import type { ListResult, LoginResult, Pagination } from '../types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
@@ -36,7 +36,50 @@ export function toQuery<T extends object>(params: T): string {
   return query ? `?${query}` : ''
 }
 
-async function send(path: string, init: RequestInit = {}): Promise<Response> {
+function endSession() {
+  useAuthStore.getState().clear()
+  queryClient.clear()
+}
+
+let refreshInFlight: Promise<boolean> | null = null
+
+/**
+ * Exchanges the stored refresh token for a new session. Concurrent 401s share one
+ * request so a page with several queries does not rotate the token multiple times
+ * (the second rotation would look like token reuse and revoke the session).
+ */
+export async function refreshSession(): Promise<boolean> {
+  const refreshToken = useAuthStore.getState().refreshToken
+  if (!refreshToken) return false
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        })
+        if (!response.ok) return false
+        const payload = (await response.json()) as ApiEnvelope<LoginResult>
+        useAuthStore.getState().setSession({
+          token: payload.data.token,
+          expiresAt: payload.data.expires_at,
+          refreshToken: payload.data.refresh_token,
+          refreshExpiresAt: payload.data.refresh_expires_at,
+          user: payload.data.user,
+        })
+        return true
+      } catch {
+        return false
+      } finally {
+        refreshInFlight = null
+      }
+    })()
+  }
+  return refreshInFlight
+}
+
+async function send(path: string, init: RequestInit = {}, retried = false): Promise<Response> {
   const headers = new Headers(init.headers)
   const token = useAuthStore.getState().token
   if (init.body && !headers.has('Content-Type')) {
@@ -53,9 +96,12 @@ async function send(path: string, init: RequestInit = {}): Promise<Response> {
     throw new ApiError(0, 'NETWORK_ERROR', '网络连接失败，请检查网络后重试')
   }
 
-  if (response.status === 401 && path !== '/auth/login') {
-    useAuthStore.getState().clear()
-    queryClient.clear()
+  const isAuthCall = path.startsWith('/auth/')
+  if (response.status === 401 && !retried && !isAuthCall) {
+    if (await refreshSession()) {
+      return send(path, init, true)
+    }
+    endSession()
   }
 
   if (!response.ok) {
@@ -64,6 +110,9 @@ async function send(path: string, init: RequestInit = {}): Promise<Response> {
       detail = ((await response.json()) as ApiErrorEnvelope).error
     } catch {
       detail = undefined
+    }
+    if (response.status === 401 || (response.status === 403 && detail?.code === 'ACCOUNT_DISABLED')) {
+      endSession()
     }
     throw new ApiError(
       response.status,

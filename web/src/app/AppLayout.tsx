@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import {
   App,
   Avatar,
@@ -48,6 +48,7 @@ export default function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   const user = useAuthStore((state) => state.user)
+  const token = useAuthStore((state) => state.token)
   const setUser = useAuthStore((state) => state.setUser)
   const clear = useAuthStore((state) => state.clear)
 
@@ -97,6 +98,7 @@ export default function AppLayout() {
   const notificationsQuery = useQuery({
     queryKey: queryKeys.notifications({ page: 1, page_size: 6 }),
     queryFn: () => listNotifications(1, 6),
+    enabled: Boolean(token),
   })
   const notices = notificationsQuery.data?.items ?? []
   const hasUnread = notices.some((item) => item.status !== 'read')
@@ -119,7 +121,7 @@ export default function AppLayout() {
   const handleUserMenuClick: MenuProps['onClick'] = async ({ key }) => {
     if (key !== 'logout') return
     try {
-      await logout()
+      await logout(useAuthStore.getState().refreshToken ?? undefined)
     } catch {
       // Logout is best effort; the local session is cleared regardless.
     }
@@ -292,7 +294,15 @@ export default function AppLayout() {
 
         <Content className="app-content">
           <div className="content-inner" key={location.pathname}>
-            <Outlet />
+            <Suspense
+              fallback={
+                <div className="route-loading">
+                  <Spin />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </div>
         </Content>
       </Layout>

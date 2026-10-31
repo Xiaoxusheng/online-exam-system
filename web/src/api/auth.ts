@@ -12,6 +12,9 @@ export function fetchMe(): Promise<User> {
   return apiRequest<User>('/auth/me')
 }
 
-export function logout(): Promise<void> {
-  return apiRequest<void>('/auth/logout', { method: 'POST' })
+export function logout(refreshToken?: string): Promise<void> {
+  return apiRequest<void>('/auth/logout', {
+    method: 'POST',
+    body: refreshToken ? JSON.stringify({ refresh_token: refreshToken }) : undefined,
+  })
 }

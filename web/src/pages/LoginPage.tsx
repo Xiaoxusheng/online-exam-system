@@ -45,7 +45,13 @@ export default function LoginPage() {
   const mutation = useMutation({
     mutationFn: (values: LoginForm) => login(values.account.trim(), values.password),
     onSuccess: (result) => {
-      setSession({ token: result.token, expiresAt: result.expires_at, user: result.user })
+      setSession({
+        token: result.token,
+        expiresAt: result.expires_at,
+        refreshToken: result.refresh_token,
+        refreshExpiresAt: result.refresh_expires_at,
+        user: result.user,
+      })
       message.success(`欢迎回来，${result.user.name}`)
       navigate(redirectTarget, { replace: true })
     },

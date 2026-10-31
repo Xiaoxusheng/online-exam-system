@@ -1000,6 +1000,17 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.route-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+.route-loading-full {
+  min-height: 100vh;
+}
+
 .socket-badge {
   margin-left: 16px;
 }

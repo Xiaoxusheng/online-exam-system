@@ -1,26 +1,29 @@
-import type { ReactNode } from 'react'
+import { lazy, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import AppLayout from './AppLayout'
 import RequireAuth from './RequireAuth'
 import RequireRole from './RequireRole'
-import DashboardPage from '../pages/DashboardPage'
 import LoginPage from '../pages/LoginPage'
 import NotFoundPage from '../pages/NotFoundPage'
-import NotificationsPage from '../pages/NotificationsPage'
-import QuestionsPage from '../pages/questions/QuestionsPage'
-import PapersPage from '../pages/papers/PapersPage'
-import ExamsPage from '../pages/exams/ExamsPage'
-import ReviewPage from '../pages/review/ReviewPage'
-import ScoresPage from '../pages/scores/ScoresPage'
-import AnalyticsPage from '../pages/analytics/AnalyticsPage'
-import ProctorPage from '../pages/proctor/ProctorPage'
-import MyExamsPage from '../pages/student/MyExamsPage'
-import MyScoresPage from '../pages/student/MyScoresPage'
-import AttemptPage from '../pages/student/AttemptPage'
-import UsersPage from '../pages/system/UsersPage'
-import OrgsPage from '../pages/system/OrgsPage'
-import AuditLogsPage from '../pages/system/AuditLogsPage'
-import NotificationSettingsPage from '../pages/system/NotificationSettingsPage'
+
+// Every workspace page is split into its own chunk: the login screen and the shell
+// stay small, and a role only downloads the pages it can open.
+const DashboardPage = lazy(() => import('../pages/DashboardPage'))
+const NotificationsPage = lazy(() => import('../pages/NotificationsPage'))
+const QuestionsPage = lazy(() => import('../pages/questions/QuestionsPage'))
+const PapersPage = lazy(() => import('../pages/papers/PapersPage'))
+const ExamsPage = lazy(() => import('../pages/exams/ExamsPage'))
+const ReviewPage = lazy(() => import('../pages/review/ReviewPage'))
+const ScoresPage = lazy(() => import('../pages/scores/ScoresPage'))
+const AnalyticsPage = lazy(() => import('../pages/analytics/AnalyticsPage'))
+const ProctorPage = lazy(() => import('../pages/proctor/ProctorPage'))
+const MyExamsPage = lazy(() => import('../pages/student/MyExamsPage'))
+const MyScoresPage = lazy(() => import('../pages/student/MyScoresPage'))
+const AttemptPage = lazy(() => import('../pages/student/AttemptPage'))
+const UsersPage = lazy(() => import('../pages/system/UsersPage'))
+const OrgsPage = lazy(() => import('../pages/system/OrgsPage'))
+const AuditLogsPage = lazy(() => import('../pages/system/AuditLogsPage'))
+const NotificationSettingsPage = lazy(() => import('../pages/system/NotificationSettingsPage'))
 
 function guarded(path: string, element: ReactNode) {
   return <RequireRole path={path}>{element}</RequireRole>
