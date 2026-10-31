@@ -32,6 +32,7 @@ export const queryKeys = {
   scoreRecord: (attemptId: string) => ['score', 'record', attemptId] as const,
   analytics: (examId: string) => ['score', 'analytics', examId] as const,
 
+  proctorRooms: ['proctor', 'rooms'] as const,
   proctorOverview: (examId: string) => ['proctor', 'overview', examId] as const,
   proctorEvents: (examId: string, params: KeyParams) => ['proctor', 'events', examId, params] as const,
 

@@ -1,11 +1,15 @@
 import { apiListRequest, apiRequest, apiSocketUrl, toQuery } from './client'
-import type { ListResult, ProctorEvent, ProctorOverview } from '../types'
+import type { ListResult, ProctorEvent, ProctorOverview, ProctorRoom } from '../types'
 
 export interface ProctorEventParams {
   level?: string
   handled?: string
   page?: number
   page_size?: number
+}
+
+export function listProctorRooms(): Promise<ProctorRoom[]> {
+  return apiRequest<ProctorRoom[]>('/proctor/exams')
 }
 
 export function getProctorOverview(examId: string): Promise<ProctorOverview> {

@@ -13,19 +13,14 @@ import ExamsPage from '../pages/exams/ExamsPage'
 import ReviewPage from '../pages/review/ReviewPage'
 import ScoresPage from '../pages/scores/ScoresPage'
 import AnalyticsPage from '../pages/analytics/AnalyticsPage'
+import ProctorPage from '../pages/proctor/ProctorPage'
 import UsersPage from '../pages/system/UsersPage'
 import OrgsPage from '../pages/system/OrgsPage'
 import AuditLogsPage from '../pages/system/AuditLogsPage'
 import NotificationSettingsPage from '../pages/system/NotificationSettingsPage'
-import ModulePage from '../pages/ModulePage'
-import { moduleMeta, type ModuleKey } from '../pages/moduleMeta'
 
 function guarded(path: string, element: ReactNode) {
   return <RequireRole path={path}>{element}</RequireRole>
-}
-
-function skeleton(path: string, key: ModuleKey) {
-  return guarded(path, <ModulePage meta={moduleMeta[key]} />)
 }
 
 export default function AppRoutes() {
@@ -44,7 +39,7 @@ export default function AppRoutes() {
         <Route path="questions" element={guarded('/questions', <QuestionsPage />)} />
         <Route path="papers" element={guarded('/papers', <PapersPage />)} />
         <Route path="exams" element={guarded('/exams', <ExamsPage />)} />
-        <Route path="proctor" element={skeleton('/proctor', 'proctor')} />
+        <Route path="proctor" element={guarded('/proctor', <ProctorPage />)} />
         <Route path="review" element={guarded('/review', <ReviewPage />)} />
         <Route path="scores" element={guarded('/scores', <ScoresPage />)} />
         <Route path="analytics" element={guarded('/analytics', <AnalyticsPage />)} />

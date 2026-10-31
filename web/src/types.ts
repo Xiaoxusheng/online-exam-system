@@ -372,6 +372,17 @@ export interface ExamAnalytics {
   distribution: ScoreBucket[]
 }
 
+export interface ProctorRoom {
+  exam_id: string
+  title: string
+  status: string
+  start_at: string
+  end_at: string
+  duration_minutes: number
+  candidates: number
+  assigned: boolean
+}
+
 export interface ProctorEvent {
   id: number
   exam_id: string

@@ -1000,6 +1000,37 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.socket-badge {
+  margin-left: 16px;
+}
+
+.live-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.live-title {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 600;
+  color: var(--app-text-secondary);
+}
+
+.live-item {
+  color: var(--app-text-secondary);
+}
+
+.live-time {
+  margin-right: 6px;
+  font-size: 12px;
+  color: var(--app-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
 .review-block {
   margin-bottom: 20px;
 }

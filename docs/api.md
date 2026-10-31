@@ -263,6 +263,7 @@
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
+| GET | `/proctor/exams` | 我可监考的考场列表：已分配的全部场次 + 未分配的进行中场次；考务/超管不受名单限制 |
 | GET | `/proctor/exams/{examId}/overview` | 候考/考试中/已交卷/缺考、在线数、未处置告警 |
 | GET | `/proctor/exams/{examId}/events` | 事件列表；支持 `level`、`handled`、分页 |
 | POST | `/proctor/events/{eventId}/handle` | 处置事件；请求 `{"action":"warning","note":"..."}` |

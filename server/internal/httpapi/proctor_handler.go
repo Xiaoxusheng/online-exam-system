@@ -33,6 +33,16 @@ func (a *API) canWatchExam(w http.ResponseWriter, r *http.Request, claims *auth.
 	return true
 }
 
+func (a *API) handleProctorRooms(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	rooms, err := a.store.ListProctorRooms(r.Context(), claims.OrgID, claims.Subject, claims.Role != "proctor")
+	if err != nil {
+		a.storeError(w, r, err, "暂无可监考的考试")
+		return
+	}
+	data(w, http.StatusOK, rooms)
+}
+
 func (a *API) handleProctorOverview(w http.ResponseWriter, r *http.Request) {
 	claims, _ := claimsFrom(r.Context())
 	examID, ok := parseUUIDParam(w, pathParam(r, "examId"), "考试 ID")

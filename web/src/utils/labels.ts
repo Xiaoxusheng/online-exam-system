@@ -108,6 +108,14 @@ export const proctorEventTypeLabels: Record<string, string> = {
   face_missing: '人脸缺失',
 }
 
+export const proctorActionLabels: Record<string, string> = {
+  warning: '口头警告',
+  warn_and_watch: '警告并重点观察',
+  mark_cheating: '标记疑似违规',
+  force_submit: '强制交卷',
+  ignore: '忽略（误报）',
+}
+
 export const auditActionLabels: Record<string, string> = {
   'auth.login': '登录系统',
   'auth.logout': '退出登录',

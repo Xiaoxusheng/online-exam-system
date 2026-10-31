@@ -208,6 +208,63 @@ func (s *Store) getProctorEvent(ctx context.Context, eventID int64) (ProctorEven
 	return event, nil
 }
 
+// ProctorRoom is one entry in the proctor console list: the exams a proctor may watch.
+type ProctorRoom struct {
+	ExamID         string    `json:"exam_id"`
+	Title          string    `json:"title"`
+	Status         string    `json:"status"`
+	StartAt        time.Time `json:"start_at"`
+	EndAt          time.Time `json:"end_at"`
+	DurationMinute int       `json:"duration_minutes"`
+	Candidates     int64     `json:"candidates"`
+	Assigned       bool      `json:"assigned"`
+}
+
+// ListProctorRooms returns the exams open to a caller. Administrators (unrestricted)
+// see every running exam; a proctor sees the exams they were assigned to plus the
+// exams that have no assignment yet.
+func (s *Store) ListProctorRooms(ctx context.Context, orgID, userID string, unrestricted bool) ([]ProctorRoom, error) {
+	// Assigned rooms keep their history; unassigned rooms only surface while they are live,
+	// so a proctor is not handed every past exam of the organization.
+	scopeSQL := `
+		( EXISTS(SELECT 1 FROM exam_proctors mine WHERE mine.exam_id = e.id AND mine.user_id = $2::uuid)
+			OR ( NOT EXISTS(SELECT 1 FROM exam_proctors any1 WHERE any1.exam_id = e.id)
+				AND e.status IN ('pending_start', 'in_progress') ) )`
+	if unrestricted {
+		// Keep the $2 reference so the simple protocol can type the parameter.
+		scopeSQL = `(1 = 1 OR EXISTS(SELECT 1 FROM exam_proctors mine WHERE mine.exam_id = e.id AND mine.user_id = $2::uuid))`
+	}
+
+	rows, err := s.pool.Query(ctx, `
+		SELECT e.id::text, e.title, e.status, e.start_at, e.end_at, e.duration_minutes,
+			(SELECT count(*) FROM exam_candidates ec WHERE ec.exam_id = e.id),
+			EXISTS(SELECT 1 FROM exam_proctors mine WHERE mine.exam_id = e.id AND mine.user_id = $2::uuid)
+		FROM exams e
+		WHERE e.org_id = $1::uuid
+			AND e.status IN ('pending_start', 'in_progress', 'ended', 'grading')
+			AND `+scopeSQL+`
+		ORDER BY e.start_at DESC
+		LIMIT 50`, orgID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list proctor rooms: %w", err)
+	}
+	defer rows.Close()
+
+	rooms := make([]ProctorRoom, 0, 16)
+	for rows.Next() {
+		var room ProctorRoom
+		if err := rows.Scan(&room.ExamID, &room.Title, &room.Status, &room.StartAt, &room.EndAt,
+			&room.DurationMinute, &room.Candidates, &room.Assigned); err != nil {
+			return nil, fmt.Errorf("scan proctor room: %w", err)
+		}
+		rooms = append(rooms, room)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate proctor rooms: %w", err)
+	}
+	return rooms, nil
+}
+
 func (s *Store) GetProctorOverview(ctx context.Context, orgID, examID string) (ProctorOverview, error) {
 	var exists bool
 	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM exams WHERE id = $1 AND org_id = $2)`, examID, orgID).Scan(&exists); err != nil {

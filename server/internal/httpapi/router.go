@@ -122,6 +122,7 @@ func (a *API) Router() http.Handler {
 			// Proctoring. Proctors are limited to the exams they are assigned to.
 			r.Group(func(r chi.Router) {
 				r.Use(a.requireRoles("proctor", "exam_admin"))
+				r.Get("/proctor/exams", a.handleProctorRooms)
 				r.Get("/proctor/exams/{examId}/overview", a.handleProctorOverview)
 				r.Get("/proctor/exams/{examId}/events", a.handleListProctorEvents)
 				r.Post("/proctor/events/{eventId}/handle", a.handleHandleProctorEvent)
