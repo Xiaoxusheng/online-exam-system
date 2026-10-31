@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+web/node_modules/
+
+# builds
+dist/
+web/dist/
+server/bin/
+*.exe
+*.test
+
+# env & secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# logs & runtime
+*.log
+logs/
+tmp/
+.data/
+_diag/
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# local database
+pgdata/
