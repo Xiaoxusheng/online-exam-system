@@ -1,4 +1,5 @@
-import { Button, Card, Col, Empty, List, Result, Row, Skeleton, Tag } from 'antd'
+import type { CSSProperties } from 'react'
+import { Button, Card, Col, List, Row, Skeleton, Tag } from 'antd'
 import {
   ArrowRightOutlined,
   BookOutlined,
@@ -6,15 +7,24 @@ import {
   ClockCircleOutlined,
   FileDoneOutlined,
   FileTextOutlined,
+  HistoryOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
+  ThunderboltOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import { fetchDashboardSummary } from '../api/dashboard'
+import EmptyState from '../components/EmptyState'
 import { useAuthStore } from '../stores/auth'
 import { activityLabel, examStatusLabels, roleLabel } from '../utils/labels'
+
+type AccentVars = CSSProperties & {
+  '--accent': string
+  '--accent-soft': string
+}
 
 const quickActions = [
   {
@@ -30,16 +40,16 @@ const quickActions = [
     description: '固定卷 / 随机卷 / AB 卷',
     path: '/papers',
     icon: <FileTextOutlined />,
-    color: '#12B76A',
-    background: '#E8F8F0',
+    color: '#7A5AF8',
+    background: '#F2EEFF',
   },
   {
     title: '考试管理',
     description: '编排考试计划与考生',
     path: '/exams',
     icon: <CalendarOutlined />,
-    color: '#7A5AF8',
-    background: '#F2EEFF',
+    color: '#12B76A',
+    background: '#E8F8F0',
   },
   {
     title: '监考中心',
@@ -49,6 +59,12 @@ const quickActions = [
     color: '#F79009',
     background: '#FFF6E5',
   },
+]
+
+const capabilities = [
+  { value: '5,000', label: '单场并发作答目标', icon: <ThunderboltOutlined /> },
+  { value: '5 秒', label: '告警到达监考台', icon: <ClockCircleOutlined /> },
+  { value: '6 类角色', label: '全流程权限控制', icon: <TeamOutlined /> },
 ]
 
 function greeting(): string {
@@ -104,33 +120,67 @@ export default function DashboardPage() {
     },
   ]
 
+  const today = dayjs().format('YYYY年M月D日 dddd')
+  const heroSub = isLoading
+    ? '正在加载今日考试概览…'
+    : data
+      ? `当前身份：${roleLabel(user?.role)} · ${data.stats.exams_in_progress} 场考试进行中，${data.stats.pending_grading} 份答卷待阅`
+      : `当前身份：${roleLabel(user?.role)} · 数据暂不可用`
+
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">
+      <section className="dashboard-hero">
+        <div className="hero-content">
+          <div className="hero-eyebrow">工作台 · {today}</div>
+          <h1 className="hero-title">
             {greeting()}，{user?.name ?? '管理员'}
           </h1>
-          <p className="page-subtitle">
-            {dayjs().format('YYYY年M月D日 dddd')} · 当前身份：{roleLabel(user?.role)}
-          </p>
+          <p className="hero-sub">{heroSub}</p>
+          <div className="hero-actions">
+            <Button
+              className="hero-btn-primary"
+              icon={<CalendarOutlined />}
+              onClick={() => navigate('/exams')}
+            >
+              进入考试管理
+            </Button>
+            <Button className="hero-btn-ghost" onClick={() => navigate('/proctor')}>
+              查看监考中心
+            </Button>
+          </div>
         </div>
-        <Button
-          type="primary"
-          icon={<CalendarOutlined />}
-          onClick={() => navigate('/exams')}
-        >
-          进入考试管理
-        </Button>
+
+        <div className="hero-side">
+          {capabilities.map((item) => (
+            <div className="hero-capability" key={item.label}>
+              <span className="hero-capability-icon">{item.icon}</span>
+              <div>
+                <strong>{item.value}</strong>
+                <span>{item.label}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="section-head">
+        <div>
+          <h2>今日概览</h2>
+          <p>关键运营指标</p>
+        </div>
+        <span className="live-pill">
+          <span className="status-dot" />
+          实时
+        </span>
       </div>
 
       {isError ? (
-        <Card className="surface-card" variant="borderless">
-          <Result
-            status="warning"
+        <Card className="panel-card" variant="borderless">
+          <EmptyState
+            icon={<WarningOutlined />}
             title="工作台数据加载失败"
-            subTitle="请检查后端服务与数据库连接后重试。"
-            extra={
+            description="请检查后端服务与数据库连接后重试。"
+            action={
               <Button type="primary" onClick={() => refetch()}>
                 重新加载
               </Button>
@@ -141,24 +191,23 @@ export default function DashboardPage() {
         <Row gutter={[16, 16]}>
           {stats.map((stat) => (
             <Col key={stat.label} xs={12} sm={12} xl={6}>
-              <Card className="stat-card" variant="borderless">
+              <Card
+                className="stat-card"
+                variant="borderless"
+                style={
+                  { '--accent': stat.color, '--accent-soft': stat.background } as AccentVars
+                }
+              >
                 <div className="stat-head">
-                  <div>
-                    <div className="stat-label">{stat.label}</div>
-                    <div className="stat-value">
-                      {isLoading ? (
-                        <Skeleton.Input active size="small" style={{ width: 64 }} />
-                      ) : (
-                        stat.value
-                      )}
-                    </div>
-                  </div>
-                  <span
-                    className="stat-icon"
-                    style={{ color: stat.color, background: stat.background }}
-                  >
-                    {stat.icon}
-                  </span>
+                  <span className="stat-icon">{stat.icon}</span>
+                </div>
+                <div className="stat-label">{stat.label}</div>
+                <div className="stat-value">
+                  {isLoading ? (
+                    <Skeleton.Input active size="small" style={{ width: 58 }} />
+                  ) : (
+                    stat.value
+                  )}
                 </div>
                 <div className="stat-foot">{stat.foot}</div>
               </Card>
@@ -167,14 +216,18 @@ export default function DashboardPage() {
         </Row>
       )}
 
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+      <div className="section-head">
+        <div>
+          <h2>快捷入口</h2>
+          <p>常用操作，一步直达</p>
+        </div>
+        <span className="section-head-meta">4 个模块</span>
+      </div>
+
+      <Row gutter={[16, 16]}>
         {quickActions.map((action) => (
           <Col key={action.path} xs={24} sm={12} xl={6}>
-            <button
-              type="button"
-              className="quick-card"
-              onClick={() => navigate(action.path)}
-            >
+            <button type="button" className="quick-card" onClick={() => navigate(action.path)}>
               <span
                 className="quick-icon"
                 style={{ color: action.color, background: action.background }}
@@ -196,12 +249,12 @@ export default function DashboardPage() {
       </Row>
 
       {!isError && (
-        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
           <Col xs={24} xl={15}>
             <Card
-              className="surface-card"
+              className="panel-card"
               variant="borderless"
-              title={<span style={{ fontSize: 15, fontWeight: 600 }}>待开始考试</span>}
+              title="待开始考试"
               extra={
                 <Button type="link" size="small" onClick={() => navigate('/exams')}>
                   全部考试
@@ -218,21 +271,11 @@ export default function DashboardPage() {
                     const status = examStatusLabels[exam.status]
                     return (
                       <List.Item>
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 16,
-                            width: '100%',
-                          }}
-                        >
+                        <div className="exam-item">
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 500 }}>{exam.title}</div>
-                            <div
-                              style={{ marginTop: 2, fontSize: 12, color: '#8F959E' }}
-                            >
-                              <ClockCircleOutlined />{' '}
+                            <div className="exam-item-title">{exam.title}</div>
+                            <div className="exam-item-meta">
+                              <ClockCircleOutlined />
                               {dayjs(exam.start_at).format('MM-DD HH:mm')} -{' '}
                               {dayjs(exam.end_at).format('MM-DD HH:mm')}
                             </div>
@@ -246,24 +289,26 @@ export default function DashboardPage() {
                   }}
                 />
               ) : (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="暂无待开始考试"
-                >
-                  <Button size="small" onClick={() => navigate('/exams')}>
-                    去创建考试
-                  </Button>
-                </Empty>
+                <EmptyState
+                  icon={<CalendarOutlined />}
+                  title="暂无待开始考试"
+                  description="创建考试计划后，即将开始的场次会显示在这里。"
+                  action={
+                    <Button size="small" onClick={() => navigate('/exams')}>
+                      去创建考试
+                    </Button>
+                  }
+                />
               )}
             </Card>
           </Col>
 
           <Col xs={24} xl={9}>
             <Card
-              className="surface-card"
+              className="panel-card"
               variant="borderless"
-              title={<span style={{ fontSize: 15, fontWeight: 600 }}>最近动态</span>}
-              extra={<span style={{ fontSize: 12, color: '#8F959E' }}>近 5 条</span>}
+              title="最近动态"
+              extra={<span className="panel-sub">近 5 条</span>}
             >
               {isLoading ? (
                 <Skeleton active paragraph={{ rows: 4 }} />
@@ -288,9 +333,11 @@ export default function DashboardPage() {
                   )}
                 />
               ) : (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="暂无操作动态"
+                <EmptyState
+                  compact
+                  icon={<HistoryOutlined />}
+                  title="暂无操作动态"
+                  description="登录、组卷与发布等操作会记录在这里。"
                 />
               )}
             </Card>

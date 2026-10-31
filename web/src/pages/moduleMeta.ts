@@ -3,10 +3,27 @@ export interface ModuleFeature {
   description: string
 }
 
+export type ModuleIcon =
+  | 'book'
+  | 'paper'
+  | 'calendar'
+  | 'shield'
+  | 'review'
+  | 'score'
+  | 'analytics'
+  | 'users'
+  | 'org'
+  | 'audit'
+  | 'bell'
+
 export interface ModuleMeta {
   title: string
   subtitle: string
   milestone: string
+  area: string
+  icon: ModuleIcon
+  accent: string
+  accentSoft: string
   features: ModuleFeature[]
 }
 
@@ -15,6 +32,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '题库管理',
     subtitle: '维护题目、知识点与版本，支撑组卷与考试内容供给。',
     milestone: 'M1 基础闭环',
+    area: '考试运营',
+    icon: 'book',
+    accent: '#3370FF',
+    accentSoft: '#EAF1FF',
     features: [
       { title: '题型与属性', description: '单选、多选、判断、填空、简答、论述、编程与音视频题；知识点、难度、标签与解析。' },
       { title: '富文本与媒体', description: '题干与选项支持富文本、图片、音频与视频，Formula 公式按里程碑接入。' },
@@ -28,6 +49,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '试卷与组卷',
     subtitle: '固定卷、随机卷与 AB 卷，构建可审核、可快照的试卷资产。',
     milestone: 'M1 基础闭环',
+    area: '考试运营',
+    icon: 'paper',
+    accent: '#7A5AF8',
+    accentSoft: '#F2EEFF',
     features: [
       { title: '三种试卷类型', description: '固定卷指定题目，随机卷按规则抽题，AB 卷分流防作弊。' },
       { title: '随机抽题规则', description: '按题型、知识点与难度设置数量分值，抽题去重并校验总分比例。' },
@@ -41,6 +66,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '考试管理',
     subtitle: '规划考试时间窗、编排考生、配置规则与监考策略。',
     milestone: 'M1 基础闭环',
+    area: '考试运营',
+    icon: 'calendar',
+    accent: '#12B76A',
+    accentSoft: '#E8F8F0',
     features: [
       { title: '考试计划', description: '名称、试卷、时间窗、时长与考试说明，覆盖多场次与考场编排（P1）。' },
       { title: '考生编排', description: '按班级选择、名单导入与条件筛选，去重并校验账号有效性。' },
@@ -54,6 +83,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '监考中心',
     subtitle: '实时掌握考生状态，接收分级告警并完成处置留痕。',
     milestone: 'M3 严格监考',
+    area: '考试运营',
+    icon: 'shield',
+    accent: '#F79009',
+    accentSoft: '#FFF6E5',
     features: [
       { title: '切屏与失焦检测', description: '记录切屏次数与时长，达阈值弹窗警告并推送监考员。' },
       { title: '作答环境限制', description: '强制全屏、禁用复制粘贴与快捷键，离开页面提示。' },
@@ -67,6 +100,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '阅卷中心',
     subtitle: '自动判分与人工阅卷协同，支持编程题判题与音视频评分。',
     milestone: 'M2 阅卷与分析',
+    area: '考试运营',
+    icon: 'review',
+    accent: '#EE46BC',
+    accentSoft: '#FDF2FA',
     features: [
       { title: '自动判分', description: '客观题按规则判分，填空题多答案匹配，未命中转人工。' },
       { title: '编程题判题', description: '隔离沙箱执行，按用例通过比例给分，编译失败零分。' },
@@ -80,6 +117,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '成绩管理',
     subtitle: '成绩合成、发布、复核与导出，异常成绩默认挂起。',
     milestone: 'M1 基础闭环',
+    area: '成绩与分析',
+    icon: 'score',
+    accent: '#0BA5EC',
+    accentSoft: '#E8F6FE',
     features: [
       { title: '成绩汇总', description: '按考试、班级与考生查看成绩、状态、用时与异常标记。' },
       { title: '成绩合成', description: '客观、主观与人工调整合成，人工调整必须填写理由并留痕。' },
@@ -93,6 +134,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '数据分析',
     subtitle: '从分数、题目与知识点三个视角评估教学与考试质量。',
     milestone: 'M2 阅卷与分析',
+    area: '成绩与分析',
+    icon: 'analytics',
+    accent: '#6172F3',
+    accentSoft: '#EEF0FF',
     features: [
       { title: '考试统计', description: '参考率、平均分、最高最低分、及格率与分数段分布。' },
       { title: '题目分析', description: '每题正确率、平均得分、选项分布与区分度。' },
@@ -105,6 +150,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '账号与角色',
     subtitle: '统一账号体系，RBAC 与数据范围双重控制。',
     milestone: 'M1 基础闭环',
+    area: '系统管理',
+    icon: 'users',
+    accent: '#3370FF',
+    accentSoft: '#EAF1FF',
     features: [
       { title: '用户管理', description: '学员、教师与管理员账号创建、批量导入与停用。' },
       { title: '角色权限', description: '机构管理员、考务、命题、阅卷、监考与考生六类角色。' },
@@ -116,6 +165,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '组织架构',
     subtitle: '维护校区与班级，支撑考生编排与数据范围。',
     milestone: 'M1 基础闭环',
+    area: '系统管理',
+    icon: 'org',
+    accent: '#12B76A',
+    accentSoft: '#E8F8F0',
     features: [
       { title: '校区管理', description: '多校区信息维护与启停。' },
       { title: '班级管理', description: '班级、年级与校区归属，支持批量导入。' },
@@ -126,6 +179,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '审计日志',
     subtitle: '关键操作全量留痕，满足合规与追责要求。',
     milestone: 'M1 基础闭环',
+    area: '系统管理',
+    icon: 'audit',
+    accent: '#667085',
+    accentSoft: '#F2F4F7',
     features: [
       { title: '登录日志', description: '记录登录成功、失败原因、IP 与设备信息。' },
       { title: '关键操作', description: '组卷、发布、改分、导出、删除等操作留痕。' },
@@ -136,6 +193,10 @@ export const moduleMeta: Record<string, ModuleMeta> = {
     title: '通知配置',
     subtitle: '站内、短信与邮件模板管理，覆盖考前提醒与成绩通知。',
     milestone: 'M2 阅卷与分析',
+    area: '系统管理',
+    icon: 'bell',
+    accent: '#F79009',
+    accentSoft: '#FFF6E5',
     features: [
       { title: '多渠道通知', description: '站内消息、短信与邮件统一编排。' },
       { title: '模板管理', description: '按场景维护模板，支持启停与变量占位。' },

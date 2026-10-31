@@ -17,6 +17,13 @@ interface LoginLocationState {
   from?: { pathname?: string }
 }
 
+const capabilities = [
+  '全流程闭环，考试数据统一沉淀',
+  '切屏检测、抓拍与水印，严肃考试防作弊',
+  '实时监考告警，异常 5 秒内到达监考台',
+  '成绩统计与知识点掌握度分析',
+]
+
 export default function LoginPage() {
   const { message } = App.useApp()
   const navigate = useNavigate()
@@ -72,27 +79,26 @@ export default function LoginPage() {
             覆盖题库、组卷、考试、监考、阅卷与数据分析，支持人脸核验与 AI
             行为检测，让每一场考试稳定、可信、可追溯。
           </p>
-          <ul className="login-feature-list">
-            <li>
-              <CheckCircleFilled /> 全流程闭环，考试数据统一沉淀
-            </li>
-            <li>
-              <CheckCircleFilled /> 切屏检测、抓拍与水印，严肃考试防作弊
-            </li>
-            <li>
-              <CheckCircleFilled /> 实时监考告警，异常 5 秒内到达监考台
-            </li>
-            <li>
-              <CheckCircleFilled /> 成绩统计与知识点掌握度分析
-            </li>
-          </ul>
+
+          <div className="login-feature-grid">
+            {capabilities.map((feature) => (
+              <div className="login-feature-card" key={feature}>
+                <CheckCircleFilled />
+                <span>{feature}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="login-trust">数据加密存储 · 人脸信息单独授权 · 支持人工核验替代</div>
         </div>
 
-        <div className="login-brand-footer">© 2026 在线考试系统 · v0.1 工程骨架</div>
+        <div className="login-brand-footer">© 2026 在线考试系统 · v0.2 界面预览</div>
       </aside>
 
       <main className="login-panel">
-        <div className="login-form-wrap">
+        <span className="login-version">v0.2 · 界面预览</span>
+
+        <div className="login-form-card">
           <div className="login-panel-brand">
             <span className="login-panel-mark">考</span>
             <span>在线考试系统</span>
@@ -114,7 +120,7 @@ export default function LoginPage() {
               rules={[{ required: true, message: '请输入账号或手机号' }]}
             >
               <Input
-                prefix={<UserOutlined style={{ color: '#8F959E' }} />}
+                prefix={<UserOutlined style={{ color: '#98A2B3' }} />}
                 placeholder="用户名或手机号"
                 autoComplete="username"
                 autoFocus
@@ -126,7 +132,7 @@ export default function LoginPage() {
               rules={[{ required: true, message: '请输入密码' }]}
             >
               <Input.Password
-                prefix={<LockOutlined style={{ color: '#8F959E' }} />}
+                prefix={<LockOutlined style={{ color: '#98A2B3' }} />}
                 placeholder="请输入密码"
                 autoComplete="current-password"
               />

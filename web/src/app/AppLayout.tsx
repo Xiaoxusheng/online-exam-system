@@ -9,7 +9,7 @@ import {
   Grid,
   Layout,
   Menu,
-  Tooltip,
+  Popover,
 } from 'antd'
 import type { MenuProps } from 'antd'
 import {
@@ -22,6 +22,7 @@ import {
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { fetchMe, logout } from '../api/auth'
+import EmptyState from '../components/EmptyState'
 import { queryClient } from './queryClient'
 import { useAuthStore } from '../stores/auth'
 import { roleLabel } from '../utils/labels'
@@ -67,14 +68,14 @@ export default function AppLayout() {
 
   const menuItems = useMemo<MenuProps['items']>(
     () =>
-      navigation.map((item) => ({
-        key: item.key,
-        icon: item.icon,
-        label: item.label,
-        children: item.children?.map((child) => ({
-          key: child.key,
-          icon: child.icon,
-          label: child.label,
+      navigation.map((group) => ({
+        type: 'group' as const,
+        key: group.key,
+        label: group.label,
+        children: group.items.map((item) => ({
+          key: item.key,
+          icon: item.icon,
+          label: item.label,
         })),
       })),
     [],
@@ -104,13 +105,9 @@ export default function AppLayout() {
       key: 'identity',
       disabled: true,
       label: (
-        <div style={{ padding: '2px 0' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#1F2329' }}>
-            {user?.name ?? '未登录'}
-          </div>
-          <div style={{ fontSize: 12, color: '#8F959E', marginTop: 2 }}>
-            {roleLabel(user?.role)}
-          </div>
+        <div className="user-menu-identity">
+          <div className="user-menu-name">{user?.name ?? '未登录'}</div>
+          <div className="user-menu-role">{roleLabel(user?.role)}</div>
         </div>
       ),
     },
@@ -122,13 +119,15 @@ export default function AppLayout() {
   const breadcrumbItems =
     location.pathname === '/'
       ? [{ title: '工作台' }]
-      : [{ title: '工作台' }, ...trail.map((item) => ({ title: item.label }))]
+      : trail
+        ? [{ title: '工作台' }, { title: trail.group.label }, { title: trail.item.label }]
+        : [{ title: '工作台' }]
 
   const brand = (
-    <div className="app-brand">
+    <div className={collapsed ? 'app-brand app-brand-collapsed' : 'app-brand'}>
       <span className="app-brand-mark">考</span>
       {!collapsed && (
-        <div>
+        <div className="app-brand-text">
           <div className="app-brand-name">在线考试系统</div>
           <div className="app-brand-sub">Online Exam Platform</div>
         </div>
@@ -142,9 +141,26 @@ export default function AppLayout() {
       mode="inline"
       items={menuItems}
       selectedKeys={[location.pathname]}
-      defaultOpenKeys={['scores-group', 'system-group']}
       onClick={handleMenuClick}
     />
+  )
+
+  const notifications = (
+    <div className="notice-popover">
+      <div className="notice-head">
+        <div>
+          <div className="notice-title">通知中心</div>
+          <div className="notice-sub">考试提醒、阅卷任务与成绩发布</div>
+        </div>
+        <span className="notice-count">0 条未读</span>
+      </div>
+      <EmptyState
+        compact
+        icon={<BellOutlined />}
+        title="暂无新通知"
+        description="有新的考试安排或阅卷任务时，会在这里提醒你。"
+      />
+    </div>
   )
 
   return (
@@ -153,27 +169,34 @@ export default function AppLayout() {
         <Sider
           className="app-sider"
           theme="light"
-          width={236}
-          collapsedWidth={72}
+          width={248}
+          collapsedWidth={76}
           collapsible
           collapsed={collapsed}
           trigger={null}
         >
           {brand}
           {menu}
-          {!collapsed && <div className="app-sider-footer">v0.1 · 骨架阶段</div>}
+          {!collapsed && (
+            <div className="app-sider-footer">
+              <span className="sider-status">
+                <span className="status-dot" />
+                界面预览
+              </span>
+              <span className="sider-version">v0.2</span>
+            </div>
+          )}
         </Sider>
       )}
 
-      <Layout>
+      <Layout className="app-main">
         <Header className="app-header">
           <div className="header-left">
             <Button
               type="text"
+              className="header-icon-btn"
               aria-label="切换导航"
-              icon={
-                isMobile || collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />
-              }
+              icon={isMobile || collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() =>
                 isMobile ? setDrawerOpen(true) : setCollapsed((value) => !value)
               }
@@ -182,35 +205,51 @@ export default function AppLayout() {
           </div>
 
           <div className="header-actions">
-            <Tooltip title="通知中心">
-              <Button type="text" aria-label="通知中心" icon={<BellOutlined />} />
-            </Tooltip>
+            <Popover
+              content={notifications}
+              trigger="click"
+              placement="bottomRight"
+              arrow={false}
+              rootClassName="notice-popover-root"
+            >
+              <Button
+                type="text"
+                className="header-icon-btn"
+                aria-label="通知中心"
+                icon={<BellOutlined />}
+              />
+            </Popover>
+
+            <span className="header-divider" />
+
             <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }}>
               <div className="user-chip">
                 <Avatar
-                  size={28}
+                  size={32}
                   icon={<UserOutlined />}
-                  style={{ background: '#EAF1FF', color: '#3370FF' }}
+                  className="user-avatar"
                 />
                 <div className="user-chip-meta">
                   <span className="user-chip-name">{user?.name ?? '未登录'}</span>
                   <span className="user-chip-role">{roleLabel(user?.role)}</span>
                 </div>
-                <DownOutlined style={{ fontSize: 10, color: '#8F959E' }} />
+                <DownOutlined className="user-chip-caret" />
               </div>
             </Dropdown>
           </div>
         </Header>
 
         <Content className="app-content">
-          <Outlet />
+          <div className="content-inner" key={location.pathname}>
+            <Outlet />
+          </div>
         </Content>
       </Layout>
 
       {isMobile && (
         <Drawer
           placement="left"
-          width={248}
+          width={264}
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
           closable={false}
@@ -218,7 +257,13 @@ export default function AppLayout() {
         >
           {brand}
           {menu}
-          <div className="app-sider-footer">v0.1 · 骨架阶段</div>
+          <div className="app-sider-footer">
+            <span className="sider-status">
+              <span className="status-dot" />
+              界面预览
+            </span>
+            <span className="sider-version">v0.2</span>
+          </div>
         </Drawer>
       )}
     </Layout>
