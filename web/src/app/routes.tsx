@@ -8,6 +8,8 @@ import LoginPage from '../pages/LoginPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import NotificationsPage from '../pages/NotificationsPage'
 import QuestionsPage from '../pages/questions/QuestionsPage'
+import PapersPage from '../pages/papers/PapersPage'
+import ExamsPage from '../pages/exams/ExamsPage'
 import UsersPage from '../pages/system/UsersPage'
 import OrgsPage from '../pages/system/OrgsPage'
 import AuditLogsPage from '../pages/system/AuditLogsPage'
@@ -37,8 +39,8 @@ export default function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="questions" element={guarded('/questions', <QuestionsPage />)} />
-        <Route path="papers" element={skeleton('/papers', 'papers')} />
-        <Route path="exams" element={skeleton('/exams', 'exams')} />
+        <Route path="papers" element={guarded('/papers', <PapersPage />)} />
+        <Route path="exams" element={guarded('/exams', <ExamsPage />)} />
         <Route path="proctor" element={skeleton('/proctor', 'proctor')} />
         <Route path="review" element={skeleton('/review', 'review')} />
         <Route path="scores" element={skeleton('/scores', 'scores')} />

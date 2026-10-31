@@ -803,6 +803,56 @@ body {
   font-size: 12px;
 }
 
+/* ---------- Paper builder & exam detail ---------- */
+
+.paper-picker {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(420px, 1.2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.paper-picker .ant-table-cell {
+  white-space: nowrap;
+}
+
+.paper-picker .ant-table-cell:first-child {
+  white-space: normal;
+}
+
+.section-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 12px;
+  border: 1px solid var(--app-border-soft);
+  border-radius: var(--app-radius);
+}
+
+.staff-editor {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.exam-meta {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 1280px) {
+  .paper-picker {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---------- Notification popover ---------- */
 .notice-popover-root .ant-popover-inner {
   overflow: hidden;
