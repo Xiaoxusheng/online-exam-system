@@ -54,13 +54,18 @@ func (a *API) Router() http.Handler {
 				r.Use(a.requireRoles("org_admin"))
 				r.Get("/campuses", a.handleListCampuses)
 				r.Post("/campuses", a.handleCreateCampus)
-				r.Get("/users", a.handleListUsers)
 				r.Post("/users", a.handleCreateUser)
 				r.Patch("/users/{id}", a.handleUpdateUser)
 				r.Get("/roles", a.handleRoles)
 				r.Get("/audit-logs", a.handleListAuditLogs)
 				r.Get("/notification-templates", a.handleListNotificationTemplates)
 				r.Get("/system/overview", a.handleSystemOverview)
+			})
+
+			r.Group(func(r chi.Router) {
+				// 考务编排考生需要读取学员名册，账号写操作仍限机构管理员。
+				r.Use(a.requireRoles("org_admin", "exam_admin"))
+				r.Get("/users", a.handleListUsers)
 			})
 
 			r.Group(func(r chi.Router) {

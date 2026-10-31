@@ -42,13 +42,13 @@
 | POST | `/auth/logout` | 登录用户 | 记录审计；JWT 由客户端丢弃 |
 | GET | `/dashboard/summary` | 登录用户 | 学员数、进行中考试、待阅卷、待审核 + 待开始考试 + 最近动态 |
 
-### 2.2 组织与账号（org_admin）
+### 2.2 组织与账号（org_admin；用户列表对 exam_admin 只读开放）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET / POST | `/campuses` | 校区列表 / 创建 |
 | GET / POST | `/classes` | 班级列表（可按 `campus_id` 过滤）/ 创建 |
-| GET | `/users` | 用户列表；支持 `role`、`status`、`keyword`、`campus_id`、`class_id`、分页 |
+| GET | `/users` | 用户列表（org_admin / exam_admin）；支持 `role`、`status`、`keyword`、`campus_id`、`class_id`、分页。考务编排考生需要只读名册 |
 | POST | `/users` | 创建用户（姓名、用户名、手机号、初始密码、角色、数据范围、班级/校区） |
 | PATCH | `/users/{id}` | 更新姓名/手机号/邮箱/角色/数据范围/状态/班级/校区/重置密码；不能停用自己 |
 | GET | `/roles` | 角色矩阵 |
