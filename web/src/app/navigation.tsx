@@ -10,6 +10,7 @@ import {
   FormOutlined,
   HistoryOutlined,
   LineChartOutlined,
+  NotificationOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
@@ -30,7 +31,10 @@ export const navigation: NavGroup[] = [
   {
     key: 'overview',
     label: '总览',
-    items: [{ key: '/', label: '工作台', icon: <DashboardOutlined /> }],
+    items: [
+      { key: '/', label: '工作台', icon: <DashboardOutlined /> },
+      { key: '/notifications', label: '我的通知', icon: <BellOutlined /> },
+    ],
   },
   {
     key: 'exam-ops',
@@ -58,7 +62,7 @@ export const navigation: NavGroup[] = [
       { key: '/system/users', label: '账号与角色', icon: <TeamOutlined /> },
       { key: '/system/orgs', label: '组织架构', icon: <ApartmentOutlined /> },
       { key: '/system/audit-logs', label: '审计日志', icon: <HistoryOutlined /> },
-      { key: '/system/notifications', label: '通知配置', icon: <BellOutlined /> },
+      { key: '/system/notifications', label: '通知配置', icon: <NotificationOutlined /> },
     ],
   },
 ]

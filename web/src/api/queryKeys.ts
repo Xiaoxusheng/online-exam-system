@@ -1,4 +1,4 @@
-type KeyParams = Record<string, unknown>
+type KeyParams = object
 
 export const queryKeys = {
   me: ['auth', 'me'] as const,

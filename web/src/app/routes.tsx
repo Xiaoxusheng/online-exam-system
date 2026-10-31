@@ -5,8 +5,13 @@ import RequireAuth from './RequireAuth'
 import RequireRole from './RequireRole'
 import DashboardPage from '../pages/DashboardPage'
 import LoginPage from '../pages/LoginPage'
-import ModulePage from '../pages/ModulePage'
 import NotFoundPage from '../pages/NotFoundPage'
+import NotificationsPage from '../pages/NotificationsPage'
+import UsersPage from '../pages/system/UsersPage'
+import OrgsPage from '../pages/system/OrgsPage'
+import AuditLogsPage from '../pages/system/AuditLogsPage'
+import NotificationSettingsPage from '../pages/system/NotificationSettingsPage'
+import ModulePage from '../pages/ModulePage'
 import { moduleMeta, type ModuleKey } from '../pages/moduleMeta'
 
 function guarded(path: string, element: ReactNode) {
@@ -29,6 +34,7 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="questions" element={skeleton('/questions', 'questions')} />
         <Route path="papers" element={skeleton('/papers', 'papers')} />
         <Route path="exams" element={skeleton('/exams', 'exams')} />
@@ -36,10 +42,13 @@ export default function AppRoutes() {
         <Route path="review" element={skeleton('/review', 'review')} />
         <Route path="scores" element={skeleton('/scores', 'scores')} />
         <Route path="analytics" element={skeleton('/analytics', 'analytics')} />
-        <Route path="system/users" element={skeleton('/system/users', 'users')} />
-        <Route path="system/orgs" element={skeleton('/system/orgs', 'orgs')} />
-        <Route path="system/audit-logs" element={skeleton('/system/audit-logs', 'auditLogs')} />
-        <Route path="system/notifications" element={skeleton('/system/notifications', 'notifications')} />
+        <Route path="system/users" element={guarded('/system/users', <UsersPage />)} />
+        <Route path="system/orgs" element={guarded('/system/orgs', <OrgsPage />)} />
+        <Route path="system/audit-logs" element={guarded('/system/audit-logs', <AuditLogsPage />)} />
+        <Route
+          path="system/notifications"
+          element={guarded('/system/notifications', <NotificationSettingsPage />)}
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
