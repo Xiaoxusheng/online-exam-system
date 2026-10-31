@@ -57,6 +57,9 @@ func (s *Store) FindUserByID(ctx context.Context, id string) (User, error) {
 	err := s.pool.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE id = $1`, id).
 		Scan(userScanDest(&u)...)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return User{}, ErrNotFound
+		}
 		return User{}, fmt.Errorf("find user by id: %w", err)
 	}
 	return u, nil
@@ -92,9 +95,10 @@ type UserFilter struct {
 	PageSize int
 }
 
-func (s *Store) ListUsers(ctx context.Context, orgID string, f UserFilter) ([]User, int64, error) {
-	where := []string{"org_id = $1"}
-	args := []any{orgID}
+func (s *Store) ListUsers(ctx context.Context, scope Scope, f UserFilter) ([]User, int64, error) {
+	scopeSQL, scopeArgs := scope.peopleFilter("users", 2)
+	where := []string{"org_id = $1" + scopeSQL}
+	args := append([]any{scope.OrgID}, scopeArgs...)
 
 	if f.Role != "" {
 		args = append(args, f.Role)

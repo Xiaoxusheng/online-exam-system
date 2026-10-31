@@ -15,15 +15,17 @@ import (
 )
 
 type API struct {
-	cfg    config.Config
-	log    *slog.Logger
-	store  *store.Store
-	tokens *auth.TokenManager
-	hub    *proctorHub
+	cfg     config.Config
+	log     *slog.Logger
+	store   *store.Store
+	tokens  *auth.TokenManager
+	hub     *proctorHub
+	limiter *loginLimiter
 }
 
 func New(cfg config.Config, log *slog.Logger, st *store.Store, tokens *auth.TokenManager) *API {
-	return &API{cfg: cfg, log: log, store: st, tokens: tokens, hub: newProctorHub(log)}
+	return &API{cfg: cfg, log: log, store: st, tokens: tokens, hub: newProctorHub(log),
+		limiter: newLoginLimiter(cfg.LoginAccountLimit, cfg.LoginIPLimit, cfg.LoginBlock)}
 }
 
 func (a *API) Router() http.Handler {
@@ -35,6 +37,7 @@ func (a *API) Router() http.Handler {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", a.handleLogin)
+		r.Post("/auth/refresh", a.handleRefresh)
 
 		// Proctor realtime room. Browsers cannot attach an Authorization header to a
 		// websocket, so this route authenticates its ?token= parameter itself.

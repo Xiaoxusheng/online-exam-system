@@ -12,11 +12,15 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"online-exam-system/server/internal/auth"
+	"online-exam-system/server/internal/store"
 )
 
 type ctxKey int
 
-const claimsKey ctxKey = iota
+const (
+	claimsKey ctxKey = iota
+	actorKey
+)
 
 type statusRecorder struct {
 	http.ResponseWriter
@@ -117,7 +121,19 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 			apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "登录状态已失效，请重新登录")
 			return
 		}
+		// Reload the account on every request so a disabled account or a role/scope
+		// change takes effect immediately instead of when the token expires.
+		actor, err := a.store.FindUserByID(r.Context(), claims.Subject)
+		if err != nil {
+			apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "账号不存在或已停用，请重新登录")
+			return
+		}
+		if actor.Status != "active" {
+			apiError(w, http.StatusForbidden, "ACCOUNT_DISABLED", "账号已停用，请联系管理员")
+			return
+		}
 		ctx := context.WithValue(r.Context(), claimsKey, claims)
+		ctx = context.WithValue(ctx, actorKey, actor)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -150,6 +166,28 @@ func (a *API) requireRoles(roles ...string) func(http.Handler) http.Handler {
 func claimsFrom(ctx context.Context) (*auth.Claims, bool) {
 	claims, ok := ctx.Value(claimsKey).(*auth.Claims)
 	return claims, ok
+}
+
+// scopeFrom builds the caller's data scope from the freshly loaded account.
+// Handlers must use it instead of trusting query parameters for tenancy.
+func scopeFrom(ctx context.Context) store.Scope {
+	actor, ok := ctx.Value(actorKey).(store.User)
+	if !ok {
+		return store.Scope{}
+	}
+	scope := store.Scope{
+		OrgID:     actor.OrgID,
+		Role:      actor.Role,
+		UserID:    actor.ID,
+		DataScope: actor.DataScope,
+	}
+	if actor.CampusID != nil {
+		scope.CampusID = *actor.CampusID
+	}
+	if actor.ClassID != nil {
+		scope.ClassID = *actor.ClassID
+	}
+	return scope
 }
 
 func clientIP(r *http.Request) string {

@@ -2,8 +2,10 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,9 +21,11 @@ type loginRequest struct {
 }
 
 type loginResponse struct {
-	Token     string    `json:"token"`
-	ExpiresAt time.Time `json:"expires_at"`
-	User      userDTO   `json:"user"`
+	Token            string    `json:"token"`
+	ExpiresAt        time.Time `json:"expires_at"`
+	RefreshToken     string    `json:"refresh_token"`
+	RefreshExpiresAt time.Time `json:"refresh_expires_at"`
+	User             userDTO   `json:"user"`
 }
 
 type userDTO struct {
@@ -69,10 +73,23 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ip := clientIP(r)
+	if retryAfter, blocked := a.limiter.check(strings.ToLower(req.Account), ip); blocked {
+		seconds := int(retryAfter.Seconds())
+		if seconds < 1 {
+			seconds = 1
+		}
+		w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		a.log.Warn("login rate limited", "account", req.Account, "ip", ip, "retry_after_s", seconds)
+		apiError(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", "登录尝试过于频繁，请稍后再试")
+		return
+	}
+
 	user, passwordHash, err := a.store.FindUserByAccount(r.Context(), req.Account)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			auth.BurnPasswordCheck(req.Password)
+			a.limiter.fail(strings.ToLower(req.Account), ip)
 			a.audit(r, store.AuditEntry{
 				Action:     "auth.login_failed",
 				TargetType: "user",
@@ -87,6 +104,7 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !auth.VerifyPassword(passwordHash, req.Password) {
+		a.limiter.fail(strings.ToLower(req.Account), ip)
 		a.audit(r, store.AuditEntry{
 			OrgID:      user.OrgID,
 			ActorID:    user.ID,
@@ -100,6 +118,7 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user.Status != "active" {
+		a.limiter.fail(strings.ToLower(req.Account), ip)
 		a.audit(r, store.AuditEntry{
 			OrgID:      user.OrgID,
 			ActorID:    user.ID,
@@ -112,9 +131,23 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.limiter.reset(strings.ToLower(req.Account))
 	token, expiresAt, err := a.tokens.Issue(user.ID, user.OrgID, user.Role, user.Name)
 	if err != nil {
 		a.log.Error("issue token failed", "error", err, "user_id", user.ID)
+		apiError(w, http.StatusInternalServerError, "INTERNAL", "服务内部错误")
+		return
+	}
+
+	refreshToken, refreshHash, err := auth.NewRefreshToken()
+	if err != nil {
+		a.log.Error("generate refresh token failed", "error", err, "user_id", user.ID)
+		apiError(w, http.StatusInternalServerError, "INTERNAL", "服务内部错误")
+		return
+	}
+	refreshExpiresAt := time.Now().Add(a.cfg.RefreshTTL)
+	if err := a.store.CreateRefreshToken(r.Context(), user.ID, refreshHash, r.UserAgent(), ip, refreshExpiresAt); err != nil {
+		a.log.Error("store refresh token failed", "error", err, "user_id", user.ID)
 		apiError(w, http.StatusInternalServerError, "INTERNAL", "服务内部错误")
 		return
 	}
@@ -132,9 +165,71 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	data(w, http.StatusOK, loginResponse{
-		Token:     token,
-		ExpiresAt: expiresAt,
-		User:      toUserDTO(user),
+		Token:            token,
+		ExpiresAt:        expiresAt,
+		RefreshToken:     refreshToken,
+		RefreshExpiresAt: refreshExpiresAt,
+		User:             toUserDTO(user),
+	})
+}
+
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+// handleRefresh rotates a refresh token: the presented token is revoked and a new
+// access + refresh pair is issued for the same user.
+func (a *API) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	var req refreshRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	req.RefreshToken = strings.TrimSpace(req.RefreshToken)
+	if req.RefreshToken == "" || len(req.RefreshToken) > 128 {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "缺少刷新令牌")
+		return
+	}
+
+	newToken, newHash, err := auth.NewRefreshToken()
+	if err != nil {
+		apiError(w, http.StatusInternalServerError, "INTERNAL", "服务内部错误")
+		return
+	}
+	refreshExpiresAt := time.Now().Add(a.cfg.RefreshTTL)
+	rotated, err := a.store.RotateRefreshToken(r.Context(), auth.HashRefreshToken(req.RefreshToken), newHash, r.UserAgent(), clientIP(r), refreshExpiresAt)
+	if err != nil {
+		if errors.Is(err, store.ErrForbidden) {
+			a.log.Warn("refresh token reuse detected", "ip", clientIP(r))
+			a.audit(r, store.AuditEntry{
+				Action:     "auth.refresh_reuse",
+				TargetType: "user",
+				Detail:     map[string]any{"ip": clientIP(r)},
+			})
+		}
+		apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "登录状态已失效，请重新登录")
+		return
+	}
+
+	user, err := a.store.FindUserByID(r.Context(), rotated.UserID)
+	if err != nil || user.Status != "active" {
+		if user.ID != "" {
+			_ = a.store.RevokeAllRefreshTokens(r.Context(), user.ID)
+		}
+		apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "账号不可用，请重新登录")
+		return
+	}
+
+	token, expiresAt, err := a.tokens.Issue(user.ID, user.OrgID, user.Role, user.Name)
+	if err != nil {
+		apiError(w, http.StatusInternalServerError, "INTERNAL", "服务内部错误")
+		return
+	}
+	data(w, http.StatusOK, loginResponse{
+		Token:            token,
+		ExpiresAt:        expiresAt,
+		RefreshToken:     newToken,
+		RefreshExpiresAt: refreshExpiresAt,
+		User:             toUserDTO(user),
 	})
 }
 
@@ -164,6 +259,15 @@ func (a *API) handleMe(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleLogout(w http.ResponseWriter, r *http.Request) {
 	claims, _ := claimsFrom(r.Context())
+	var req refreshRequest
+	if r.Body != nil && r.ContentLength > 0 {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+	if token := strings.TrimSpace(req.RefreshToken); token != "" && len(token) <= 128 {
+		if err := a.store.RevokeRefreshToken(r.Context(), auth.HashRefreshToken(token)); err != nil {
+			a.log.Warn("revoke refresh token failed", "error", err)
+		}
+	}
 	if claims != nil {
 		a.audit(r, store.AuditEntry{
 			OrgID:      claims.OrgID,

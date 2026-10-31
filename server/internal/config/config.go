@@ -19,6 +19,10 @@ type Config struct {
 	DatabaseURL       string
 	JWTSecret         string
 	JWTTTL            time.Duration
+	RefreshTTL        time.Duration
+	LoginAccountLimit int
+	LoginIPLimit      int
+	LoginBlock        time.Duration
 	CORSOrigins       []string
 	LogLevel          string
 	MaxBodyBytes      int64
@@ -32,6 +36,10 @@ func Load() (Config, error) {
 		DatabaseURL:       getEnv("DATABASE_URL", defaultDatabaseURL),
 		JWTSecret:         os.Getenv("JWT_SECRET"),
 		JWTTTL:            8 * time.Hour,
+		RefreshTTL:        30 * 24 * time.Hour,
+		LoginAccountLimit: 5,
+		LoginIPLimit:      60,
+		LoginBlock:        15 * time.Minute,
 		CORSOrigins:       splitTrim(getEnv("CORS_ORIGINS", "http://127.0.0.1:5174,http://localhost:5174")),
 		LogLevel:          getEnv("LOG_LEVEL", "info"),
 		MaxBodyBytes:      1 << 20,
@@ -60,6 +68,34 @@ func Load() (Config, error) {
 			return cfg, fmt.Errorf("invalid JWT_TTL %q", v)
 		}
 		cfg.JWTTTL = d
+	}
+	if v := os.Getenv("REFRESH_TTL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			return cfg, fmt.Errorf("invalid REFRESH_TTL %q", v)
+		}
+		cfg.RefreshTTL = d
+	}
+	if v := os.Getenv("LOGIN_ACCOUNT_LIMIT"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			return cfg, fmt.Errorf("invalid LOGIN_ACCOUNT_LIMIT %q", v)
+		}
+		cfg.LoginAccountLimit = n
+	}
+	if v := os.Getenv("LOGIN_IP_LIMIT"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			return cfg, fmt.Errorf("invalid LOGIN_IP_LIMIT %q", v)
+		}
+		cfg.LoginIPLimit = n
+	}
+	if v := os.Getenv("LOGIN_BLOCK"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			return cfg, fmt.Errorf("invalid LOGIN_BLOCK %q", v)
+		}
+		cfg.LoginBlock = d
 	}
 	if v := os.Getenv("MAX_BODY_BYTES"); v != "" {
 		n, err := strconv.ParseInt(v, 10, 64)

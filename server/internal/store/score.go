@@ -61,9 +61,10 @@ type ScoreFilter struct {
 	PageSize int
 }
 
-func (s *Store) ListScores(ctx context.Context, orgID string, f ScoreFilter) ([]ScoreListItem, int64, error) {
-	where := []string{"e.org_id = $1", "a.status IN ('submitted', 'graded', 'published')"}
-	args := []any{orgID}
+func (s *Store) ListScores(ctx context.Context, scope Scope, f ScoreFilter) ([]ScoreListItem, int64, error) {
+	scopeSQL, scopeArgs := scope.peopleFilter("u", 2)
+	where := []string{"e.org_id = $1" + scopeSQL, "a.status IN ('submitted', 'graded', 'published')"}
+	args := append([]any{scope.OrgID}, scopeArgs...)
 	if f.ExamID != "" {
 		args = append(args, f.ExamID)
 		where = append(where, fmt.Sprintf("e.id = $%d::uuid", len(args)))
@@ -121,17 +122,16 @@ func (s *Store) ListScores(ctx context.Context, orgID string, f ScoreFilter) ([]
 	return items, total, nil
 }
 
-// GetScoreRecord loads the latest score record of an attempt. ownerID restricts the
-// read to the candidate themselves and to published records only (used by /my/scores).
-func (s *Store) GetScoreRecord(ctx context.Context, orgID, attemptID, ownerID string) (ScoreRecordDetail, error) {
+// GetScoreRecord loads the latest score record of an attempt within the caller's scope.
+// publishedOnly is used by the candidate route so unpublished scores stay invisible.
+func (s *Store) GetScoreRecord(ctx context.Context, scope Scope, attemptID string, publishedOnly bool) (ScoreRecordDetail, error) {
 	var item ScoreRecordDetail
 	var detailRaw []byte
-	ownerSQL := ""
-	args := []any{attemptID, orgID}
-	if ownerID != "" {
-		args = append(args, ownerID)
-		ownerSQL = fmt.Sprintf(" AND a.user_id = $%d::uuid AND sr.status = 'published'", len(args))
+	scopeSQL, scopeArgs := scope.peopleFilter("u", 3)
+	if publishedOnly {
+		scopeSQL += " AND sr.status = 'published'"
 	}
+	args := append([]any{attemptID, scope.OrgID}, scopeArgs...)
 	err := s.pool.QueryRow(ctx, `
 		SELECT a.id::text, u.id::text, u.name, u.username, e.id::text, e.title,
 			sr.total::float8, sr.status, a.status, a.submitted_at, sr.published_at, sr.detail
@@ -139,15 +139,12 @@ func (s *Store) GetScoreRecord(ctx context.Context, orgID, attemptID, ownerID st
 		JOIN attempts a ON a.id = sr.attempt_id
 		JOIN users u ON u.id = a.user_id
 		JOIN exams e ON e.id = a.exam_id
-		WHERE sr.attempt_id = $1::uuid AND e.org_id = $2`+ownerSQL+`
+		WHERE sr.attempt_id = $1::uuid AND e.org_id = $2`+scopeSQL+`
 		ORDER BY sr.created_at DESC
 		LIMIT 1`, args...).Scan(&item.AttemptID, &item.UserID, &item.UserName, &item.Username, &item.ExamID, &item.ExamTitle,
 		&item.Total, &item.ScoreStatus, &item.AttemptStatus, &item.SubmittedAt, &item.PublishedAt, &detailRaw)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			if ownerID != "" {
-				return ScoreRecordDetail{}, ErrForbidden
-			}
 			return ScoreRecordDetail{}, ErrNotFound
 		}
 		return ScoreRecordDetail{}, fmt.Errorf("get score record: %w", err)
@@ -307,14 +304,17 @@ type ExamAnalytics struct {
 	Distribution   []ScoreBucket `json:"distribution"`
 }
 
-func (s *Store) GetExamAnalytics(ctx context.Context, orgID, examID string) (ExamAnalytics, error) {
+func (s *Store) GetExamAnalytics(ctx context.Context, scope Scope, examID string) (ExamAnalytics, error) {
 	var analytics ExamAnalytics
 	var rulesRaw []byte
+	candidateScope, candidateArgs := scope.peopleFilter("cu", 3)
+	candidateSQL := `(SELECT count(*) FROM exam_candidates ec JOIN users cu ON cu.id = ec.user_id
+		WHERE ec.exam_id = e.id` + candidateScope + `)`
 	err := s.pool.QueryRow(ctx, `
 		SELECT e.id::text, e.title, p.title, e.rules,
-			(SELECT count(*) FROM exam_candidates ec WHERE ec.exam_id = e.id)
+			`+candidateSQL+`
 		FROM exams e JOIN papers p ON p.id = e.paper_id
-		WHERE e.id = $1 AND e.org_id = $2`, examID, orgID,
+		WHERE e.id = $1 AND e.org_id = $2`, append([]any{examID, scope.OrgID}, candidateArgs...)...,
 	).Scan(&analytics.ExamID, &analytics.ExamTitle, &analytics.PaperTitle, &rulesRaw, &analytics.CandidateCount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -338,11 +338,14 @@ func (s *Store) GetExamAnalytics(ctx context.Context, orgID, examID string) (Exa
 		analytics.PassScore = math.Round(analytics.TotalScore*0.6*100) / 100
 	}
 
+	scoreScope, scoreArgs := scope.peopleFilter("u", 2)
 	rows, err := s.pool.Query(ctx, `
 		SELECT sr.total::float8
 		FROM score_records sr
 		JOIN attempts a ON a.id = sr.attempt_id
-		WHERE a.exam_id = $1 AND a.status IN ('graded', 'published')`, examID)
+		JOIN users u ON u.id = a.user_id
+		WHERE a.exam_id = $1 AND a.status IN ('graded', 'published')`+scoreScope,
+		append([]any{examID}, scoreArgs...)...)
 	if err != nil {
 		return ExamAnalytics{}, fmt.Errorf("load analytics scores: %w", err)
 	}

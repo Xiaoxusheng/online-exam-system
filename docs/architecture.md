@@ -56,7 +56,8 @@ internal/httpapi     路由、中间件、各模块 handler
 | Web 框架 | chi | 轻量、标准 `net/http` 兼容、路由分组适合 RBAC |
 | 数据访问 | pgx + 手写 SQL | 高频答案写入需要可控 SQL；避免 ORM 黑盒 |
 | 数据库 | PostgreSQL 16 | JSONB 承载试卷快照/规则/配置；并发写入与统计强 |
-| 鉴权 | JWT（HS256）+ 角色中间件 | 无状态横向扩展；后续加刷新令牌与吊销表 |
+| 鉴权 | JWT（HS256）+ 刷新令牌轮换 | 访问令牌短、刷新令牌可吊销；旧刷新令牌重放触发全家桶吊销 |
+| 数据范围 | 请求级加载账号 + SQL 谓词注入 | `peopleFilter`/`bankVisibility` 生成参数化谓词，未知范围按拒绝处理 |
 | 迁移 | 内嵌 SQL + 版本表 | 无外部工具依赖，启动/CI 可执行 |
 | 前端 | React 19 + antd 5 | 用户明确要求 React；antd 覆盖 B 端表格/表单 |
 | 状态 | TanStack Query + Zustand | 服务端状态与全局会话分离，避免自造缓存层 |
@@ -109,7 +110,10 @@ internal/httpapi     路由、中间件、各模块 handler
 
 - 全站 HTTPS（生产）；JWT 签名密钥仅走环境变量，release 模式缺失即拒绝启动。
 - 密码 bcrypt（cost 12）；登录失败限流（后续接 Redis）；敏感操作审计。
-- 权限校验分两层：角色路由（已实现，org_admin 为超管）+ 资源范围（监考按 `exam_proctors` 考场名单、阅卷按任务归属，均已强制；campus/class/self 细分范围后续强制）。
+- 权限校验分两层：角色路由（org_admin 为超管）+ 数据范围。数据范围已强制：账号目录、成绩列表/明细、考试分析按调用者 `data_scope`（org/campus/class/self）过滤，未知范围一律拒绝；监考按 `exam_proctors` 考场名单、阅卷按任务归属收敛；题库按 `scope`（org/personal/campus）可见性过滤。
+- 每次请求按令牌重新加载账号，停用账号或调整角色/范围立即生效（不再等令牌过期）。
+- 登录失败限流：账号 5 次、IP 60 次 / 15 分钟（`LOGIN_ACCOUNT_LIMIT`、`LOGIN_IP_LIMIT`、`LOGIN_BLOCK`），单实例内存计数，多副本需换 Redis。
+- 刷新令牌轮换与重用检测：`refresh_tokens` 只存哈希，旧令牌重放吊销该用户全部刷新令牌。
 - WebSocket 握手前校验 Token、角色与考场名单，并校验 `Origin` 白名单；Token 通过查询参数传递是浏览器限制下的折中，日志不记录查询串。
 - 答案保存使用 `version` 乐观锁，拒绝过期写入（需求 6.3）。
 - 考生取卷接口剔除标准答案与编程题隐藏用例；快照答案仅服务端与阅卷接口可见（需求 6.4）。

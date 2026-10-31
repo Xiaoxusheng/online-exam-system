@@ -76,8 +76,7 @@ func validateQuestionPayload(questionType, difficulty string, content, answer, s
 }
 
 func (a *API) handleListQuestionBanks(w http.ResponseWriter, r *http.Request) {
-	claims, _ := claimsFrom(r.Context())
-	banks, err := a.store.ListQuestionBanks(r.Context(), claims.OrgID)
+	banks, err := a.store.ListQuestionBanks(r.Context(), scopeFrom(r.Context()))
 	if err != nil {
 		a.storeError(w, r, err, "题库不存在")
 		return
@@ -121,7 +120,6 @@ func (a *API) handleCreateQuestionBank(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) handleListQuestions(w http.ResponseWriter, r *http.Request) {
-	claims, _ := claimsFrom(r.Context())
 	page, pageSize := pagination(r)
 	filter := store.QuestionFilter{
 		BankID:     strings.TrimSpace(r.URL.Query().Get("bank_id")),
@@ -141,7 +139,7 @@ func (a *API) handleListQuestions(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "题型不正确")
 		return
 	}
-	questions, total, err := a.store.ListQuestions(r.Context(), claims.OrgID, filter)
+	questions, total, err := a.store.ListQuestions(r.Context(), scopeFrom(r.Context()), filter)
 	if err != nil {
 		a.storeError(w, r, err, "题目不存在")
 		return

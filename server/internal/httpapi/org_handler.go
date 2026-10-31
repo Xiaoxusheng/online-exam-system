@@ -104,7 +104,6 @@ func (a *API) handleCreateClass(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	claims, _ := claimsFrom(r.Context())
 	page, pageSize := pagination(r)
 	filter := store.UserFilter{
 		Role:     strings.TrimSpace(r.URL.Query().Get("role")),
@@ -119,7 +118,7 @@ func (a *API) handleListUsers(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "角色不正确")
 		return
 	}
-	users, total, err := a.store.ListUsers(r.Context(), claims.OrgID, filter)
+	users, total, err := a.store.ListUsers(r.Context(), scopeFrom(r.Context()), filter)
 	if err != nil {
 		a.storeError(w, r, err, "用户不存在")
 		return

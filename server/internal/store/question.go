@@ -46,14 +46,15 @@ func questionScanDest(q *Question) []any {
 	}
 }
 
-func (s *Store) ListQuestionBanks(ctx context.Context, orgID string) ([]QuestionBank, error) {
+func (s *Store) ListQuestionBanks(ctx context.Context, scope Scope) ([]QuestionBank, error) {
+	visSQL, visArgs := scope.bankVisibility("b", 2)
 	rows, err := s.pool.Query(ctx, `
 		SELECT b.id::text, b.name, b.scope, b.status, count(q.id), b.created_at
 		FROM question_banks b
 		LEFT JOIN questions q ON q.bank_id = b.id
-		WHERE b.org_id = $1
+		WHERE b.org_id = $1`+visSQL+`
 		GROUP BY b.id
-		ORDER BY b.created_at DESC`, orgID)
+		ORDER BY b.created_at DESC`, append([]any{scope.OrgID}, visArgs...)...)
 	if err != nil {
 		return nil, fmt.Errorf("list question banks: %w", err)
 	}
@@ -100,9 +101,11 @@ type QuestionFilter struct {
 	PageSize   int
 }
 
-func (s *Store) ListQuestions(ctx context.Context, orgID string, f QuestionFilter) ([]Question, int64, error) {
-	where := []string{"org_id = $1"}
-	args := []any{orgID}
+func (s *Store) ListQuestions(ctx context.Context, scope Scope, f QuestionFilter) ([]Question, int64, error) {
+	visSQL, visArgs := scope.bankVisibility("b", 2)
+	bankSQL := " AND EXISTS (SELECT 1 FROM question_banks b WHERE b.id = questions.bank_id" + visSQL + ")"
+	where := []string{"org_id = $1" + bankSQL}
+	args := append([]any{scope.OrgID}, visArgs...)
 
 	if f.BankID != "" {
 		args = append(args, f.BankID)
