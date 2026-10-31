@@ -68,6 +68,21 @@
 | GET | `/questions/{id}` | 题目详情（含答案，教师端） |
 | PUT | `/questions/{id}` | 更新题目，版本号 +1，写入 `question_revisions` |
 | POST | `/questions/{id}/publish` | 发布题目（draft/pending_review → published） |
+| GET | `/questions/import-template` | 下载 `.xlsx` 导入模板（含填写说明页与下拉校验） |
+| POST | `/questions/import` | 批量导入：`multipart/form-data`，字段 `bank_id` + `file`；逐行校验并返回报告 |
+| GET | `/questions/export` | 导出题目 `.xlsx`；支持与列表相同的 `bank_id`/`type`/`difficulty`/`status`/`keyword` 过滤 |
+
+导入约定：表头行为 `题型* 题干 选项A~F 正确答案* 分值* 难度 知识点 评分要点 状态`（列顺序任意，标题行以上可加说明行）。
+多选题答案接受 `ABD` / `A,B,D`；填空题多空用 `||` 分隔、同一空的等价答案用 `/` 分隔；判断题写 `对/错`。
+单次最多 1000 行；题干与库内已有题目完全相同时跳过（可重复上传同一文件）。响应：
+
+```json
+{
+  "bank_id": "…", "bank_name": "高中数学", "total": 12,
+  "created": 9, "published": 8, "skipped": 2, "failed": 1,
+  "report": [{ "line": 3, "stem": "…", "status": "failed", "message": "正确答案「E」不在选项范围内，可用 A~D" }]
+}
+```
 
 ### 2.4 试卷（teacher / exam_admin；审核通过仅 exam_admin）
 
@@ -156,6 +171,8 @@
 | POST | `/attempts/{id}/events` | 上报监考事件（切屏、失焦等） |
 | GET | `/my/scores` | 已发布成绩 |
 | GET | `/my/scores/{attemptId}` | 本人已发布成绩的逐题明细；未发布或他人答卷返回 403 |
+| POST | `/my/scores/{attemptId}/appeals` | 成绩申诉：`{"reason":"…","question_id":"可选"}`；仅已发布成绩可申诉，同一题只能有一条待处理申诉 |
+| GET | `/my/appeals` | 我的申诉与处理结果 |
 
 答卷状态响应（节选）：
 
@@ -202,6 +219,7 @@
 |---|---|---|
 | GET | `/review-tasks` | 阅卷任务；支持 `status`、`exam_id`、分页。阅卷教师只返回分配给自己的任务与待认领任务 |
 | GET | `/review-tasks/{id}` | 任务详情：题目、参考答案、考生答案、满分、是否匿名、全部轮次 |
+| GET | `/review-tasks/{id}/neighbors` | 连续批阅：在与列表相同的 `status`/`exam_id` 过滤下返回 `{position,total,prev_id,next_id}` |
 | POST | `/review-tasks/{id}/submit` | 提交评分与评语，按轮次规则合成答卷总分 |
 
 评分请求：`{"score": 2.5, "comment": "要点完整"}`。分数必须在 `0..题目满分` 之间；全部轮次完成后答卷状态转为 `graded`。
@@ -238,7 +256,18 @@
 | GET | `/scores` | 成绩汇总；支持 `exam_id`、`status`、`keyword`、分页。按调用者 `data_scope` 收敛（校区/班级） |
 | GET | `/scores/{attemptId}` | 成绩明细（逐题得分、是否需要人工复核）；不在调用者数据范围内返回 404 |
 | POST | `/scores/publish` | 按考试发布已判分成绩；请求 `{"exam_id":"<uuid>"}` |
+| GET | `/scores/export?exam_id=` | 导出该考试全部已判分成绩为 `.xlsx`（成绩 + 汇总两个工作表，逐行水印）；仅 exam_admin/teacher |
+| POST | `/scores/{attemptId}/adjust` | 成绩更正（仅 exam_admin）：`{"reason":"…","items":[{"question_id":"…","score":1}]}` |
+| GET | `/scores/{attemptId}/adjustments` | 该答卷的更正历史（含逐题前后分、操作人、时间） |
 | GET | `/analytics/exams/{examId}` | 参考人数、已判分数、平均/最高/最低、及格率、分数段分布；只统计调用者数据范围内的考生 |
+| GET | `/analytics/exams/{examId}/items` | 逐题诊断：正确率、得分率、未作答人数、区分度、选项分布 |
+| GET | `/analytics/knowledge-points?exam_id=` | 知识点掌握度：不带 `exam_id` 时汇总全部考试，返回得分率、掌握度等级与历次趋势 |
+| GET | `/appeals?status=` | 申诉队列（仅 exam_admin），按调用者数据范围收敛 |
+| POST | `/appeals/{id}/handle` | 处理申诉：`{"action":"accepted|rejected","note":"…"}`，结果站内通知考生 |
+
+成绩更正写入新的一条 `score_records`（保留原记录做历史），`status` 跟随原记录（已发布的更正后仍对考生可见），并写 `score_adjustments` 与审计日志 `score.adjusted`。
+逐题诊断的区分度按总分排序取前/后 27% 考生的该题得分率之差；样本不足 10 份时响应带 `sample_note` 提示。
+导出接口返回 `Content-Disposition: attachment; filename*=UTF-8''…` 与 `Cache-Control: no-store`，并写审计 `score.exported` / `question.exported`。
 
 统计响应（节选）：
 
@@ -313,6 +342,8 @@
 | GET | `/notifications` | 登录用户 | 我的通知（分页）；`source_type`/`source_id` 用于前端跳转 |
 | PATCH | `/notifications/{id}/read` | 登录用户 | 标记已读 |
 | GET | `/notification-templates` | org_admin | 模板列表 |
+| PUT | `/notification-templates/{id}` | org_admin | 编辑标题/正文模板与启用开关 |
+| GET | `/notification-logs` | org_admin | 全机构发送记录（`status`、`keyword`、分页） |
 
 站内通知自动生成，无需前端调用：
 
@@ -320,6 +351,10 @@
 |---|---|---|---|
 | 考试发布 | 该考试全部考生 | `exam_publish` | `考试发布：<考试名>`，正文含考试起止时间与时长 |
 | 成绩发布 | 该次发布对应的考生 | `score_publish` | `成绩发布`，正文含《考试名》与得分 |
+| 成绩更正 | 该答卷考生 | `score_adjust` | `成绩更正`，正文含更正后与原得分 |
+| 申诉处理 | 申诉人 | `score_appeal` | `成绩申诉结果`，正文含结论与说明 |
+
+`source_type` 同时是模板编码：启用且命中模板时，用模板正文渲染 `{exam}` `{total}` `{verdict}` 等占位符（未识别的占位符会被去掉）；模板停用、缺失或渲染后为空时回退到内置文案。迁移 `0007` 为每个机构预置五个默认模板。
 
 `(user_id, source_type, source_id)` 唯一：同一考试重复发布成绩不会重复发送。新通知 `status='sent'`，已读后为 `read`。
 
@@ -361,9 +396,8 @@
 ## 5. 明确未实现
 
 - 编程题隔离沙箱执行与用例判题；当前编程题只走人工阅卷。
-- Excel 批量导入/导出、文件上传/抓拍存储（`snapshot_url` 仅接受前端传入的字符串）。
-- 短信/邮件真实发送、通知模板编辑（站内通知已自动生成）。
-- 人脸核验、AI 行为检测、双机位、证书与申诉。
-- 校区/班级级数据范围强制（当前只实现监考考场范围与阅卷任务范围）。
-- 刷新令牌、登录限流。
-- 前端页面接真实接口（当前 `web/` 仍为 UI 骨架）。
+- 音视频题的媒体文件上传与播放存储；抓拍 `snapshot_url` 仅接受前端传入的字符串，对象存储未接入。
+- 短信 / 邮件真实投递（模板与发送记录已支持，通道仅站内消息落地）。
+- 人脸核验、AI 行为检测、双机位、证书发放。
+- 试卷与题库的删除/归档接口（当前只能新建与状态流转）。
+- 多机构自助注册与计费；当前机构由种子数据创建。

@@ -89,7 +89,17 @@ internal/httpapi     路由、中间件、各模块 handler
 6. 兜底：未配置阅卷教师时任务留在公共池（`reviewer_id` 为空）由任意阅卷教师认领，认领后任务归属该教师，他人打开/提交返回 403。
 7. 通知：考试发布通知全体考生、成绩发布通知对应考生，`(user_id, source_type, source_id)` 唯一约束保证重复发布不重复发送。
 
-## 5. 数据模型（v0.4 schema）
+### 4.3 批量导入导出与质量分析（v1.0 已实现）
+
+1. Excel 通道：`internal/excel` 用 excelize 做工作簿读写，模板带下拉校验与填写说明页；导入按表头名定位列（列顺序可变、标题行以上可加说明行），单次上限 1000 行、上传上限 12 MB，解析时显式限制解压体积（`UnzipSizeLimit`）防 zip 炸弹。
+2. 幂等导入：逐行校验 → 与库内题干完全相同则跳过 → 通过 `validateQuestionPayload` 后写库，`状态=已发布` 的行自动发布；整批返回逐行报告（`created/skipped/failed`），失败行不阻断其余行。导出的题目表与导入模板同构，可导出后编辑再导入。
+3. 导出留痕：成绩/题目导出均为 `.xlsx`，`Cache-Control: no-store`、RFC 5987 中文文件名、逐行「导出水印」列 + 表头水印（导出人、角色、数据范围、时间、行数），并写审计 `score.exported` / `question.exported`。
+4. 题目诊断：以 `score_records.detail`（最新一条）为事实来源重算逐题正确率与得分率，`answers.content` 提供选项分布（选项集合来自题面 `content.options`，未选中的也补 0），区分度按总分排序取前/后 27% 考生的得分率差；样本 <10 时响应带 `sample_note`。
+5. 知识点掌握度：一条 SQL 用 `GROUPING SETS` 同时算出「知识点汇总」与「知识点 × 考试」趋势，按数据范围收敛，得分率分档为 优秀/良好/待巩固/待提升。
+6. 成绩更正：写一条新的 `score_records`（原记录保留）+ `score_adjustments` 明细，状态跟随原记录（已发布的更正后仍可见），通知考生并写审计；申诉走 `score_appeals`，处理结果站内通知。
+7. 通知模板：`source_type` 即模板编码，命中启用模板时按 `{exam}`/`{total}`/`{verdict}` 等占位符渲染，未识别占位符丢弃，模板缺失或停用回退内置文案；迁移 0007 为每个机构预置默认模板。
+
+## 5. 数据模型（v1.0 schema）
 
 | 实体 | 表 | 关键点 |
 |---|---|---|
@@ -101,8 +111,9 @@ internal/httpapi     路由、中间件、各模块 handler
 | 答卷 | `attempts` `answers` | 答卷 AB 分组；答案 `(attempt_id, question_id)` 主键 + version 乐观锁 |
 | 判题/阅卷 | `judge_results` `review_tasks` | 用例结果 JSONB；人工评分按 `round`（1 一评 / 2 二评 / 3 仲裁）唯一 |
 | 监考 | `proctor_events` | 分级告警、关键帧、处置留痕 |
-| 成绩 | `score_records` | 合成明细 JSONB、发布状态 |
-| 系统 | `audit_logs` `notifications` `notification_templates` | 审计只追加；通知带 `source_type`/`source_id` 去重 |
+| 成绩 | `score_records` `score_adjustments` `score_appeals` | 合成明细 JSONB、发布状态；更正逐次留痕（前后总分 + 逐题分差），申诉按 `(attempt, question)` 唯一开放 |
+| 会话 | `refresh_tokens` | 只存哈希，轮换 + 重用检测 |
+| 系统 | `audit_logs` `notifications` `notification_templates` | 审计只追加；通知带 `source_type`/`source_id` 去重；模板编码 = 通知 `source_type` |
 
 索引覆盖：用户登录、题目筛选、考试状态、答卷状态、监考事件时间线、审计时间。
 
@@ -119,12 +130,16 @@ internal/httpapi     路由、中间件、各模块 handler
 - 考生取卷接口剔除标准答案与编程题隐藏用例；快照答案仅服务端与阅卷接口可见（需求 6.4）。
 - 匿名阅卷开启时，阅卷任务列表与详情都不返回考生真实姓名（`user_name` 一并按「匿名考生」下发）。
 - 交卷/阅卷/成绩发布使用状态校验与幂等路径；自动收卷与到期结束重复执行安全。
+- 批量导入：只接受 `.xlsx`（zip 魔数 + 表头匹配），单文件 12 MB、解压 64 MB、单次 1000 行；逐行服务端校验后写库，题干重复跳过；导入目标题库必须在该账号可见范围内，跨机构/未知题库返回 `INVALID_BANK`。
+- 导出：按调用者数据范围过滤行，逐行水印 + 表头水印（导出人/角色/数据范围/时间/行数）使外泄可追溯；文件名过滤路径字符，响应 `Cache-Control: no-store`；导出与更正、申诉处理均写审计。
+- 成绩更正要求「同一答卷 + 分数确有变化 + 不超过题目满分」，越界或无变化返回 `INVALID_STATE`；跨数据范围访问返回 404，不泄露资源是否存在。
 - 对外错误统一文案，不泄露资源是否存在。
 
 ## 7. 部署形态
 
 | 环境 | 形态 |
 |---|---|
-| 本地开发 | Go :8081 + Vite :5174 + 本机 PostgreSQL :5432 |
-| 测试/生产 | Docker Compose：api + web(nginx) + postgres + redis；后续加 judge worker |
+| 本地开发 | Go :8081 + Vite :5174（代理 `/api`）+ 本机 PostgreSQL :5432 |
+| 单机生产 | 单个静态 Go 二进制（`CGO_ENABLED=0`）同时提供 API 与 `WEB_DIR` 下的 SPA 静态资源：`/assets/*` 一年 immutable 缓存，其余非 `/api` 路径回落到 `index.html`；systemd 托管，同源部署无需 CORS |
+| 多副本 | Docker Compose：api + postgres + redis（限流/会话换 Redis 后启用）；judge worker 后续接入 |
 | 可观测 | 结构化日志（slog JSON）、/healthz、/readyz；后续接入指标与 Trace |
