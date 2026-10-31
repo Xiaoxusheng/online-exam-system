@@ -19,10 +19,11 @@ type API struct {
 	log    *slog.Logger
 	store  *store.Store
 	tokens *auth.TokenManager
+	hub    *proctorHub
 }
 
 func New(cfg config.Config, log *slog.Logger, st *store.Store, tokens *auth.TokenManager) *API {
-	return &API{cfg: cfg, log: log, store: st, tokens: tokens}
+	return &API{cfg: cfg, log: log, store: st, tokens: tokens, hub: newProctorHub(log)}
 }
 
 func (a *API) Router() http.Handler {
@@ -34,6 +35,10 @@ func (a *API) Router() http.Handler {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", a.handleLogin)
+
+		// Proctor realtime room. Browsers cannot attach an Authorization header to a
+		// websocket, so this route authenticates its ?token= parameter itself.
+		r.Get("/proctor/exams/{examId}/ws", a.handleProctorWebSocket)
 
 		r.Group(func(r chi.Router) {
 			r.Use(a.authenticate)
@@ -91,6 +96,10 @@ func (a *API) Router() http.Handler {
 				r.Post("/exams/{id}/publish", a.handlePublishExam)
 				r.Get("/exams/{id}/candidates", a.handleListExamCandidates)
 				r.Post("/exams/{id}/candidates", a.handleAddExamCandidates)
+				r.Get("/exams/{id}/proctors", a.handleListExamProctors)
+				r.Put("/exams/{id}/proctors", a.handleSetExamProctors)
+				r.Get("/exams/{id}/reviewers", a.handleListExamReviewers)
+				r.Put("/exams/{id}/reviewers", a.handleSetExamReviewers)
 			})
 
 			// Candidate taking exams.
@@ -105,18 +114,17 @@ func (a *API) Router() http.Handler {
 				r.Get("/my/scores", a.handleMyScores)
 			})
 
-			// Proctoring.
+			// Proctoring. Proctors are limited to the exams they are assigned to.
 			r.Group(func(r chi.Router) {
 				r.Use(a.requireRoles("proctor", "exam_admin"))
 				r.Get("/proctor/exams/{examId}/overview", a.handleProctorOverview)
 				r.Get("/proctor/exams/{examId}/events", a.handleListProctorEvents)
 				r.Post("/proctor/events/{eventId}/handle", a.handleHandleProctorEvent)
-				r.Get("/proctor/exams/{examId}/ws", notImplementedHandler)
 			})
 
-			// Review & grading.
+			// Review & grading. Reviewers only see the tasks assigned to them.
 			r.Group(func(r chi.Router) {
-				r.Use(a.requireRoles("reviewer"))
+				r.Use(a.requireRoles("reviewer", "exam_admin"))
 				r.Get("/review-tasks", a.handleListReviewTasks)
 				r.Get("/review-tasks/{id}", a.handleGetReviewTask)
 				r.Post("/review-tasks/{id}/submit", a.handleSubmitReview)

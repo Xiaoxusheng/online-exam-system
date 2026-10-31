@@ -40,6 +40,34 @@ func validateCandidateInputs(w http.ResponseWriter, candidates []store.Candidate
 	return true
 }
 
+func validateExamRules(w http.ResponseWriter, raw json.RawMessage) bool {
+	if len(raw) == 0 {
+		return true
+	}
+	var rules struct {
+		ReviewMode      *string  `json:"review_mode"`
+		ReviewThreshold *float64 `json:"review_threshold"`
+		PassScore       *float64 `json:"pass_score"`
+	}
+	if err := json.Unmarshal(raw, &rules); err != nil {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "考试规则字段类型不正确")
+		return false
+	}
+	if rules.ReviewMode != nil && *rules.ReviewMode != "single" && *rules.ReviewMode != "double" {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "review_mode 只能是 single 或 double")
+		return false
+	}
+	if rules.ReviewThreshold != nil && *rules.ReviewThreshold < 0 {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "review_threshold 不能为负数")
+		return false
+	}
+	if rules.PassScore != nil && *rules.PassScore < 0 {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "pass_score 不能为负数")
+		return false
+	}
+	return true
+}
+
 func (a *API) handleCreateExam(w http.ResponseWriter, r *http.Request) {
 	claims, _ := claimsFrom(r.Context())
 	var req createExamRequest
@@ -64,6 +92,9 @@ func (a *API) handleCreateExam(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.Rules) > 0 && !isJSONObject(req.Rules) {
 		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "考试规则必须是 JSON 对象")
+		return
+	}
+	if !validateExamRules(w, req.Rules) {
 		return
 	}
 	if len(req.ProctorConfig) > 0 && !isJSONObject(req.ProctorConfig) {

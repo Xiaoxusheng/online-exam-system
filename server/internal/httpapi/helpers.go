@@ -34,6 +34,15 @@ func validateUUIDField(w http.ResponseWriter, raw, field string) (string, bool) 
 	return parseUUIDParam(w, raw, field)
 }
 
+func bearerToken(r *http.Request) string {
+	const prefix = "Bearer "
+	header := r.Header.Get("Authorization")
+	if !strings.HasPrefix(header, prefix) {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(header, prefix))
+}
+
 func validOneOf(value string, allowed ...string) bool {
 	for _, item := range allowed {
 		if value == item {

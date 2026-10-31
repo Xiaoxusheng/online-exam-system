@@ -2,10 +2,6 @@ package httpapi
 
 import "net/http"
 
-func notImplementedHandler(w http.ResponseWriter, _ *http.Request) {
-	apiError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "该功能尚未实现")
-}
-
 type roleDescriptor struct {
 	Code        string `json:"code"`
 	Name        string `json:"name"`

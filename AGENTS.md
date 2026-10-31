@@ -10,7 +10,7 @@
 ## 技术栈
 
 - 前端：React 19 + TypeScript + Vite + Ant Design 5 + React Router 7 + TanStack Query + Zustand
-- 后端：Go 1.27 + chi v5 + pgx v5 + golang-jwt v5 + bcrypt
+- 后端：Go 1.27 + chi v5 + pgx v5 + golang-jwt v5 + bcrypt + gorilla/websocket
 - 数据库：PostgreSQL 16
 - 单仓：`server/`（Go）+ `web/`（React），`docs/` 存放文档
 
@@ -62,7 +62,7 @@ npm run build                   # 生产构建
 
 ## 后端规范
 
-- 响应统一：成功 `{"data": ...}`（列表带 `pagination`）；失败 `{"error":{"code","message"}}`，错误码大写下划线，如 `INVALID_CREDENTIALS`、`UNAUTHORIZED`、`NOT_IMPLEMENTED`。
+- 响应统一：成功 `{"data": ...}`（列表带 `pagination`）；失败 `{"error":{"code","message"}}`，错误码大写下划线，如 `INVALID_CREDENTIALS`、`UNAUTHORIZED`、`INVALID_STATE`。
 - 路由统一前缀 `/api/v1`；健康检查 `/healthz`、`/readyz` 不带前缀。
 - 鉴权：Bearer JWT；角色 `org_admin | exam_admin | teacher | reviewer | proctor | student`，路由按角色分组挂中间件。
 - 敏感操作（登录、改分、导出、删除）写 `audit_logs`。
@@ -88,12 +88,13 @@ npm run build                   # 生产构建
 5. 一个任务一个 commit，提交信息遵循 Conventional Commits（中文 subject 可）。
 6. 不得擅自扩大范围、不得删除已有功能规避问题、测试失败不得声称完成。
 
-## 已知边界（v0.3）
+## 已知边界（v0.4）
 
-- 后端核心业务链路已实现：组织账号、题库、组卷、考试发布、考生作答、自动判分、人工阅卷、成绩发布、统计、监考事件、审计。
+- 后端核心业务链路已实现：组织账号、题库、组卷、考试发布、考生作答、自动判分、人工阅卷（含分配/双评/仲裁）、成绩发布、统计、监考事件与 WebSocket 实时推送、考试到期自动结束与缺考、站内通知、审计。
 - 前端页面仍为展示骨架，尚未接入真实业务接口（下一阶段）。
-- 未实现：WebSocket 实时推送、编程题隔离沙箱、Excel 导入导出、文件上传、短信/邮件真实发送、人脸核验与 AI 行为检测。
-- 单机构模型：表结构预留 `org_id`，数据范围目前按机构过滤，细分 campus/class/self 范围未强制。
-- 自动收卷由服务内每 30 秒执行的后台任务完成；交卷、阅卷提交、成绩发布均幂等或带状态校验。
+- 未实现：编程题隔离沙箱、Excel 导入导出、文件上传与抓拍存储、短信/邮件真实发送、人脸核验与 AI 行为检测。
+- 单机构模型：表结构预留 `org_id`，数据范围按机构过滤；监考考场范围与阅卷任务归属已强制，campus/class/self 细分范围未强制。
+- 后台任务每 30 秒执行：先结束到期考试并标记未入场考生缺考，再自动提交超时答卷；交卷、阅卷提交、成绩发布均幂等或带状态校验。
 - 编程题、音视频题走人工阅卷；单选、多选、判断、填空自动判分。
-- 阅卷任务暂未按教师分配，也未实现双评/仲裁；reviewer 可查看本机构待阅任务。
+- 阅卷轮次依赖 `exams.rules.review_mode`（`single`/`double`）与 `review_threshold`；未配置阅卷教师时任务进入公共认领池。
+- 监考 WebSocket 用 `?token=` 传 JWT（浏览器无法为 WS 附加请求头），仅房间鉴权路径不参与 Bearer 中间件。

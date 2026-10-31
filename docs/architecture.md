@@ -60,7 +60,10 @@ internal/httpapi     路由、中间件、各模块 handler
 | 迁移 | 内嵌 SQL + 版本表 | 无外部工具依赖，启动/CI 可执行 |
 | 前端 | React 19 + antd 5 | 用户明确要求 React；antd 覆盖 B 端表格/表单 |
 | 状态 | TanStack Query + Zustand | 服务端状态与全局会话分离，避免自造缓存层 |
-| 实时 | WebSocket + 5s 轮询兜底 | 对应 M-09；v0.3 仅保留接口占位（501），前端可先轮询 |
+| 实时 | WebSocket 房间广播（gorilla/websocket） | 对应 M-09；按考试建房间，心跳 + 慢消费者断开，前端仍可轮询兜底 |
+| 实时事件通道 | store 定义 `RealtimePublisher` 接口，由 httpapi 的房间 Hub 实现 | Store 不依赖 HTTP 包，依赖方向保持单向；事件在事务提交后发出 |
+| 考试生命周期 | 30s ticker 先结束到期考试并标记缺考，再自动收卷 | 与自动交卷共用一个后台任务，状态推进幂等 |
+| 阅卷轮次 | `review_tasks.round`（1-3）+ `(attempt_id, question_id, round)` 唯一索引 | 双评/仲裁可按轮次幂等创建，重复交卷不产生脏任务 |
 | 自动收卷 | 服务内 30s ticker | 扫描超过个人截止时间的答卷并幂等交卷 |
 | 判分 | 纯函数包 `internal/grading` | 客观题自动判分；主观题生成阅卷任务 |
 
@@ -70,12 +73,22 @@ internal/httpapi     路由、中间件、各模块 handler
 2. 组卷：固定卷/AB 卷写入 `paper_questions`；随机卷保存 `rules.sections`，在考试发布时抽题。
 3. 发布考试：校验试卷 `approved`、考生非空，将题目内容/答案/分值/分组固化到 `paper_snapshots`，考试进入待开考。
 4. 开考：校验考生身份与时间窗，创建 `attempts`（含 AB 分组）；答案以 `version` 乐观锁保存。
-5. 交卷：按快照自动判分客观题，主观题创建 `review_tasks`；逐题得分写入 `score_records.detail`。
-6. 阅卷：分数与评语合并到成绩明细，全部任务完成后答卷转 `graded`。
+5. 交卷：按快照自动判分客观题，主观题创建 `review_tasks`（第 1 轮，按考试阅卷教师自动分配）；逐题得分写入 `score_records.detail`。
+6. 阅卷：轮次完成后把最终分合并到成绩明细，全部任务完成后答卷转 `graded`。
 7. 发布成绩：仅发布 `graded` 答卷；考生只能看到 `published` 成绩。
-8. 后台任务：每 30 秒自动提交超时答卷；全部考生交卷/缺考后考试转 `ended`。
+8. 后台任务：每 30 秒先结束到期考试（未入场考生标记缺考），再自动提交超时答卷；全部考生交卷/缺考后考试转 `ended`。
 
-## 5. 数据模型（v0.3 schema）
+### 4.2 监考实时化与阅卷协同（v0.4 已实现）
+
+1. 名单配置：`exam_proctors` / `exam_reviewers` 由考务按考试维护（全量覆盖，角色与机构归属校验）。
+2. 考场范围：名单为空 → 全机构监考员可进入；名单非空 → 仅名单内可查房间、事件与处置。考务/超管不受限。
+3. 事件流：业务写入（开考、交卷、告警、处置、发布、结束）在事务提交后经 `RealtimePublisher` 广播到该考试的房间；无人订阅时为一次 map 查找，无额外开销。
+4. 连接治理：`?token=` 鉴权 + Origin 白名单 + 60s ping/75s pong 超时 + 每房间 64 连接上限 + 发送缓冲满即断开慢消费者。
+5. 双评：`rules.review_mode=double` 时一评只记录不定分，系统按「待评任务最少 + 排除前一轮教师」自动创建二评；分差在阈值内取平均，超阈值生成三评仲裁，仲裁分即最终分。
+6. 兜底：未配置阅卷教师时任务留在公共池（`reviewer_id` 为空）由任意阅卷教师认领，认领后任务归属该教师，他人打开/提交返回 403。
+7. 通知：考试发布通知全体考生、成绩发布通知对应考生，`(user_id, source_type, source_id)` 唯一约束保证重复发布不重复发送。
+
+## 5. 数据模型（v0.4 schema）
 
 | 实体 | 表 | 关键点 |
 |---|---|---|
@@ -83,12 +96,12 @@ internal/httpapi     路由、中间件、各模块 handler
 | 用户 | `users` | 统一账号；role 枚举 + data_scope；campus/class 归属；bcrypt |
 | 题库/题目 | `question_banks` `questions` `question_assets` `question_revisions` | 题目 JSONB 内容；版本化 |
 | 试卷 | `papers` `paper_questions` `paper_snapshots` | 随机规则 JSONB；发布快照 |
-| 考试 | `exams` `exam_candidates` | 规则/监考配置 JSONB；考生 AB 分组；状态机 |
+| 考试 | `exams` `exam_candidates` `exam_proctors` `exam_reviewers` | 规则/监考配置 JSONB；考生 AB 分组；状态机；考场与阅卷名单 |
 | 答卷 | `attempts` `answers` | 答卷 AB 分组；答案 `(attempt_id, question_id)` 主键 + version 乐观锁 |
-| 判题/阅卷 | `judge_results` `review_tasks` | 用例结果 JSONB；人工评分 |
+| 判题/阅卷 | `judge_results` `review_tasks` | 用例结果 JSONB；人工评分按 `round`（1 一评 / 2 二评 / 3 仲裁）唯一 |
 | 监考 | `proctor_events` | 分级告警、关键帧、处置留痕 |
 | 成绩 | `score_records` | 合成明细 JSONB、发布状态 |
-| 系统 | `audit_logs` `notifications` `notification_templates` | 审计只追加；通知渠道 |
+| 系统 | `audit_logs` `notifications` `notification_templates` | 审计只追加；通知带 `source_type`/`source_id` 去重 |
 
 索引覆盖：用户登录、题目筛选、考试状态、答卷状态、监考事件时间线、审计时间。
 
@@ -96,10 +109,12 @@ internal/httpapi     路由、中间件、各模块 handler
 
 - 全站 HTTPS（生产）；JWT 签名密钥仅走环境变量，release 模式缺失即拒绝启动。
 - 密码 bcrypt（cost 12）；登录失败限流（后续接 Redis）；敏感操作审计。
-- 权限校验分两层：角色路由（已实现，org_admin 为超管）+ 数据范围（当前按机构过滤，campus/class/self 细分范围后续强制）。
+- 权限校验分两层：角色路由（已实现，org_admin 为超管）+ 资源范围（监考按 `exam_proctors` 考场名单、阅卷按任务归属，均已强制；campus/class/self 细分范围后续强制）。
+- WebSocket 握手前校验 Token、角色与考场名单，并校验 `Origin` 白名单；Token 通过查询参数传递是浏览器限制下的折中，日志不记录查询串。
 - 答案保存使用 `version` 乐观锁，拒绝过期写入（需求 6.3）。
 - 考生取卷接口剔除标准答案与编程题隐藏用例；快照答案仅服务端与阅卷接口可见（需求 6.4）。
-- 交卷/阅卷/成绩发布使用状态校验与幂等路径；自动收卷重复执行安全。
+- 匿名阅卷开启时，阅卷任务列表与详情都不返回考生真实姓名（`user_name` 一并按「匿名考生」下发）。
+- 交卷/阅卷/成绩发布使用状态校验与幂等路径；自动收卷与到期结束重复执行安全。
 - 对外错误统一文案，不泄露资源是否存在。
 
 ## 7. 部署形态

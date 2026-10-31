@@ -45,8 +45,10 @@ func run() error {
 	defer pool.Close()
 
 	st := store.New(pool)
-	go runAutoSubmit(ctx, log, st)
 	api := httpapi.New(cfg, log, st, auth.NewTokenManager(cfg.JWTSecret, cfg.JWTTTL))
+	// Wired before any request or background job can emit an event.
+	st.UseRealtime(api)
+	go runExamGovernance(ctx, log, st)
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           api.Router(),
@@ -80,7 +82,7 @@ func run() error {
 	return nil
 }
 
-func runAutoSubmit(ctx context.Context, log *slog.Logger, st *store.Store) {
+func runExamGovernance(ctx context.Context, log *slog.Logger, st *store.Store) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -89,6 +91,14 @@ func runAutoSubmit(ctx context.Context, log *slog.Logger, st *store.Store) {
 			return
 		case <-ticker.C:
 			runCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+			lifecycle, err := st.CloseExpiredExams(runCtx)
+			if err != nil {
+				log.Warn("close expired exams failed", "error", err)
+			} else if lifecycle.ClosedExams > 0 || lifecycle.AbsentCandidates > 0 {
+				log.Info("exam lifecycle sweep",
+					"closed_exams", lifecycle.ClosedExams, "absent_candidates", lifecycle.AbsentCandidates)
+			}
+
 			count, err := st.FinalizeExpiredAttempts(runCtx)
 			cancel()
 			if err != nil {

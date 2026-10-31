@@ -59,7 +59,24 @@ func (s *Store) CreateProctorEvent(ctx context.Context, userID, attemptID, event
 	if err != nil {
 		return ProctorEvent{}, fmt.Errorf("create proctor event: %w", err)
 	}
-	return s.getProctorEvent(ctx, eventID)
+	event, err := s.getProctorEvent(ctx, eventID)
+	if err != nil {
+		return ProctorEvent{}, err
+	}
+	s.emit(RealtimeEvent{
+		Type:      EventProctorAlarm,
+		ExamID:    examID,
+		AttemptID: attemptID,
+		UserID:    event.UserID,
+		UserName:  event.UserName,
+		Detail: map[string]any{
+			"event_id":     event.ID,
+			"event_type":   eventType,
+			"level":        level,
+			"snapshot_url": snapshotURL,
+		},
+	})
+	return event, nil
 }
 
 type ProctorEventFilter struct {
@@ -123,6 +140,22 @@ func (s *Store) ListProctorEvents(ctx context.Context, orgID, examID string, f P
 	return events, total, nil
 }
 
+// ProctorEventExam resolves the exam of an event so the handler can apply the proctor scope.
+func (s *Store) ProctorEventExam(ctx context.Context, orgID string, eventID int64) (string, error) {
+	var examID string
+	err := s.pool.QueryRow(ctx, `
+		SELECT pe.exam_id::text
+		FROM proctor_events pe JOIN exams e ON e.id = pe.exam_id
+		WHERE pe.id = $1 AND e.org_id = $2`, eventID, orgID).Scan(&examID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", fmt.Errorf("load proctor event exam: %w", err)
+	}
+	return examID, nil
+}
+
 func (s *Store) HandleProctorEvent(ctx context.Context, orgID string, eventID int64, actorID, action, note string) (ProctorEvent, error) {
 	tag, err := s.pool.Exec(ctx, `
 		UPDATE proctor_events pe
@@ -136,7 +169,21 @@ func (s *Store) HandleProctorEvent(ctx context.Context, orgID string, eventID in
 	if tag.RowsAffected() == 0 {
 		return ProctorEvent{}, ErrNotFound
 	}
-	return s.getProctorEvent(ctx, eventID)
+	event, err := s.getProctorEvent(ctx, eventID)
+	if err != nil {
+		return ProctorEvent{}, err
+	}
+	s.emit(RealtimeEvent{
+		Type:      EventProctorHandled,
+		ExamID:    event.ExamID,
+		AttemptID: event.AttemptID,
+		UserID:    actorID,
+		Detail: map[string]any{
+			"event_id": event.ID,
+			"action":   action,
+		},
+	})
+	return event, nil
 }
 
 func (s *Store) getProctorEvent(ctx context.Context, eventID int64) (ProctorEvent, error) {

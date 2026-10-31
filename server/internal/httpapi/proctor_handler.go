@@ -6,13 +6,40 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"online-exam-system/server/internal/auth"
 	"online-exam-system/server/internal/store"
 )
+
+// canWatchExam enforces the proctor data scope: exam administrators see every exam of
+// the organization, proctors only the rooms they were assigned to.
+func (a *API) canWatchExam(w http.ResponseWriter, r *http.Request, claims *auth.Claims, examID string) bool {
+	switch claims.Role {
+	case "org_admin", "exam_admin":
+		return true
+	case "proctor":
+	default:
+		apiError(w, http.StatusForbidden, "FORBIDDEN", "无权访问该考场")
+		return false
+	}
+	allowed, err := a.store.CanProctorExam(r.Context(), claims.OrgID, examID, claims.Subject)
+	if err != nil {
+		a.storeError(w, r, err, "考试不存在")
+		return false
+	}
+	if !allowed {
+		apiError(w, http.StatusForbidden, "FORBIDDEN", "仅可查看分配给你的考试")
+		return false
+	}
+	return true
+}
 
 func (a *API) handleProctorOverview(w http.ResponseWriter, r *http.Request) {
 	claims, _ := claimsFrom(r.Context())
 	examID, ok := parseUUIDParam(w, pathParam(r, "examId"), "考试 ID")
 	if !ok {
+		return
+	}
+	if !a.canWatchExam(w, r, claims, examID) {
 		return
 	}
 	overview, err := a.store.GetProctorOverview(r.Context(), claims.OrgID, examID)
@@ -27,6 +54,9 @@ func (a *API) handleListProctorEvents(w http.ResponseWriter, r *http.Request) {
 	claims, _ := claimsFrom(r.Context())
 	examID, ok := parseUUIDParam(w, pathParam(r, "examId"), "考试 ID")
 	if !ok {
+		return
+	}
+	if !a.canWatchExam(w, r, claims, examID) {
 		return
 	}
 	page, pageSize := pagination(r)
@@ -53,6 +83,14 @@ func (a *API) handleHandleProctorEvent(w http.ResponseWriter, r *http.Request) {
 	eventID, err := strconv.ParseInt(pathParam(r, "eventId"), 10, 64)
 	if err != nil {
 		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "事件 ID 格式不正确")
+		return
+	}
+	examID, err := a.store.ProctorEventExam(r.Context(), claims.OrgID, eventID)
+	if err != nil {
+		a.storeError(w, r, err, "监考事件不存在")
+		return
+	}
+	if !a.canWatchExam(w, r, claims, examID) {
 		return
 	}
 	var req handleProctorEventRequest

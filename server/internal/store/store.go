@@ -17,7 +17,8 @@ type DBTX interface {
 }
 
 type Store struct {
-	pool *pgxpool.Pool
+	pool     *pgxpool.Pool
+	realtime RealtimePublisher
 }
 
 func New(pool *pgxpool.Pool) *Store {

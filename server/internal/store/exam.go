@@ -209,6 +209,10 @@ func (s *Store) PublishExam(ctx context.Context, orgID, examID string) (Exam, er
 
 	var (
 		examStatus  string
+		examTitle   string
+		startAt     time.Time
+		endAt       time.Time
+		duration    int
 		paperID     string
 		paperTitle  string
 		paperType   string
@@ -216,11 +220,13 @@ func (s *Store) PublishExam(ctx context.Context, orgID, examID string) (Exam, er
 		rules       json.RawMessage
 	)
 	err = tx.QueryRow(ctx, `
-		SELECT e.status, e.paper_id::text, p.title, p.type, p.status, p.rules
+		SELECT e.status, e.title, e.start_at, e.end_at, e.duration_minutes,
+			e.paper_id::text, p.title, p.type, p.status, p.rules
 		FROM exams e JOIN papers p ON p.id = e.paper_id
 		WHERE e.id = $1 AND e.org_id = $2
 		FOR UPDATE OF e`, examID, orgID,
-	).Scan(&examStatus, &paperID, &paperTitle, &paperType, &paperStatus, &rules)
+	).Scan(&examStatus, &examTitle, &startAt, &endAt, &duration,
+		&paperID, &paperTitle, &paperType, &paperStatus, &rules)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Exam{}, ErrNotFound
@@ -259,10 +265,51 @@ func (s *Store) PublishExam(ctx context.Context, orgID, examID string) (Exam, er
 	if _, err := tx.Exec(ctx, `UPDATE exams SET status = 'pending_start' WHERE id = $1`, examID); err != nil {
 		return Exam{}, fmt.Errorf("mark exam published: %w", err)
 	}
+
+	candidates, err := listCandidateUserIDs(ctx, tx, examID)
+	if err != nil {
+		return Exam{}, err
+	}
+	notice := fmt.Sprintf("考试时间 %s 至 %s，限时 %d 分钟，请按时参加。",
+		startAt.Format("2006-01-02 15:04"), endAt.Format("2006-01-02 15:04"), duration)
+	if err := notifyMany(ctx, tx, orgID, candidates,
+		fmt.Sprintf("考试发布：%s", examTitle), notice, "exam_publish", examID); err != nil {
+		return Exam{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return Exam{}, fmt.Errorf("commit publish exam: %w", err)
 	}
+	s.emit(RealtimeEvent{
+		Type:   EventExamPublished,
+		ExamID: examID,
+		Detail: map[string]any{
+			"exam_title":      examTitle,
+			"candidate_count": len(candidates),
+			"start_at":        startAt,
+		},
+	})
 	return s.GetExam(ctx, orgID, examID)
+}
+
+func listCandidateUserIDs(ctx context.Context, db DBTX, examID string) ([]string, error) {
+	rows, err := db.Query(ctx, `SELECT user_id::text FROM exam_candidates WHERE exam_id = $1::uuid ORDER BY created_at`, examID)
+	if err != nil {
+		return nil, fmt.Errorf("list exam candidate ids: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan exam candidate id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate exam candidate ids: %w", err)
+	}
+	return ids, nil
 }
 
 func (s *Store) buildSnapshot(ctx context.Context, tx pgx.Tx, orgID, paperID, paperTitle, paperType string, rules json.RawMessage) (PaperSnapshot, error) {

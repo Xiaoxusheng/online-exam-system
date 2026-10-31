@@ -1,11 +1,12 @@
 package httpapi
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"runtime/debug"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -32,6 +33,15 @@ func (r *statusRecorder) Write(b []byte) (int, error) {
 		r.status = http.StatusOK
 	}
 	return r.ResponseWriter.Write(b)
+}
+
+// Hijack keeps the websocket handshake working through the logging wrapper.
+func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("underlying ResponseWriter does not implement http.Hijacker")
+	}
+	return hijacker.Hijack()
 }
 
 func (a *API) requestLogger(next http.Handler) http.Handler {
@@ -97,13 +107,11 @@ func (a *API) bodyLimit(next http.Handler) http.Handler {
 
 func (a *API) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		header := r.Header.Get("Authorization")
-		const prefix = "Bearer "
-		if !strings.HasPrefix(header, prefix) {
+		raw := bearerToken(r)
+		if raw == "" {
 			apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "请先登录")
 			return
 		}
-		raw := strings.TrimSpace(strings.TrimPrefix(header, prefix))
 		claims, err := a.tokens.Parse(raw)
 		if err != nil {
 			apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "登录状态已失效，请重新登录")

@@ -160,8 +160,9 @@ func (s *Store) PublishScores(ctx context.Context, orgID, examID string) (int64,
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 
-	var examStatus string
-	err = tx.QueryRow(ctx, `SELECT status FROM exams WHERE id = $1 AND org_id = $2 FOR UPDATE`, examID, orgID).Scan(&examStatus)
+	var examStatus, examTitle string
+	err = tx.QueryRow(ctx, `SELECT status, title FROM exams WHERE id = $1 AND org_id = $2 FOR UPDATE`, examID, orgID).
+		Scan(&examStatus, &examTitle)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, ErrNotFound
@@ -172,18 +173,38 @@ func (s *Store) PublishScores(ctx context.Context, orgID, examID string) (int64,
 		return 0, ErrInvalidState
 	}
 
-	tag, err := tx.Exec(ctx, `
+	type publishedScore struct {
+		userID string
+		total  float64
+	}
+	published := make([]publishedScore, 0)
+	rows, err := tx.Query(ctx, `
 		UPDATE score_records sr
 		SET status = 'published', published_at = now()
 		FROM attempts a
 		WHERE sr.attempt_id = a.id
 			AND a.exam_id = $1
 			AND a.status = 'graded'
-			AND sr.status = 'pending'`, examID)
+			AND sr.status = 'pending'
+		RETURNING a.user_id::text, sr.total::float8`, examID)
 	if err != nil {
 		return 0, fmt.Errorf("publish score records: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
+	for rows.Next() {
+		var item publishedScore
+		if err := rows.Scan(&item.userID, &item.total); err != nil {
+			rows.Close()
+			return 0, fmt.Errorf("scan published score: %w", err)
+		}
+		published = append(published, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, fmt.Errorf("iterate published scores: %w", err)
+	}
+	rows.Close()
+
+	if len(published) == 0 {
 		var alreadyPublished int64
 		if err := tx.QueryRow(ctx, `
 			SELECT count(*) FROM score_records sr
@@ -205,10 +226,16 @@ func (s *Store) PublishScores(ctx context.Context, orgID, examID string) (int64,
 		WHERE id = $1 AND org_id = $2`, examID, orgID); err != nil {
 		return 0, fmt.Errorf("mark exam published: %w", err)
 	}
+	for _, item := range published {
+		content := fmt.Sprintf("《%s》成绩已公布，得分 %.2f 分。", examTitle, item.total)
+		if _, err := notifyUser(ctx, tx, orgID, item.userID, "成绩发布", content, "score_publish", examID); err != nil {
+			return 0, err
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return 0, fmt.Errorf("commit publish scores: %w", err)
 	}
-	return tag.RowsAffected(), nil
+	return int64(len(published)), nil
 }
 
 func validExamStatusForPublish(status string) bool {

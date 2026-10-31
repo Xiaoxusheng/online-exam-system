@@ -7,13 +7,15 @@ import (
 )
 
 type Notification struct {
-	ID        string     `json:"id"`
-	Channel   string     `json:"channel"`
-	Title     string     `json:"title"`
-	Content   string     `json:"content"`
-	Status    string     `json:"status"`
-	SentAt    *time.Time `json:"sent_at"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID         string     `json:"id"`
+	Channel    string     `json:"channel"`
+	Title      string     `json:"title"`
+	Content    string     `json:"content"`
+	Status     string     `json:"status"`
+	SourceType string     `json:"source_type"`
+	SourceID   string     `json:"source_id"`
+	SentAt     *time.Time `json:"sent_at"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 type NotificationTemplate struct {
@@ -33,7 +35,7 @@ func (s *Store) ListNotifications(ctx context.Context, userID string, page, page
 	}
 
 	rows, err := s.pool.Query(ctx, `
-		SELECT id::text, channel, title, content, status, sent_at, created_at
+		SELECT id::text, channel, title, content, status, source_type, source_id, sent_at, created_at
 		FROM notifications
 		WHERE user_id = $1::uuid
 		ORDER BY created_at DESC
@@ -46,7 +48,8 @@ func (s *Store) ListNotifications(ctx context.Context, userID string, page, page
 	items := make([]Notification, 0, pageSize)
 	for rows.Next() {
 		var item Notification
-		if err := rows.Scan(&item.ID, &item.Channel, &item.Title, &item.Content, &item.Status, &item.SentAt, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Channel, &item.Title, &item.Content, &item.Status,
+			&item.SourceType, &item.SourceID, &item.SentAt, &item.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan notification: %w", err)
 		}
 		items = append(items, item)
@@ -99,4 +102,29 @@ func (s *Store) ListNotificationTemplates(ctx context.Context, orgID string) ([]
 		return nil, fmt.Errorf("iterate notification templates: %w", err)
 	}
 	return templates, nil
+}
+
+const notificationChannelInApp = "inapp"
+
+// notifyUser writes one in-app notification. The (user, source_type, source_id) unique
+// index makes the write idempotent: republishing an exam or a score never spams people.
+func notifyUser(ctx context.Context, db DBTX, orgID, userID, title, content, sourceType, sourceID string) (bool, error) {
+	tag, err := db.Exec(ctx, `
+		INSERT INTO notifications (org_id, user_id, channel, title, content, status, sent_at, source_type, source_id)
+		VALUES ($1::uuid, $2::uuid, $3, $4, $5, 'sent', now(), $6, $7)
+		ON CONFLICT (user_id, source_type, source_id) WHERE source_type <> '' DO NOTHING`,
+		orgID, userID, notificationChannelInApp, title, content, sourceType, sourceID)
+	if err != nil {
+		return false, fmt.Errorf("insert notification: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+func notifyMany(ctx context.Context, db DBTX, orgID string, userIDs []string, title, content, sourceType, sourceID string) error {
+	for _, userID := range userIDs {
+		if _, err := notifyUser(ctx, db, orgID, userID, title, content, sourceType, sourceID); err != nil {
+			return err
+		}
+	}
+	return nil
 }

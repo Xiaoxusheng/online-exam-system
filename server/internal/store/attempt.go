@@ -55,6 +55,7 @@ type attemptRow struct {
 	ExamID          string
 	ExamTitle       string
 	UserID          string
+	UserName        string
 	Status          string
 	PaperGroup      string
 	StartedAt       time.Time
@@ -68,17 +69,18 @@ type attemptRow struct {
 
 func loadAttempt(ctx context.Context, db DBTX, attemptID string, forUpdate bool) (attemptRow, error) {
 	query := `
-		SELECT a.id::text, a.exam_id::text, e.title, a.user_id::text, a.status, a.paper_group,
+		SELECT a.id::text, a.exam_id::text, e.title, a.user_id::text, u.name, a.status, a.paper_group,
 			a.started_at, a.submitted_at, a.score::float8, e.start_at, e.end_at, e.duration_minutes, e.rules
 		FROM attempts a
 		JOIN exams e ON e.id = a.exam_id
+		JOIN users u ON u.id = a.user_id
 		WHERE a.id = $1`
 	if forUpdate {
 		query += ` FOR UPDATE OF a`
 	}
 	var row attemptRow
 	err := db.QueryRow(ctx, query, attemptID).Scan(
-		&row.ID, &row.ExamID, &row.ExamTitle, &row.UserID, &row.Status, &row.PaperGroup,
+		&row.ID, &row.ExamID, &row.ExamTitle, &row.UserID, &row.UserName, &row.Status, &row.PaperGroup,
 		&row.StartedAt, &row.SubmittedAt, &row.Score, &row.StartAt, &row.EndAt, &row.DurationMinutes, &row.Rules,
 	)
 	if err != nil {
@@ -113,14 +115,17 @@ func (s *Store) StartAttempt(ctx context.Context, orgID, userID, examID string) 
 		endAt           time.Time
 		duration        int
 		attemptID       *string
+		userName        string
 	)
 	err = tx.QueryRow(ctx, `
-		SELECT e.status, ec.status, ec.paper_group, e.start_at, e.end_at, e.duration_minutes, ec.attempt_id::text
+		SELECT e.status, ec.status, ec.paper_group, e.start_at, e.end_at, e.duration_minutes,
+			ec.attempt_id::text, u.name
 		FROM exams e
 		JOIN exam_candidates ec ON ec.exam_id = e.id AND ec.user_id = $2
+		JOIN users u ON u.id = $2
 		WHERE e.id = $1 AND e.org_id = $3
 		FOR UPDATE OF ec`, examID, userID, orgID,
-	).Scan(&examStatus, &candidateStatus, &paperGroup, &startAt, &endAt, &duration, &attemptID)
+	).Scan(&examStatus, &candidateStatus, &paperGroup, &startAt, &endAt, &duration, &attemptID, &userName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", ErrNotFound
@@ -185,6 +190,14 @@ func (s *Store) StartAttempt(ctx context.Context, orgID, userID, examID string) 
 	if err := tx.Commit(ctx); err != nil {
 		return "", fmt.Errorf("commit start attempt: %w", err)
 	}
+	s.emit(RealtimeEvent{
+		Type:      EventAttemptStarted,
+		ExamID:    examID,
+		AttemptID: insertedID,
+		UserID:    userID,
+		UserName:  userName,
+		Detail:    map[string]any{"paper_group": paperGroup},
+	})
 	return insertedID, nil
 }
 
@@ -453,9 +466,12 @@ func (s *Store) SubmitAttempt(ctx context.Context, userID, attemptID string) (Su
 		return SubmitResult{}, fmt.Errorf("mark attempt submitted: %w", err)
 	}
 	for _, question := range needsReview {
+		reviewerID, _ := pickReviewer(ctx, tx, row.ExamID, []string{})
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO review_tasks (attempt_id, question_id, status)
-			VALUES ($1, $2, 'pending')`, attemptID, question.QuestionID); err != nil {
+			INSERT INTO review_tasks (attempt_id, question_id, round, reviewer_id, status)
+			VALUES ($1::uuid, $2::uuid, 1, NULLIF($3, '')::uuid, 'pending')
+			ON CONFLICT (attempt_id, question_id, round) DO NOTHING`,
+			attemptID, question.QuestionID, reviewerID); err != nil {
 			return SubmitResult{}, fmt.Errorf("create review task: %w", err)
 		}
 	}
@@ -470,15 +486,36 @@ func (s *Store) SubmitAttempt(ctx context.Context, userID, attemptID string) (Su
 		WHERE exam_id = $1 AND status NOT IN ('submitted', 'absent')`, row.ExamID).Scan(&remaining); err != nil {
 		return SubmitResult{}, fmt.Errorf("count remaining candidates: %w", err)
 	}
+	examEnded := false
 	if remaining == 0 {
-		if _, err := tx.Exec(ctx, `
+		tag, err := tx.Exec(ctx, `
 			UPDATE exams SET status = 'ended'
-			WHERE id = $1 AND status IN ('in_progress', 'pending_start')`, row.ExamID); err != nil {
+			WHERE id = $1 AND status IN ('in_progress', 'pending_start')`, row.ExamID)
+		if err != nil {
 			return SubmitResult{}, fmt.Errorf("mark exam ended: %w", err)
 		}
+		examEnded = tag.RowsAffected() > 0
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return SubmitResult{}, fmt.Errorf("commit submit attempt: %w", err)
+	}
+	s.emit(RealtimeEvent{
+		Type:      EventAttemptSubmitted,
+		ExamID:    row.ExamID,
+		AttemptID: attemptID,
+		UserID:    row.UserID,
+		UserName:  row.UserName,
+		Detail: map[string]any{
+			"pending_review": len(needsReview),
+			"auto_graded":    len(needsReview) == 0,
+		},
+	})
+	if examEnded {
+		s.emit(RealtimeEvent{
+			Type:   EventExamClosed,
+			ExamID: row.ExamID,
+			Detail: map[string]any{"reason": "all_candidates_submitted"},
+		})
 	}
 	visible := showScore(row.Rules)
 	var publicScore *float64

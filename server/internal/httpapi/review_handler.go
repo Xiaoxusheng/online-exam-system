@@ -5,17 +5,28 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"online-exam-system/server/internal/auth"
 	"online-exam-system/server/internal/store"
 )
+
+// reviewScope returns the reviewer id to filter by. Plain reviewers only see their own
+// (plus unassigned) tasks; exam administrators and org admins see the whole pool.
+func reviewScope(claims *auth.Claims) string {
+	if claims.Role == "reviewer" {
+		return claims.Subject
+	}
+	return ""
+}
 
 func (a *API) handleListReviewTasks(w http.ResponseWriter, r *http.Request) {
 	claims, _ := claimsFrom(r.Context())
 	page, pageSize := pagination(r)
 	filter := store.ReviewFilter{
-		Status:   strings.TrimSpace(r.URL.Query().Get("status")),
-		ExamID:   strings.TrimSpace(r.URL.Query().Get("exam_id")),
-		Page:     page,
-		PageSize: pageSize,
+		Status:     strings.TrimSpace(r.URL.Query().Get("status")),
+		ExamID:     strings.TrimSpace(r.URL.Query().Get("exam_id")),
+		ReviewerID: reviewScope(claims),
+		Page:       page,
+		PageSize:   pageSize,
 	}
 	if filter.ExamID != "" {
 		if _, ok := parseUUIDParam(w, filter.ExamID, "exam_id"); !ok {
@@ -36,7 +47,7 @@ func (a *API) handleGetReviewTask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	task, err := a.store.GetReviewTaskDetail(r.Context(), claims.OrgID, taskID)
+	task, err := a.store.GetReviewTaskDetail(r.Context(), claims.OrgID, taskID, reviewScope(claims))
 	if err != nil {
 		a.storeError(w, r, err, "阅卷任务不存在")
 		return
