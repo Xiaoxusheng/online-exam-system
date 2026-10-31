@@ -1,16 +1,12 @@
-import type { CSSProperties } from 'react'
 import { Button, Card, Col, List, Row, Skeleton, Tag } from 'antd'
 import {
   ArrowRightOutlined,
   BookOutlined,
   CalendarOutlined,
   ClockCircleOutlined,
-  FileDoneOutlined,
   FileTextOutlined,
   HistoryOutlined,
   SafetyCertificateOutlined,
-  TeamOutlined,
-  ThunderboltOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
@@ -18,13 +14,9 @@ import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import { fetchDashboardSummary } from '../api/dashboard'
 import EmptyState from '../components/EmptyState'
+import PageHeader from '../components/PageHeader'
 import { useAuthStore } from '../stores/auth'
 import { activityLabel, examStatusLabels, roleLabel } from '../utils/labels'
-
-type AccentVars = CSSProperties & {
-  '--accent': string
-  '--accent-soft': string
-}
 
 const quickActions = [
   {
@@ -32,39 +24,25 @@ const quickActions = [
     description: '维护题目、知识点与版本',
     path: '/questions',
     icon: <BookOutlined />,
-    color: '#3370FF',
-    background: '#EAF1FF',
   },
   {
     title: '试卷与组卷',
     description: '固定卷 / 随机卷 / AB 卷',
     path: '/papers',
     icon: <FileTextOutlined />,
-    color: '#7A5AF8',
-    background: '#F2EEFF',
   },
   {
     title: '考试管理',
     description: '编排考试计划与考生',
     path: '/exams',
     icon: <CalendarOutlined />,
-    color: '#12B76A',
-    background: '#E8F8F0',
   },
   {
     title: '监考中心',
     description: '实时状态与告警处置',
     path: '/proctor',
     icon: <SafetyCertificateOutlined />,
-    color: '#F79009',
-    background: '#FFF6E5',
   },
-]
-
-const capabilities = [
-  { value: '5,000', label: '单场并发作答目标', icon: <ThunderboltOutlined /> },
-  { value: '5 秒', label: '告警到达监考台', icon: <ClockCircleOutlined /> },
-  { value: '6 类角色', label: '全流程权限控制', icon: <TeamOutlined /> },
 ]
 
 function greeting(): string {
@@ -89,90 +67,49 @@ export default function DashboardPage() {
     {
       label: '在读学员',
       value: data?.stats.students ?? 0,
-      icon: <TeamOutlined />,
-      color: '#3370FF',
-      background: '#EAF1FF',
       foot: '机构全部启用学员',
     },
     {
       label: '进行中考试',
       value: data?.stats.exams_in_progress ?? 0,
-      icon: <CalendarOutlined />,
-      color: '#12B76A',
-      background: '#E8F8F0',
-      foot: '实时统计',
+      foot: '处于考试时间窗内',
     },
     {
       label: '待阅卷任务',
       value: data?.stats.pending_grading ?? 0,
-      icon: <FileDoneOutlined />,
-      color: '#7A5AF8',
-      background: '#F2EEFF',
       foot: '主观题与音视频题',
     },
     {
       label: '待审核试卷',
       value: data?.stats.pending_review ?? 0,
-      icon: <SafetyCertificateOutlined />,
-      color: '#F79009',
-      background: '#FFF6E5',
       foot: '待考务审核',
     },
   ]
 
   const today = dayjs().format('YYYY年M月D日 dddd')
-  const heroSub = isLoading
-    ? '正在加载今日考试概览…'
-    : data
-      ? `当前身份：${roleLabel(user?.role)} · ${data.stats.exams_in_progress} 场考试进行中，${data.stats.pending_grading} 份答卷待阅`
-      : `当前身份：${roleLabel(user?.role)} · 数据暂不可用`
+  const subtitle = `今天是${today} · ${
+    isLoading
+      ? '正在加载今日概览…'
+      : data
+        ? `当前身份：${roleLabel(user?.role)} · ${data.stats.exams_in_progress} 场考试进行中，${data.stats.pending_grading} 份答卷待阅`
+        : `当前身份：${roleLabel(user?.role)} · 数据暂不可用`
+  }`
 
   return (
     <div>
-      <section className="dashboard-hero">
-        <div className="hero-content">
-          <div className="hero-eyebrow">工作台 · {today}</div>
-          <h1 className="hero-title">
-            {greeting()}，{user?.name ?? '管理员'}
-          </h1>
-          <p className="hero-sub">{heroSub}</p>
-          <div className="hero-actions">
-            <Button
-              className="hero-btn-primary"
-              icon={<CalendarOutlined />}
-              onClick={() => navigate('/exams')}
-            >
-              进入考试管理
-            </Button>
-            <Button className="hero-btn-ghost" onClick={() => navigate('/proctor')}>
-              查看监考中心
-            </Button>
-          </div>
-        </div>
-
-        <div className="hero-side">
-          {capabilities.map((item) => (
-            <div className="hero-capability" key={item.label}>
-              <span className="hero-capability-icon">{item.icon}</span>
-              <div>
-                <strong>{item.value}</strong>
-                <span>{item.label}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div className="section-head">
-        <div>
-          <h2>今日概览</h2>
-          <p>关键运营指标</p>
-        </div>
-        <span className="live-pill">
-          <span className="status-dot" />
-          实时
-        </span>
-      </div>
+      <PageHeader
+        title={`${greeting()}，${user?.name ?? '管理员'}`}
+        subtitle={subtitle}
+        extra={
+          <Button
+            type="primary"
+            icon={<CalendarOutlined />}
+            onClick={() => navigate('/exams')}
+          >
+            进入考试管理
+          </Button>
+        }
+      />
 
       {isError ? (
         <Card className="panel-card" variant="borderless">
@@ -188,68 +125,27 @@ export default function DashboardPage() {
           />
         </Card>
       ) : (
-        <Row gutter={[16, 16]}>
-          {stats.map((stat) => (
-            <Col key={stat.label} xs={12} sm={12} xl={6}>
-              <Card
-                className="stat-card"
-                variant="borderless"
-                style={
-                  { '--accent': stat.color, '--accent-soft': stat.background } as AccentVars
-                }
-              >
-                <div className="stat-head">
-                  <span className="stat-icon">{stat.icon}</span>
-                </div>
+        <Card className="stat-panel" variant="borderless">
+          <div className="stat-grid">
+            {stats.map((stat) => (
+              <div className="stat-cell" key={stat.label}>
                 <div className="stat-label">{stat.label}</div>
                 <div className="stat-value">
                   {isLoading ? (
-                    <Skeleton.Input active size="small" style={{ width: 58 }} />
+                    <Skeleton.Input active size="small" style={{ width: 56 }} />
                   ) : (
                     stat.value
                   )}
                 </div>
                 <div className="stat-foot">{stat.foot}</div>
-              </Card>
-            </Col>
-          ))}
-        </Row>
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
 
-      <div className="section-head">
-        <div>
-          <h2>快捷入口</h2>
-          <p>常用操作，一步直达</p>
-        </div>
-        <span className="section-head-meta">4 个模块</span>
-      </div>
-
-      <Row gutter={[16, 16]}>
-        {quickActions.map((action) => (
-          <Col key={action.path} xs={24} sm={12} xl={6}>
-            <button type="button" className="quick-card" onClick={() => navigate(action.path)}>
-              <span
-                className="quick-icon"
-                style={{ color: action.color, background: action.background }}
-              >
-                {action.icon}
-              </span>
-              <span>
-                <span className="quick-title" style={{ display: 'block' }}>
-                  {action.title}
-                </span>
-                <span className="quick-desc" style={{ display: 'block' }}>
-                  {action.description}
-                </span>
-              </span>
-              <ArrowRightOutlined className="quick-arrow" />
-            </button>
-          </Col>
-        ))}
-      </Row>
-
       {!isError && (
-        <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
+        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
           <Col xs={24} xl={15}>
             <Card
               className="panel-card"
@@ -344,6 +240,29 @@ export default function DashboardPage() {
           </Col>
         </Row>
       )}
+
+      <div className="section-head">
+        <h2>快捷入口</h2>
+      </div>
+
+      <Row gutter={[16, 16]}>
+        {quickActions.map((action) => (
+          <Col key={action.path} xs={24} sm={12} xl={6}>
+            <button type="button" className="quick-card" onClick={() => navigate(action.path)}>
+              <span className="quick-icon">{action.icon}</span>
+              <span>
+                <span className="quick-title" style={{ display: 'block' }}>
+                  {action.title}
+                </span>
+                <span className="quick-desc" style={{ display: 'block' }}>
+                  {action.description}
+                </span>
+              </span>
+              <ArrowRightOutlined className="quick-arrow" />
+            </button>
+          </Col>
+        ))}
+      </Row>
     </div>
   )
 }

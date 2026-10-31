@@ -57,9 +57,6 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <aside className="login-brand">
-        <div className="login-brand-glow login-brand-glow-a" />
-        <div className="login-brand-glow login-brand-glow-b" />
-
         <div className="login-brand-top">
           <span className="login-brand-mark">考</span>
           <div>
@@ -69,7 +66,6 @@ export default function LoginPage() {
         </div>
 
         <div className="login-brand-copy">
-          <span className="login-eyebrow">教育培训机构 · 严肃考试</span>
           <h2 className="login-headline">
             从组卷到成绩
             <br />
@@ -80,24 +76,22 @@ export default function LoginPage() {
             行为检测，让每一场考试稳定、可信、可追溯。
           </p>
 
-          <div className="login-feature-grid">
+          <ul className="login-feature-list">
             {capabilities.map((feature) => (
-              <div className="login-feature-card" key={feature}>
+              <li key={feature}>
                 <CheckCircleFilled />
                 <span>{feature}</span>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
 
           <div className="login-trust">数据加密存储 · 人脸信息单独授权 · 支持人工核验替代</div>
         </div>
 
-        <div className="login-brand-footer">© 2026 在线考试系统 · v0.2 界面预览</div>
+        <div className="login-brand-footer">© 2026 在线考试系统</div>
       </aside>
 
       <main className="login-panel">
-        <span className="login-version">v0.2 · 界面预览</span>
-
         <div className="login-form-card">
           <div className="login-panel-brand">
             <span className="login-panel-mark">考</span>

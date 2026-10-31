@@ -152,7 +152,6 @@ export default function AppLayout() {
           <div className="notice-title">通知中心</div>
           <div className="notice-sub">考试提醒、阅卷任务与成绩发布</div>
         </div>
-        <span className="notice-count">0 条未读</span>
       </div>
       <EmptyState
         compact
@@ -179,10 +178,6 @@ export default function AppLayout() {
           {menu}
           {!collapsed && (
             <div className="app-sider-footer">
-              <span className="sider-status">
-                <span className="status-dot" />
-                界面预览
-              </span>
               <span className="sider-version">v0.2</span>
             </div>
           )}
@@ -258,10 +253,6 @@ export default function AppLayout() {
           {brand}
           {menu}
           <div className="app-sider-footer">
-            <span className="sider-status">
-              <span className="status-dot" />
-              界面预览
-            </span>
             <span className="sider-version">v0.2</span>
           </div>
         </Drawer>
