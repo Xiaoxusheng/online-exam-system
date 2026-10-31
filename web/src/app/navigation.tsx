@@ -6,6 +6,7 @@ import {
   BookOutlined,
   CalendarOutlined,
   DashboardOutlined,
+  TrophyOutlined,
   FileTextOutlined,
   FormOutlined,
   HistoryOutlined,
@@ -34,6 +35,14 @@ export const navigation: NavGroup[] = [
     items: [
       { key: '/', label: '工作台', icon: <DashboardOutlined /> },
       { key: '/notifications', label: '我的通知', icon: <BellOutlined /> },
+    ],
+  },
+  {
+    key: 'student',
+    label: '我的考试',
+    items: [
+      { key: '/my/exams', label: '我的考试', icon: <CalendarOutlined /> },
+      { key: '/my/scores', label: '我的成绩', icon: <TrophyOutlined /> },
     ],
   },
   {

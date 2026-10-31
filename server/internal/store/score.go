@@ -121,9 +121,17 @@ func (s *Store) ListScores(ctx context.Context, orgID string, f ScoreFilter) ([]
 	return items, total, nil
 }
 
-func (s *Store) GetScoreRecord(ctx context.Context, orgID, attemptID string) (ScoreRecordDetail, error) {
+// GetScoreRecord loads the latest score record of an attempt. ownerID restricts the
+// read to the candidate themselves and to published records only (used by /my/scores).
+func (s *Store) GetScoreRecord(ctx context.Context, orgID, attemptID, ownerID string) (ScoreRecordDetail, error) {
 	var item ScoreRecordDetail
 	var detailRaw []byte
+	ownerSQL := ""
+	args := []any{attemptID, orgID}
+	if ownerID != "" {
+		args = append(args, ownerID)
+		ownerSQL = fmt.Sprintf(" AND a.user_id = $%d::uuid AND sr.status = 'published'", len(args))
+	}
 	err := s.pool.QueryRow(ctx, `
 		SELECT a.id::text, u.id::text, u.name, u.username, e.id::text, e.title,
 			sr.total::float8, sr.status, a.status, a.submitted_at, sr.published_at, sr.detail
@@ -131,13 +139,15 @@ func (s *Store) GetScoreRecord(ctx context.Context, orgID, attemptID string) (Sc
 		JOIN attempts a ON a.id = sr.attempt_id
 		JOIN users u ON u.id = a.user_id
 		JOIN exams e ON e.id = a.exam_id
-		WHERE sr.attempt_id = $1::uuid AND e.org_id = $2
+		WHERE sr.attempt_id = $1::uuid AND e.org_id = $2`+ownerSQL+`
 		ORDER BY sr.created_at DESC
-		LIMIT 1`, attemptID, orgID,
-	).Scan(&item.AttemptID, &item.UserID, &item.UserName, &item.Username, &item.ExamID, &item.ExamTitle,
+		LIMIT 1`, args...).Scan(&item.AttemptID, &item.UserID, &item.UserName, &item.Username, &item.ExamID, &item.ExamTitle,
 		&item.Total, &item.ScoreStatus, &item.AttemptStatus, &item.SubmittedAt, &item.PublishedAt, &detailRaw)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			if ownerID != "" {
+				return ScoreRecordDetail{}, ErrForbidden
+			}
 			return ScoreRecordDetail{}, ErrNotFound
 		}
 		return ScoreRecordDetail{}, fmt.Errorf("get score record: %w", err)

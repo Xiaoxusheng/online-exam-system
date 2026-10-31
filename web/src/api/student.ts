@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { AttemptState, MyExam, MyScore, SubmitResult } from '../types'
+import type { AttemptState, MyExam, MyScore, ScoreRecordDetail, SubmitResult } from '../types'
 
 export function listMyExams(): Promise<MyExam[]> {
   return apiRequest<MyExam[]>('/my/exams')
@@ -30,4 +30,8 @@ export function reportEvent(attemptId: string, input: { type: string; level?: st
 
 export function listMyScores(): Promise<MyScore[]> {
   return apiRequest<MyScore[]>('/my/scores')
+}
+
+export function getMyScoreRecord(attemptId: string): Promise<ScoreRecordDetail> {
+  return apiRequest<ScoreRecordDetail>(`/my/scores/${attemptId}`)
 }

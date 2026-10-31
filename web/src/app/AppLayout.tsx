@@ -68,10 +68,12 @@ export default function AppLayout() {
   const role = user?.role
   const allowedHere = canAccess(role, location.pathname)
 
+  const isAttemptRoute = location.pathname.startsWith('/attempts/')
+
   useEffect(() => {
-    const title = allowedHere ? pageTitle(location.pathname) : '无访问权限'
+    const title = !allowedHere ? '无访问权限' : isAttemptRoute ? '作答' : pageTitle(location.pathname)
     document.title = `${title} · 在线考试系统`
-  }, [location.pathname, allowedHere])
+  }, [location.pathname, allowedHere, isAttemptRoute])
 
   useEffect(() => {
     setDrawerOpen(false)
@@ -142,7 +144,7 @@ export default function AppLayout() {
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, danger: true },
   ]
 
-  const trail = findNavTrail(location.pathname)
+  const trail = isAttemptRoute ? { group: { label: '我的考试' }, item: { label: '作答' } } : findNavTrail(location.pathname)
   const breadcrumbItems =
     allowedHere && location.pathname !== '/' && trail
       ? [{ title: '工作台' }, { title: trail.group.label }, { title: trail.item.label }]

@@ -24,6 +24,7 @@ const pageRoles: Record<string, Role[]> = {
 
 export function canAccess(role: Role | undefined, path: string): boolean {
   if (!role) return false
+  if (path.startsWith('/attempts/')) return role === 'student'
   if (role === 'org_admin') return true
   const allowed = pageRoles[path]
   if (!allowed) return true

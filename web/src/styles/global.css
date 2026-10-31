@@ -1135,6 +1135,110 @@ body {
   }
 }
 
+/* ---------- Candidate taking page ---------- */
+
+.countdown.ant-tag {
+  margin-inline-end: 0;
+  padding: 4px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--app-text);
+  background: var(--app-bg);
+  border: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown-danger.ant-tag {
+  color: var(--app-error, #f04438);
+  background: #fef3f2;
+}
+
+.attempt-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.attempt-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.attempt-nav-title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--app-text-tertiary);
+}
+
+.attempt-nav-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attempt-nav-item {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--app-text-secondary);
+  background: var(--app-bg);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.attempt-nav-done {
+  color: var(--app-primary);
+  background: var(--app-primary-soft);
+}
+
+.attempt-nav-active {
+  color: #fff;
+  background: var(--app-primary);
+}
+
+.attempt-question {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fill-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 480px;
+}
+
+.programming-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.answer-code-input.ant-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.attempt-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border-soft);
+}
+
+@media (max-width: 992px) {
+  .attempt-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---------- Notification popover ---------- */
 .notice-popover-root .ant-popover-inner {
   overflow: hidden;

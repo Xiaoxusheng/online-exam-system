@@ -153,6 +153,7 @@
 | POST | `/attempts/{id}/submit` | 交卷（幂等），返回自动判分总分与待阅卷数 |
 | POST | `/attempts/{id}/events` | 上报监考事件（切屏、失焦等） |
 | GET | `/my/scores` | 已发布成绩 |
+| GET | `/my/scores/{attemptId}` | 本人已发布成绩的逐题明细；未发布或他人答卷返回 403 |
 
 答卷状态响应（节选）：
 

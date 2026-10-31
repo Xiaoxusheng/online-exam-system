@@ -117,6 +117,7 @@ func (a *API) Router() http.Handler {
 				r.Post("/attempts/{id}/submit", a.handleSubmitAttempt)
 				r.Post("/attempts/{id}/events", a.handleCreateProctorEvent)
 				r.Get("/my/scores", a.handleMyScores)
+				r.Get("/my/scores/{attemptId}", a.handleMyScoreRecord)
 			})
 
 			// Proctoring. Proctors are limited to the exams they are assigned to.

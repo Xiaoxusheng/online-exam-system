@@ -14,6 +14,9 @@ import ReviewPage from '../pages/review/ReviewPage'
 import ScoresPage from '../pages/scores/ScoresPage'
 import AnalyticsPage from '../pages/analytics/AnalyticsPage'
 import ProctorPage from '../pages/proctor/ProctorPage'
+import MyExamsPage from '../pages/student/MyExamsPage'
+import MyScoresPage from '../pages/student/MyScoresPage'
+import AttemptPage from '../pages/student/AttemptPage'
 import UsersPage from '../pages/system/UsersPage'
 import OrgsPage from '../pages/system/OrgsPage'
 import AuditLogsPage from '../pages/system/AuditLogsPage'
@@ -35,6 +38,9 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route path="my/exams" element={guarded('/my/exams', <MyExamsPage />)} />
+        <Route path="my/scores" element={guarded('/my/scores', <MyScoresPage />)} />
+        <Route path="attempts/:attemptId" element={guarded('/attempts/', <AttemptPage />)} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="questions" element={guarded('/questions', <QuestionsPage />)} />
         <Route path="papers" element={guarded('/papers', <PapersPage />)} />
