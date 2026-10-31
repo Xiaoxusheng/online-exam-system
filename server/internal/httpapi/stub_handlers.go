@@ -2,14 +2,6 @@ package httpapi
 
 import "net/http"
 
-// Skeleton endpoints: lists return empty pages, writes report NOT_IMPLEMENTED.
-// Replace each handler as the corresponding module is implemented.
-
-func emptyListHandler(w http.ResponseWriter, r *http.Request) {
-	page, pageSize := pagination(r)
-	listData(w, []any{}, page, pageSize, 0)
-}
-
 func notImplementedHandler(w http.ResponseWriter, _ *http.Request) {
 	apiError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "该功能尚未实现")
 }

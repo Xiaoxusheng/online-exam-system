@@ -25,28 +25,36 @@ type loginResponse struct {
 }
 
 type userDTO struct {
-	ID        string `json:"id"`
-	OrgID     string `json:"org_id"`
-	Name      string `json:"name"`
-	Username  string `json:"username"`
-	Phone     string `json:"phone"`
-	Email     string `json:"email"`
-	Role      string `json:"role"`
-	DataScope string `json:"data_scope"`
-	Status    string `json:"status"`
+	ID          string     `json:"id"`
+	OrgID       string     `json:"org_id"`
+	Name        string     `json:"name"`
+	Username    string     `json:"username"`
+	Phone       string     `json:"phone"`
+	Email       string     `json:"email"`
+	Role        string     `json:"role"`
+	DataScope   string     `json:"data_scope"`
+	Status      string     `json:"status"`
+	CampusID    *string    `json:"campus_id,omitempty"`
+	ClassID     *string    `json:"class_id,omitempty"`
+	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 func toUserDTO(u store.User) userDTO {
 	return userDTO{
-		ID:        u.ID,
-		OrgID:     u.OrgID,
-		Name:      u.Name,
-		Username:  u.Username,
-		Phone:     u.Phone,
-		Email:     u.Email,
-		Role:      u.Role,
-		DataScope: u.DataScope,
-		Status:    u.Status,
+		ID:          u.ID,
+		OrgID:       u.OrgID,
+		Name:        u.Name,
+		Username:    u.Username,
+		Phone:       u.Phone,
+		Email:       u.Email,
+		Role:        u.Role,
+		DataScope:   u.DataScope,
+		Status:      u.Status,
+		CampusID:    u.CampusID,
+		ClassID:     u.ClassID,
+		LastLoginAt: u.LastLoginAt,
+		CreatedAt:   u.CreatedAt,
 	}
 }
 

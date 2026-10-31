@@ -44,7 +44,9 @@ func run() error {
 	}
 	defer pool.Close()
 
-	api := httpapi.New(cfg, log, store.New(pool), auth.NewTokenManager(cfg.JWTSecret, cfg.JWTTTL))
+	st := store.New(pool)
+	go runAutoSubmit(ctx, log, st)
+	api := httpapi.New(cfg, log, st, auth.NewTokenManager(cfg.JWTSecret, cfg.JWTTTL))
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           api.Router(),
@@ -76,6 +78,28 @@ func run() error {
 	}
 	log.Info("api server stopped")
 	return nil
+}
+
+func runAutoSubmit(ctx context.Context, log *slog.Logger, st *store.Store) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			runCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+			count, err := st.FinalizeExpiredAttempts(runCtx)
+			cancel()
+			if err != nil {
+				log.Warn("auto submit expired attempts failed", "error", err)
+				continue
+			}
+			if count > 0 {
+				log.Info("auto submitted expired attempts", "count", count)
+			}
+		}
+	}
 }
 
 func newLogger(cfg config.Config) *slog.Logger {

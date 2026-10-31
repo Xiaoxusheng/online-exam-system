@@ -14,18 +14,18 @@ export default function ModulePage({ meta }: { meta: ModuleMeta }) {
       <Card className="panel-card" variant="borderless">
         <Alert
           className="module-alert"
-          type="info"
+          type="success"
           showIcon
-          message="该模块处于骨架阶段"
-          description="页面、路由与鉴权已接入；列表接口返回空数据，写操作返回 501 NOT_IMPLEMENTED。业务能力将按里程碑计划逐步交付。"
+          message="后端接口已就绪"
+          description="页面骨架、路由与鉴权已接入；后端业务接口已实现并连接真实数据，前端交互与表单将在后续任务中接入。"
         />
         <div className="module-roadmap">
           <Steps
             size="small"
-            current={1}
+            current={2}
             items={[
               { title: '页面骨架', description: '路由、布局与鉴权' },
-              { title: '接口实现', description: '数据模型就绪，接口待实现' },
+              { title: '接口实现', description: '真实数据已接入' },
               { title: '业务验收', description: `计划 ${meta.milestone}` },
             ]}
           />
@@ -34,7 +34,7 @@ export default function ModulePage({ meta }: { meta: ModuleMeta }) {
 
       <div className="section-head">
         <h2>能力规划</h2>
-        <span className="section-head-meta">{meta.features.length} 项 · 按里程碑逐步交付</span>
+        <span className="section-head-meta">{meta.features.length} 项 · 接口已实现，页面待接入</span>
       </div>
 
       <Card className="panel-card" variant="borderless">

@@ -126,6 +126,10 @@ func (a *API) requireRoles(roles ...string) func(http.Handler) http.Handler {
 				apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "请先登录")
 				return
 			}
+			if claims.Role == "org_admin" {
+				next.ServeHTTP(w, r)
+				return
+			}
 			if _, ok := allowed[claims.Role]; !ok {
 				apiError(w, http.StatusForbidden, "FORBIDDEN", "无权访问该资源")
 				return

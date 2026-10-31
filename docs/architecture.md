@@ -1,6 +1,6 @@
 # 架构设计
 
-> v0.1 · 2026-10-31 · 对应需求 `exam-requirements.md`
+> v0.3 · 2026-10-31 · 对应需求 `exam-requirements.md`
 
 ## 1. 总体结构
 
@@ -60,18 +60,31 @@ internal/httpapi     路由、中间件、各模块 handler
 | 迁移 | 内嵌 SQL + 版本表 | 无外部工具依赖，启动/CI 可执行 |
 | 前端 | React 19 + antd 5 | 用户明确要求 React；antd 覆盖 B 端表格/表单 |
 | 状态 | TanStack Query + Zustand | 服务端状态与全局会话分离，避免自造缓存层 |
-| 实时 | WebSocket + 5s 轮询兜底 | 对应 M-09；断线重连由前端统一处理 |
+| 实时 | WebSocket + 5s 轮询兜底 | 对应 M-09；v0.3 仅保留接口占位（501），前端可先轮询 |
+| 自动收卷 | 服务内 30s ticker | 扫描超过个人截止时间的答卷并幂等交卷 |
+| 判分 | 纯函数包 `internal/grading` | 客观题自动判分；主观题生成阅卷任务 |
 
-## 5. 数据模型（v0.1 schema 全量建表）
+### 4.1 考试主链路（v0.3 已实现）
+
+1. 命题：题目创建即版本 1，更新递增版本并写 `question_revisions`；发布后才能被固定卷/AB 卷引用。
+2. 组卷：固定卷/AB 卷写入 `paper_questions`；随机卷保存 `rules.sections`，在考试发布时抽题。
+3. 发布考试：校验试卷 `approved`、考生非空，将题目内容/答案/分值/分组固化到 `paper_snapshots`，考试进入待开考。
+4. 开考：校验考生身份与时间窗，创建 `attempts`（含 AB 分组）；答案以 `version` 乐观锁保存。
+5. 交卷：按快照自动判分客观题，主观题创建 `review_tasks`；逐题得分写入 `score_records.detail`。
+6. 阅卷：分数与评语合并到成绩明细，全部任务完成后答卷转 `graded`。
+7. 发布成绩：仅发布 `graded` 答卷；考生只能看到 `published` 成绩。
+8. 后台任务：每 30 秒自动提交超时答卷；全部考生交卷/缺考后考试转 `ended`。
+
+## 5. 数据模型（v0.3 schema）
 
 | 实体 | 表 | 关键点 |
 |---|---|---|
 | 组织/校区/班级 | `organizations` `campuses` `classes` | 单机构，预留 org_id |
-| 用户 | `users` | 统一账号；role 枚举 + data_scope；bcrypt |
+| 用户 | `users` | 统一账号；role 枚举 + data_scope；campus/class 归属；bcrypt |
 | 题库/题目 | `question_banks` `questions` `question_assets` `question_revisions` | 题目 JSONB 内容；版本化 |
 | 试卷 | `papers` `paper_questions` `paper_snapshots` | 随机规则 JSONB；发布快照 |
-| 考试 | `exams` `exam_candidates` | 规则/监考配置 JSONB；状态机 |
-| 答卷 | `attempts` `answers` | 答案 `(attempt_id, question_id)` 主键 + version 乐观锁 |
+| 考试 | `exams` `exam_candidates` | 规则/监考配置 JSONB；考生 AB 分组；状态机 |
+| 答卷 | `attempts` `answers` | 答卷 AB 分组；答案 `(attempt_id, question_id)` 主键 + version 乐观锁 |
 | 判题/阅卷 | `judge_results` `review_tasks` | 用例结果 JSONB；人工评分 |
 | 监考 | `proctor_events` | 分级告警、关键帧、处置留痕 |
 | 成绩 | `score_records` | 合成明细 JSONB、发布状态 |
@@ -83,9 +96,10 @@ internal/httpapi     路由、中间件、各模块 handler
 
 - 全站 HTTPS（生产）；JWT 签名密钥仅走环境变量，release 模式缺失即拒绝启动。
 - 密码 bcrypt（cost 12）；登录失败限流（后续接 Redis）；敏感操作审计。
-- 权限校验分两层：角色路由（当前）+ 数据范围（org/campus/class/self，模块落地时实现）。
+- 权限校验分两层：角色路由（已实现，org_admin 为超管）+ 数据范围（当前按机构过滤，campus/class/self 细分范围后续强制）。
 - 答案保存使用 `version` 乐观锁，拒绝过期写入（需求 6.3）。
-- 判题沙箱与媒体访问走独立鉴权，开考前任何角色不可取答案（需求 6.4）。
+- 考生取卷接口剔除标准答案与编程题隐藏用例；快照答案仅服务端与阅卷接口可见（需求 6.4）。
+- 交卷/阅卷/成绩发布使用状态校验与幂等路径；自动收卷重复执行安全。
 - 对外错误统一文案，不泄露资源是否存在。
 
 ## 7. 部署形态
