@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -13,6 +14,11 @@ import (
 	"online-exam-system/server/internal/config"
 	"online-exam-system/server/internal/store"
 )
+
+// chiRouter keeps mountStatic independent from the concrete chi type.
+type chiRouter interface {
+	Get(pattern string, handlerFn http.HandlerFunc)
+}
 
 type API struct {
 	cfg     config.Config
@@ -151,7 +157,15 @@ func (a *API) Router() http.Handler {
 		})
 	})
 
-	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
+	if a.cfg.WebDir != "" {
+		a.mountStatic(r, a.cfg.WebDir)
+	}
+
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		if a.cfg.WebDir != "" && !strings.HasPrefix(r.URL.Path, "/api/") {
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
 		apiError(w, http.StatusNotFound, "NOT_FOUND", "接口不存在")
 	})
 	r.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {

@@ -27,6 +27,7 @@ type Config struct {
 	LogLevel          string
 	MaxBodyBytes      int64
 	SeedAdminPassword string
+	WebDir            string
 }
 
 func Load() (Config, error) {
@@ -44,6 +45,7 @@ func Load() (Config, error) {
 		LogLevel:          getEnv("LOG_LEVEL", "info"),
 		MaxBodyBytes:      1 << 20,
 		SeedAdminPassword: getEnv("SEED_ADMIN_PASSWORD", "Admin@123456"),
+		WebDir:            os.Getenv("WEB_DIR"),
 	}
 
 	switch cfg.Env {
