@@ -995,4 +995,365 @@ check(closedItem?.candidate_status === 'absent', 'student sees own absence', clo
 const closedAudit = expect(await api('GET', '/audit-logs?action=exam.reviewers_assigned', { token: adminToken }), 200, 'audit log for reviewer assignment')
 check(closedAudit.length > 0, 'reviewer assignment is audited', closedAudit)
 
+// ---------- Excel import & export ----------
+async function raw(method, path, { token, body, headers } = {}) {
+  const response = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
+    body,
+  })
+  return { status: response.status, headers: response.headers, buffer: Buffer.from(await response.arrayBuffer()) }
+}
+const isWorkbook = (buffer) => buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b
+
+const deniedTemplate = await raw('GET', '/questions/import-template')
+check(deniedTemplate.status === 401, 'template requires a session', deniedTemplate.status)
+
+const template = await raw('GET', '/questions/import-template', { token: adminToken })
+check(template.status === 200, 'download import template')
+check(isWorkbook(template.buffer), 'import template is a real xlsx', template.buffer.length)
+check(
+  (template.headers.get('content-disposition') ?? '').includes('filename*=UTF-8'),
+  'template carries an RFC 5987 filename',
+  template.headers.get('content-disposition'),
+)
+
+const importForm = new FormData()
+importForm.append('bank_id', bank.id)
+importForm.append('file', new Blob([template.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'template.xlsx')
+const importResponse = await fetch(`${BASE}/questions/import`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${adminToken}` },
+  body: importForm,
+})
+const imported = expect(
+  { status: importResponse.status, json: await importResponse.json() },
+  200,
+  'import the sample row from the template',
+)
+check(imported.total === 1 && imported.created + imported.skipped === 1, 'import report counts add up', imported)
+check(imported.report.length === 1 && typeof imported.report[0].line === 'number', 'import report names the row', imported.report)
+
+const reimportForm = new FormData()
+reimportForm.append('bank_id', bank.id)
+reimportForm.append('file', new Blob([template.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'template.xlsx')
+const reimportResponse = await fetch(`${BASE}/questions/import`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${adminToken}` },
+  body: reimportForm,
+})
+const reimported = expect(
+  { status: reimportResponse.status, json: await reimportResponse.json() },
+  200,
+  'importing the same file twice stays idempotent',
+)
+check(reimported.created === 0 && reimported.skipped === 1, 'duplicate stems are skipped', reimported)
+
+const badBankResponse = await fetch(`${BASE}/questions/import`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${adminToken}` },
+  body: (() => {
+    const form = new FormData()
+    form.append('bank_id', 'not-a-uuid')
+    form.append('file', new Blob([template.buffer]), 'template.xlsx')
+    return form
+  })(),
+})
+const badBank = { status: badBankResponse.status, json: await badBankResponse.json() }
+check(badBank.status === 400 && badBank.json?.error?.code === 'INVALID_BANK', 'import rejects an unknown bank', badBank)
+
+const badFileResponse = await fetch(`${BASE}/questions/import`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${adminToken}` },
+  body: (() => {
+    const form = new FormData()
+    form.append('bank_id', bank.id)
+    form.append('file', new Blob(['这不是 Excel'], { type: 'text/plain' }), 'notes.txt')
+    return form
+  })(),
+})
+const badFile = { status: badFileResponse.status, json: await badFileResponse.json() }
+check(badFile.status === 400 && badFile.json?.error?.code === 'INVALID_WORKBOOK', 'import rejects a non-workbook upload', badFile)
+
+const studentExport = await raw('GET', '/questions/export', { token: studentToken })
+check(studentExport.status === 403, 'student cannot export questions', studentExport.status)
+
+const questionsWorkbook = await raw('GET', `/questions/export?bank_id=${bank.id}`, { token: adminToken })
+check(questionsWorkbook.status === 200, 'export questions')
+check(isWorkbook(questionsWorkbook.buffer), 'question export is a real xlsx', questionsWorkbook.buffer.length)
+check(
+  (questionsWorkbook.headers.get('cache-control') ?? '') === 'no-store',
+  'exports are never cached',
+  questionsWorkbook.headers.get('cache-control'),
+)
+const exportAudit = expect(await api('GET', '/audit-logs?action=question.exported', { token: adminToken }), 200, 'question export audit')
+check(exportAudit.length > 0, 'question export is audited', exportAudit)
+
+const scoreWorkbook = await raw('GET', `/scores/export?exam_id=${exam.id}`, { token: adminToken })
+check(scoreWorkbook.status === 200, 'export scores of an exam')
+check(isWorkbook(scoreWorkbook.buffer), 'score export is a real xlsx', scoreWorkbook.buffer.length)
+const missingExam = await raw('GET', '/scores/export', { token: adminToken })
+check(missingExam.status === 400, 'score export requires an exam', missingExam.status)
+const scoreAudit = expect(await api('GET', '/audit-logs?action=score.exported', { token: adminToken }), 200, 'score export audit')
+check(scoreAudit.length > 0, 'score export is audited', scoreAudit)
+
+const roundTripBank = expect(
+  await api('POST', '/question-banks', { token: adminToken, body: { name: `E2E 导入回环 ${suffix}`, scope: 'org' } }),
+  201,
+  'create round-trip bank',
+)
+const roundTripForm = new FormData()
+roundTripForm.append('bank_id', roundTripBank.id)
+roundTripForm.append('file', new Blob([questionsWorkbook.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'export.xlsx')
+const roundTripResponse = await fetch(`${BASE}/questions/import`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${adminToken}` },
+  body: roundTripForm,
+})
+const roundTrip = expect({ status: roundTripResponse.status, json: await roundTripResponse.json() }, 200, 're-import the exported workbook')
+const sourceQuestions = (await api('GET', `/questions?bank_id=${bank.id}&page_size=100`, { token: adminToken })).json
+check(roundTrip.total === sourceQuestions.pagination.total, 'round trip reads every exported row', {
+  total: roundTrip.total,
+  expected: sourceQuestions.pagination.total,
+})
+check(roundTrip.failed === 0 && roundTrip.created === roundTrip.total, 'export → import keeps all question types', roundTrip)
+const roundTripList = expect(await api('GET', `/questions?bank_id=${roundTripBank.id}&page_size=100`, { token: adminToken }), 200, 'round-trip questions landed')
+check(
+  roundTripList.every((item) => item.content?.stem && Number(item.default_score) > 0),
+  'round-tripped questions carry a stem and a score',
+  roundTripList.slice(0, 3),
+)
+const roundTripTypes = new Set(roundTripList.map((item) => item.type))
+check(
+  sourceQuestions.data.every((item) => roundTripTypes.has(item.type)),
+  'question type survives the round trip',
+  { exported: [...new Set(sourceQuestions.data.map((item) => item.type))], imported: [...roundTripTypes] },
+)
+
+// ---------- 题目分析、知识点分析、成绩更正与申诉 ----------
+const teacher = await createStaff('teacher', 'tc', 'E2E 教师', 'org')
+
+const items = expect(await api('GET', `/analytics/exams/${exam.id}/items`, { token: adminToken }), 200, 'exam item analytics')
+check(items.participants > 0, 'item analytics counts participants', items)
+check(items.items.length > 0, 'item analytics returns every question', { count: items.items.length })
+const objective = items.items.filter((item) => !item.subjective)
+check(objective.length > 0, 'objective items are separated from subjective ones')
+check(
+  objective.every((item) => item.correct_rate >= 0 && item.correct_rate <= 100 && item.score_rate >= 0 && item.score_rate <= 100),
+  'correct rate and score rate stay inside 0~100',
+  objective.slice(0, 3),
+)
+check(
+  objective.every((item) => item.discrimination >= -100 && item.discrimination <= 100),
+  'discrimination stays inside -100~100',
+  objective.map((item) => item.discrimination),
+)
+const choice = objective.find((item) => item.type === 'single' || item.type === 'multiple')
+check(Boolean(choice) && choice.options.length > 0, 'choice items carry an option distribution', choice)
+if (choice) {
+  const picked = choice.options.reduce((sum, option) => sum + option.count, 0)
+  check(picked === choice.answered, 'option counts add up to the answered head count', { picked, answered: choice.answered })
+  check(choice.options.some((option) => option.correct), 'the right option is flagged', choice.options)
+}
+const foreignItems = await api('GET', `/analytics/exams/${exam.id}/items`, { token: studentToken })
+check(foreignItems.status === 403, 'student cannot read item analytics', foreignItems.status)
+const teacherItems = expect(await api('GET', `/analytics/exams/${exam.id}/items`, { token: teacher.token }), 200, 'teacher can read item analytics')
+check(teacherItems.participants === items.participants, 'the same scope sees the same sample', teacherItems)
+
+const knowledge = expect(await api('GET', `/analytics/knowledge-points?exam_id=${exam.id}`, { token: adminToken }), 200, 'knowledge analytics for one exam')
+check(knowledge.scope === 'exam', 'knowledge scope reports the exam filter', knowledge)
+check(knowledge.points.length > 0, 'knowledge points are aggregated', knowledge.points)
+check(
+  knowledge.points.every((point) => point.score_rate >= 0 && point.score_rate <= 100 && point.level),
+  'each knowledge point gets a mastery level',
+  knowledge.points.slice(0, 3),
+)
+check(knowledge.points[0].trend.length > 0, 'knowledge point carries its per-exam trend', knowledge.points[0])
+const knowledgeAll = expect(await api('GET', '/analytics/knowledge-points', { token: adminToken }), 200, 'knowledge analytics across the org')
+check(knowledgeAll.scope === 'all', 'unfiltered knowledge analytics spans every exam', knowledgeAll)
+check(knowledgeAll.exams >= 1, 'at least one exam contributed', knowledgeAll)
+
+const record = expect(await api('GET', `/scores/${attempt.attempt_id}`, { token: adminToken }), 200, 'score record before correction')
+const targetItem = record.detail.questions.find((item) => item.max_score > 0)
+const adjustment = expect(
+  await api('POST', `/scores/${attempt.attempt_id}/adjust`, {
+    token: adminToken,
+    body: { reason: 'E2E 复核后扣分', items: [{ question_id: targetItem.question_id, score: 0 }] },
+  }),
+  200,
+  'correct one question score to zero',
+)
+check(adjustment.before_total === record.total, 'adjustment records the previous total', adjustment)
+check(
+  Math.abs(adjustment.after_total - (record.total - targetItem.score)) < 0.01,
+  'adjusted total drops by the removed points',
+  { after: adjustment.after_total, expected: record.total - targetItem.score },
+)
+check(adjustment.items.length === 1 && adjustment.items[0].before === targetItem.score, 'adjustment keeps per-question trace', adjustment.items)
+check(Boolean(adjustment.operator_name), 'adjustment names the operator', adjustment)
+
+const afterCorrection = expect(await api('GET', `/scores/${attempt.attempt_id}`, { token: adminToken }), 200, 'score record after correction')
+check(afterCorrection.total === adjustment.after_total, 'the latest record reflects the correction', afterCorrection)
+check(afterCorrection.published_at !== null, 'a corrected score stays published for the candidate', afterCorrection)
+const history = expect(await api('GET', `/scores/${attempt.attempt_id}/adjustments`, { token: adminToken }), 200, 'correction history')
+check(history.length === 1 && history[0].reason === 'E2E 复核后扣分', 'correction history is traceable', history)
+const repeatCorrection = await api('POST', `/scores/${attempt.attempt_id}/adjust`, {
+  token: adminToken,
+  body: { reason: '重复更正', items: [{ question_id: targetItem.question_id, score: 0 }] },
+})
+check(repeatCorrection.status === 409, 'a no-op correction is rejected', repeatCorrection.json)
+const overMaxCorrection = await api('POST', `/scores/${attempt.attempt_id}/adjust`, {
+  token: adminToken,
+  body: { reason: '超上限', items: [{ question_id: targetItem.question_id, score: targetItem.max_score + 1 }] },
+})
+check(overMaxCorrection.status === 409 && overMaxCorrection.json?.error?.code === 'INVALID_STATE', 'a score above the maximum is rejected', overMaxCorrection.json)
+const foreignAdjust = await api('POST', `/scores/${attempt.attempt_id}/adjust`, {
+  token: studentToken,
+  body: { reason: '越权', items: [{ question_id: targetItem.question_id, score: 1 }] },
+})
+check(foreignAdjust.status === 403, 'students cannot correct scores', foreignAdjust.status)
+const adjustAudit = expect(await api('GET', '/audit-logs?action=score.adjusted', { token: adminToken }), 200, 'score correction audit')
+check(adjustAudit.length > 0, 'score correction is audited', adjustAudit)
+const correctionNotice = expect(await api('GET', '/notifications', { token: studentToken }), 200, 'student notifications after correction')
+check(
+  correctionNotice.some((item) => item.source_type === 'score_adjust'),
+  'the candidate is notified about the correction',
+  correctionNotice.slice(0, 3),
+)
+
+const appeal = expect(
+  await api('POST', `/my/scores/${attempt.attempt_id}/appeals`, {
+    token: studentToken,
+    body: { question_id: targetItem.question_id, reason: 'E2E 我认为这道题应得分' },
+  }),
+  201,
+  'candidate files an appeal',
+)
+check(appeal.status === 'pending', 'a new appeal is pending', appeal)
+const duplicateAppeal = await api('POST', `/my/scores/${attempt.attempt_id}/appeals`, {
+  token: studentToken,
+  body: { question_id: targetItem.question_id, reason: '重复申诉' },
+})
+check(duplicateAppeal.status === 409, 'the same question cannot be appealed twice', duplicateAppeal.json)
+const foreignAppeal = await api('POST', `/my/scores/${doubleAttempt.attempt_id}/appeals`, {
+  token: studentToken,
+  body: { reason: '申诉别人的答卷' },
+})
+check(foreignAppeal.status === 404, 'a candidate cannot appeal another attempt', foreignAppeal.json)
+const myAppeals = expect(await api('GET', '/my/appeals', { token: studentToken }), 200, 'my appeals')
+check(myAppeals.length === 1 && myAppeals[0].exam_title === exam.title, 'appeal list shows the candidate own appeal', myAppeals)
+const adminAppeals = expect(await api('GET', '/appeals?status=pending', { token: examAdmin.token }), 200, 'administrator appeal queue')
+check(adminAppeals.some((entry) => entry.id === appeal.id), 'the pending queue contains the new appeal', adminAppeals)
+const badHandle = await api('POST', `/appeals/${appeal.id}/handle`, { token: examAdmin.token, body: { action: 'maybe', note: 'x' } })
+check(badHandle.status === 400, 'an unknown appeal verdict is rejected', badHandle.json)
+const handled = expect(
+  await api('POST', `/appeals/${appeal.id}/handle`, { token: examAdmin.token, body: { action: 'rejected', note: 'E2E 复核后维持原分' } }),
+  200,
+  'administrator rejects the appeal',
+)
+check(handled.status === 'rejected' && Boolean(handled.handler_name), 'the verdict records who handled it', handled)
+const handleAgain = await api('POST', `/appeals/${appeal.id}/handle`, { token: examAdmin.token, body: { action: 'accepted', note: '二次处理' } })
+check(handleAgain.status === 409, 'a handled appeal cannot be handled again', handleAgain.json)
+const appealNotice = expect(await api('GET', '/notifications', { token: studentToken }), 200, 'student notifications after appeal')
+check(
+  appealNotice.some((entry) => entry.source_type === 'score_appeal' && entry.content.includes('维持原分')),
+  'the candidate is notified about the verdict',
+  appealNotice.slice(0, 3),
+)
+const appealAudit = expect(await api('GET', '/audit-logs?action=score.appeal_rejected', { token: adminToken }), 200, 'appeal verdict audit')
+check(appealAudit.length > 0, 'appeal handling is audited', appealAudit)
+
+const queue = (await api('GET', '/review-tasks?status=submitted&page_size=100', { token: examAdmin.token })).json
+check(queue.pagination.total >= 2 && queue.data.length >= 2, 'at least two finished tasks exist for the queue test', queue.pagination)
+const firstTask = queue.data[0]
+const neighbors = expect(
+  await api('GET', `/review-tasks/${firstTask.id}/neighbors?status=submitted`, { token: examAdmin.token }),
+  200,
+  'review queue neighbours',
+)
+check(neighbors.position === 1 && neighbors.total === queue.pagination.total, 'the first task reports its queue position', neighbors)
+check(!neighbors.prev_id && neighbors.next_id === queue.data[1].id, 'next/previous follow the visible queue', neighbors)
+const middleNeighbors = expect(
+  await api('GET', `/review-tasks/${queue.data[1].id}/neighbors?status=submitted`, { token: examAdmin.token }),
+  200,
+  'middle task neighbours',
+)
+check(middleNeighbors.prev_id === firstTask.id && middleNeighbors.position === 2, 'middle task links both ways', middleNeighbors)
+const badFilter = await api('GET', `/review-tasks/${firstTask.id}/neighbors?status=submitted&exam_id=not-a-uuid`, { token: examAdmin.token })
+check(badFilter.status === 400, 'neighbours validate the exam filter', badFilter.json)
+
+const templates = expect(await api('GET', '/notification-templates', { token: adminToken }), 200, 'notification templates')
+check(templates.length > 0, 'templates exist for the organisation', templates)
+const notifTemplate = templates[0]
+const updatedTemplate = expect(
+  await api('PUT', `/notification-templates/${notifTemplate.id}`, {
+    token: adminToken,
+    body: { title_tpl: 'E2E 成绩发布', content_tpl: '你的成绩已发布：{total} 分', enabled: false },
+  }),
+  200,
+  'edit a notification template',
+)
+check(updatedTemplate.title_tpl === 'E2E 成绩发布' && updatedTemplate.enabled === false, 'template edits persist', updatedTemplate)
+const templateAgain = expect(await api('GET', '/notification-templates', { token: adminToken }), 200, 'templates after edit')
+check(
+  templateAgain.find((entry) => entry.id === notifTemplate.id)?.content_tpl === '你的成绩已发布：{total} 分',
+  'the edited body is readable back',
+  templateAgain,
+)
+const badTemplate = await api('PUT', `/notification-templates/${notifTemplate.id}`, { token: adminToken, body: { title_tpl: '   ' } })
+check(badTemplate.status === 400, 'an empty template title is rejected', badTemplate.json)
+const teacherTemplateEdit = await api('PUT', `/notification-templates/${notifTemplate.id}`, { token: teacher.token, body: { enabled: true } })
+check(teacherTemplateEdit.status === 403, 'only organisation admins edit templates', teacherTemplateEdit.status)
+expect(
+  await api('PUT', `/notification-templates/${notifTemplate.id}`, {
+    token: adminToken,
+    body: { title_tpl: notifTemplate.title_tpl, content_tpl: notifTemplate.content_tpl, enabled: true },
+  }),
+  200,
+  'restore the template',
+)
+const appealTemplate = templates.find((entry) => entry.code === 'score_appeal')
+check(Boolean(appealTemplate), 'the appeal wording ships as an editable template', templates.map((entry) => entry.code))
+const rendered = expect(
+  await api('POST', `/my/scores/${attempt.attempt_id}/appeals`, { token: studentToken, body: { reason: 'E2E 总分复核' } }),
+  201,
+  'appeal the whole attempt',
+)
+expect(
+  await api('PUT', `/notification-templates/${appealTemplate.id}`, {
+    token: adminToken,
+    body: { title_tpl: '模板标题', content_tpl: '模板正文：{verdict}｜{total}｜未知 {nothing}' },
+  }),
+  200,
+  'point the template at appeal wording',
+)
+expect(
+  await api('POST', `/appeals/${rendered.id}/handle`, { token: examAdmin.token, body: { action: 'accepted', note: '按模板通知' } }),
+  200,
+  'handle the templated appeal',
+)
+const renderedNotice = expect(await api('GET', '/notifications', { token: studentToken }), 200, 'notifications after template render')
+const appealNote = renderedNotice.find((entry) => entry.source_type === 'score_appeal' && entry.source_id === rendered.id)
+check(appealNote?.title === '模板标题', 'the enabled template overrides the title', appealNote)
+check(
+  appealNote?.content === `模板正文：已通过｜${rendered.total.toFixed(2)}｜未知 `,
+  'placeholders render and unknown ones disappear',
+  appealNote,
+)
+expect(
+  await api('PUT', `/notification-templates/${appealTemplate.id}`, {
+    token: adminToken,
+    body: { title_tpl: appealTemplate.title_tpl, content_tpl: appealTemplate.content_tpl },
+  }),
+  200,
+  'restore the appeal template',
+)
+const logs = (await api('GET', '/notification-logs?status=sent&page_size=5', { token: adminToken })).json
+check(logs.pagination.total > 0 && logs.data.length <= 5, 'dispatch logs paginate', logs.pagination)
+check(logs.data.every((entry) => entry.user_name && entry.channel), 'dispatch logs name the recipient', logs.data.slice(0, 2))
+const logSearch = (await api('GET', `/notification-logs?keyword=${encodeURIComponent('成绩')}`, { token: adminToken })).json
+check(logs.pagination.total >= logSearch.pagination.total, 'keyword search narrows the ledger', logSearch.pagination)
+const studentLogs = await api('GET', '/notification-logs', { token: studentToken })
+check(studentLogs.status === 403, 'students cannot read the dispatch ledger', studentLogs.status)
+
 console.log(`\nE2E PASSED: ${results.length} checks`)

@@ -1,6 +1,8 @@
 // Security regression: data scope, brute-force guard, token handling and injection.
 // Usage: node scripts/security_check.mjs   (API on :8081, seeded admin, dev DB only)
 // Creates records prefixed with "SEC " / seccheck_ and removes them at the end.
+import { inflateRawSync } from 'node:zlib'
+
 const BASE = 'http://127.0.0.1:8081/api/v1'
 const suffix = String(Date.now()).slice(-8)
 const results = []
@@ -168,6 +170,192 @@ check(injection.json.pagination.total === 0, 'SQL injection payload matches noth
 
 const questionInjection = await api('GET', `/questions?keyword=${encodeURIComponent("%' OR 1=1 --")}`, { token: admin })
 check(questionInjection.status === 200 && questionInjection.json.pagination.total === 0, 'question keyword injection is neutralised', questionInjection.json.pagination)
+
+// ------------------------------------------------------ export / import / correction surface
+const binary = async (method, path, { token, body, headers } = {}) => {
+  const init = { method, headers: { ...(headers ?? {}) } }
+  if (token) init.headers.Authorization = `Bearer ${token}`
+  if (body !== undefined) init.body = body
+  const response = await fetch(`${BASE}${path}`, init)
+  return { status: response.status, headers: response.headers, buffer: Buffer.from(await response.arrayBuffer()) }
+}
+const isZip = (buffer) => buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b
+
+// unzipEntry reads one member through the central directory (local headers may carry data descriptors).
+function unzipEntry(buffer, want) {
+  let eocd = -1
+  for (let i = buffer.length - 22; i >= 0 && i > buffer.length - 66_000; i -= 1) {
+    if (buffer.readUInt32LE(i) === 0x06054b50) {
+      eocd = i
+      break
+    }
+  }
+  if (eocd < 0) return null
+  const count = buffer.readUInt16LE(eocd + 10)
+  let offset = buffer.readUInt32LE(eocd + 16)
+  for (let index = 0; index < count; index += 1) {
+    if (buffer.readUInt32LE(offset) !== 0x02014b50) return null
+    const method = buffer.readUInt16LE(offset + 10)
+    const compressed = buffer.readUInt32LE(offset + 20)
+    const nameLength = buffer.readUInt16LE(offset + 28)
+    const extraLength = buffer.readUInt16LE(offset + 30)
+    const commentLength = buffer.readUInt16LE(offset + 32)
+    const local = buffer.readUInt32LE(offset + 42)
+    const name = buffer.slice(offset + 46, offset + 46 + nameLength).toString('utf8')
+    offset += 46 + nameLength + extraLength + commentLength
+    if (name !== want) continue
+    const localName = buffer.readUInt16LE(local + 26)
+    const localExtra = buffer.readUInt16LE(local + 28)
+    const start = local + 30 + localName + localExtra
+    const data = buffer.slice(start, start + compressed)
+    return method === 0 ? data.toString('utf8') : inflateRawSync(data).toString('utf8')
+  }
+  return null
+}
+
+const templateNoAuth = await binary('GET', '/questions/import-template')
+check(templateNoAuth.status === 401, 'the import template requires authentication', templateNoAuth.status)
+
+const exportForStudent = await binary('GET', `/scores/export?exam_id=${exam.json.data.id}`, { token: tokenStudentA })
+check(exportForStudent.status === 403, 'students cannot export scores', exportForStudent.status)
+
+const exportForClass = await binary('GET', `/scores/export?exam_id=${exam.json.data.id}`, { token: tokenTeacherA })
+check(exportForClass.status === 200 && isZip(exportForClass.buffer), 'class teacher can export the own class')
+check(exportForClass.headers.get('cache-control') === 'no-store', 'score export is never cached', exportForClass.headers.get('cache-control'))
+const exportForSelf = await binary('GET', `/scores/export?exam_id=${exam.json.data.id}`, { token: tokenSelf })
+check(exportForSelf.status === 200, 'self-scoped teacher can call the export')
+check(exportForClass.buffer.length > exportForSelf.buffer.length, 'the export only contains rows inside the caller scope', {
+  class: exportForClass.buffer.length,
+  self: exportForSelf.buffer.length,
+})
+
+const exportCampusScope = await binary('GET', `/scores/export?exam_id=${exam.json.data.id}`, { token: tokenCampus })
+check(exportCampusScope.status === 200 && isZip(exportCampusScope.buffer), 'campus admin can export')
+const exportForOrgAdmin = await binary('GET', `/scores/export?exam_id=${exam.json.data.id}`, { token: admin })
+check(exportForOrgAdmin.status === 200, 'org admin can export the same exam')
+// Counting the worksheet rows proves the scope filter instead of guessing from file size.
+const rowsOf = (buffer, sheet = 'xl/worksheets/sheet1.xml') => {
+  const xml = unzipEntry(buffer, sheet)
+  return xml ? (xml.match(/<row /g) ?? []).length : -1
+}
+check(rowsOf(exportForOrgAdmin.buffer) === 4, 'the org admin export carries both candidates', { rows: rowsOf(exportForOrgAdmin.buffer) })
+check(rowsOf(exportCampusScope.buffer) === 3, 'the campus export carries only the campus candidate', { rows: rowsOf(exportCampusScope.buffer) })
+check(rowsOf(exportForClass.buffer) === 3, 'the class export carries only the class candidate', { rows: rowsOf(exportForClass.buffer) })
+check(rowsOf(exportForSelf.buffer) === 2, 'a self-scoped teacher exports an empty sheet', { rows: rowsOf(exportForSelf.buffer) })
+const missingExport = await binary('GET', '/scores/export?exam_id=00000000-0000-0000-0000-000000000000', { token: admin })
+check(missingExport.status === 404, 'exporting an unknown exam is a 404', missingExport.status)
+
+const questionExportForStudent = await binary('GET', '/questions/export', { token: tokenStudentA })
+check(questionExportForStudent.status === 403, 'students cannot export questions', questionExportForStudent.status)
+const questionExportBadBank = await binary('POST', '/questions/import', {
+  token: tokenTeacherA,
+  body: (() => {
+    const form = new FormData()
+    form.append('bank_id', '00000000-0000-0000-0000-000000000000')
+    form.append('file', new Blob([exportForClass.buffer]), 'x.xlsx')
+    return form
+  })(),
+})
+check(
+  questionExportBadBank.status === 400 && questionExportBadBank.headers.get('content-type')?.includes('json'),
+  'importing into an unknown bank is rejected',
+  questionExportBadBank.status,
+)
+const hugeUpload = await binary('POST', '/questions/import', {
+  token: tokenTeacherA,
+  body: (() => {
+    const form = new FormData()
+    form.append('bank_id', bank.json.data.id)
+    form.append('file', new Blob([Buffer.alloc(20 * 1024 * 1024)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'huge.xlsx')
+    return form
+  })(),
+})
+check([400, 413].includes(hugeUpload.status), 'an oversized upload is refused instead of parsed', hugeUpload.status)
+
+const itemsForStudent = await api('GET', `/analytics/exams/${exam.json.data.id}/items`, { token: tokenStudentA })
+check(itemsForStudent.status === 403, 'students cannot read item analytics', itemsForStudent.json)
+const itemsForClass = await api('GET', `/analytics/exams/${exam.json.data.id}/items`, { token: tokenTeacherA })
+check(
+  itemsForClass.status === 200 && itemsForClass.json.data.participants === 1,
+  'item analytics respect the class data scope',
+  itemsForClass.json.data?.participants,
+)
+check(
+  itemsForClass.json.data.items.every((item) => item.options.some((option) => option.key === 'A')),
+  'option distribution only exposes aggregated counts',
+  itemsForClass.json.data.items[0],
+)
+const knowledgeForCampus = await api('GET', '/analytics/knowledge-points', { token: tokenCampus })
+check(knowledgeForCampus.status === 200, 'campus admin can read knowledge analytics')
+check(
+  knowledgeForCampus.json.data.points.every((point) => point.answers <= 1),
+  'knowledge aggregates stay inside the caller scope',
+  knowledgeForCampus.json.data.points,
+)
+
+const adjustAsStudent = await api('POST', `/scores/${attempts.b.id}/adjust`, {
+  token: tokenStudentA,
+  body: { reason: '越权', items: [{ question_id: question.json.data.id, score: 2 }] },
+})
+check(adjustAsStudent.status === 403, 'students cannot correct scores', adjustAsStudent.json)
+const adjustAsTeacher = await api('POST', `/scores/${attempts.b.id}/adjust`, {
+  token: tokenTeacherA,
+  body: { reason: '越权', items: [{ question_id: question.json.data.id, score: 2 }] },
+})
+check(adjustAsTeacher.status === 403, 'teachers cannot correct scores', adjustAsTeacher.json)
+const adjustForeignCampus = await api('POST', `/scores/${attempts.b.id}/adjust`, {
+  token: tokenCampus,
+  body: { reason: '跨校区', items: [{ question_id: question.json.data.id, score: 2 }] },
+})
+check(adjustForeignCampus.status === 404, 'a campus admin cannot correct a score outside the campus', adjustForeignCampus.json)
+const adjustOwnCampus = await api('POST', `/scores/${attempts.a.id}/adjust`, {
+  token: tokenCampus,
+  body: { reason: 'SEC 本校更正', items: [{ question_id: question.json.data.id, score: 1 }] },
+})
+check(adjustOwnCampus.status === 200, 'the campus admin can correct a score inside the campus', adjustOwnCampus.json)
+const historyLeak = await api('GET', `/scores/${attempts.a.id}/adjustments`, { token: tokenSelf })
+check(historyLeak.status === 200 && historyLeak.json.data.length === 0, 'a self-scoped teacher cannot read the correction trail', historyLeak.json.data)
+
+const appealOtherStudent = await api('POST', `/my/scores/${attempts.b.id}/appeals`, { token: tokenStudentA, body: { reason: '别人的答卷' } })
+check([403, 404].includes(appealOtherStudent.status), 'a student cannot appeal another candidate’s attempt', appealOtherStudent.json)
+const unpublishedAppeal = await api('POST', `/my/scores/${attempts.a.id}/appeals`, { token: attempts.a.token, body: { reason: '尚未发布' } })
+check(unpublishedAppeal.status === 409, 'an unpublished score cannot be appealed', unpublishedAppeal.json)
+const appealsAsStudent = await api('GET', '/appeals', { token: tokenStudentA })
+check(appealsAsStudent.status === 403, 'students cannot open the appeal queue', appealsAsStudent.json)
+const appealsAsTeacher = await api('GET', '/appeals', { token: tokenTeacherA })
+check(appealsAsTeacher.status === 403, 'teachers cannot open the appeal queue', appealsAsTeacher.json)
+
+const logsAsExamAdmin = await api('GET', '/notification-logs', { token: tokenExamAdmin })
+check(logsAsExamAdmin.status === 403, 'exam admins cannot read the org-wide notification ledger', logsAsExamAdmin.json)
+const templatesList = await api('GET', '/notification-templates', { token: admin })
+const templateEditByTeacher = await api('PUT', `/notification-templates/${templatesList.json.data[0].id}`, {
+  token: tokenTeacherA,
+  body: { title_tpl: '越权改名' },
+})
+check(templateEditByTeacher.status === 403, 'teachers cannot edit notification templates', templateEditByTeacher.json)
+const reviewQueueAsStudent = await api('GET', `/review-tasks/${attempts.a.id}/neighbors`, { token: tokenStudentA })
+check(reviewQueueAsStudent.status === 403, 'students cannot browse the review queue', reviewQueueAsStudent.json)
+
+const nastyExam = await api('POST', '/exams', {
+  token: admin,
+  body: {
+    paper_id: paper.json.data.id,
+    title: '../../etc/passwd 特别考试',
+    start_at: new Date(Date.now() - 60_000).toISOString(),
+    end_at: new Date(Date.now() + 3_600_000).toISOString(),
+    duration_minutes: 60,
+    candidates: [{ user_id: studentA.id }],
+  },
+})
+created.exams.push(nastyExam.json.data.id)
+const nastyExport = await binary('GET', `/scores/export?exam_id=${nastyExam.json.data.id}`, { token: admin })
+check(nastyExport.status === 200, 'a title with path characters still exports')
+const disposition = nastyExport.headers.get('content-disposition') ?? ''
+check(
+  disposition.startsWith('attachment; filename="export.xlsx"') && !disposition.includes('../') && !disposition.includes('/etc'),
+  'the download header never leaks path characters',
+  disposition,
+)
 
 // ---------------------------------------------------------------- token handling
 const tampered = `${admin.slice(0, -4)}AAAA`
