@@ -45,7 +45,7 @@
 - 产物：`CGO_ENABLED=0` 静态 Linux 二进制（api/migrate/seed）+ `web/dist`，替换 `/opt/online-exam/bin` 与 `/opt/online-exam/web`，`systemctl restart online-exam`，迁移 0006/0007 已在生产库执行。
 - `.env` 追加 `MAX_BODY_BYTES=16777216` 以匹配 12 MB 上传上限；`/healthz` 200、SPA 200、`/api/v1/questions/import-template` 未登录 401。
 - 线上只做只读复验（模板下载、导出、逐题/知识点分析、申诉队列、模板与发送记录），不向生产库写入演示数据。
--  SSH 口令登录已失效（服务器侧已改），部署改用本机 `~/.ssh/id_ed25519` 公钥认证。
+- SSH 口令登录已失效（服务器侧已改），部署改用本机 `~/.ssh/id_ed25519` 公钥认证。
 - 修掉一个线上可见的样式缺陷：得分率 100% 时进度条顶满列宽并与数值文字、相邻列重叠 —— 改为条形可收缩、数值不换行。
 
 ### 过程中修掉的问题
