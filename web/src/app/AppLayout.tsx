@@ -32,9 +32,10 @@ import EmptyState from '../components/EmptyState'
 import { queryClient } from './queryClient'
 import { canAccess, visibleNavigation } from './permissions'
 import { useAuthStore } from '../stores/auth'
+import { useThemeMode } from './useThemeMode'
 import { roleLabel } from '../utils/labels'
 import { findNavTrail, pageTitle } from './navigation'
-import { CloseOutlined } from '@ant-design/icons'
+import { CloseOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
 
 const { Header, Sider, Content } = Layout
 
@@ -58,6 +59,8 @@ export default function AppLayout() {
 
   const user = useAuthStore((state) => state.user)
   const token = useAuthStore((state) => state.token)
+  const themeMode = useThemeMode((state) => state.mode)
+  const toggleTheme = useThemeMode((state) => state.toggle)
   const setUser = useAuthStore((state) => state.setUser)
   const clear = useAuthStore((state) => state.clear)
 
@@ -288,6 +291,13 @@ export default function AppLayout() {
           </div>
 
           <div className="header-actions">
+            <Button
+              type="text"
+              className="header-icon-btn"
+              aria-label="切换主题"
+              icon={themeMode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+              onClick={toggleTheme}
+            />
             <Popover
               content={notificationPanel}
               trigger="click"

@@ -1,4 +1,4 @@
-import type { ThemeConfig } from 'antd'
+import { theme as antdTheme, type ThemeConfig } from 'antd'
 
 export const theme: ThemeConfig = {
   token: {
@@ -71,6 +71,33 @@ export const theme: ThemeConfig = {
     },
     Popover: {
       borderRadiusLG: 12,
+    },
+  },
+}
+
+
+/** 深色主题：同一套 token，换成 antd 暗色算法与深色容器色。 */
+export const darkTheme: ThemeConfig = {
+  ...theme,
+  algorithm: antdTheme.darkAlgorithm,
+  token: {
+    ...theme.token,
+    colorTextBase: '#e6ebf5',
+    colorTextSecondary: '#a9b4c7',
+    colorTextTertiary: '#78859c',
+    colorBorder: '#2a3242',
+    colorBorderSecondary: '#232a38',
+    colorBgLayout: '#0e131c',
+    colorBgContainer: '#161c27',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.4)',
+    boxShadowSecondary: '0 12px 32px rgba(0, 0, 0, 0.5)',
+  },
+  components: {
+    ...theme.components,
+    Layout: {
+      siderBg: '#121822',
+      headerBg: '#121822',
+      bodyBg: '#0e131c',
     },
   },
 }
