@@ -1629,3 +1629,423 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   v0.7 视觉升级：深色顶栏 + 页签工作区 + 数据卡片（参考 B 端运营后台风格）
+   ========================================================================== */
+
+:root {
+  --app-header-bg: #1b2a4a;
+  --app-header-bg-soft: #23355c;
+  --app-header-text: #dbe4f5;
+  --app-header-muted: #8fa2c4;
+  --app-panel-border: #e6ebf3;
+  --app-panel-head: #f7f9fc;
+  --app-accent: #3370ff;
+  --app-accent-soft: #eaf1ff;
+  --app-pos: #12b76a;
+  --app-neg: #f04438;
+  --app-radius-sm: 4px;
+  --app-radius-lg: 10px;
+  --app-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ---- 顶栏 ---- */
+.app-header {
+  height: 56px;
+  padding: 0 20px;
+  color: var(--app-header-text);
+  background: linear-gradient(180deg, var(--app-header-bg-soft), var(--app-header-bg));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 10px rgba(16, 26, 48, 0.18);
+}
+
+.app-header .ant-breadcrumb,
+.app-header .ant-breadcrumb a,
+.app-header .ant-breadcrumb-separator {
+  color: var(--app-header-muted) !important;
+  font-size: 12px;
+}
+
+.app-header .header-icon-btn,
+.app-header .user-chip-name,
+.app-header .user-chip-caret {
+  color: var(--app-header-text);
+}
+
+.app-header .header-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.app-header .user-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  transition: background var(--app-transition);
+}
+
+.app-header .user-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.app-header .user-chip-role,
+.app-header .header-divider {
+  color: var(--app-header-muted);
+}
+
+.app-header .header-divider {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* ---- 侧栏 ---- */
+.app-sider {
+  border-right: 1px solid var(--app-panel-border);
+  box-shadow: 1px 0 0 rgba(16, 26, 48, 0.02);
+}
+
+.app-brand {
+  height: 56px;
+  border-bottom: 1px solid var(--app-panel-border);
+}
+
+.app-menu .ant-menu-item-selected {
+  position: relative;
+  font-weight: 600;
+}
+
+.app-menu .ant-menu-item-selected::before {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  background: var(--app-accent);
+  border-radius: 0 3px 3px 0;
+  content: '';
+}
+
+/* ---- 页签条 ---- */
+.work-tabs {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  height: 38px;
+  padding: 0 16px;
+  overflow-x: auto;
+  background: #fff;
+  border-bottom: 1px solid var(--app-panel-border);
+}
+
+.work-tab {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  white-space: nowrap;
+  background: #f4f6fa;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--app-transition) var(--app-ease);
+}
+
+.work-tab:hover {
+  color: var(--app-accent);
+  border-color: #cddcff;
+}
+
+.work-tab-active {
+  color: var(--app-accent);
+  background: #fff;
+  border-color: #cddcff;
+  box-shadow: 0 1px 2px rgba(51, 112, 255, 0.12);
+}
+
+.work-tab-close {
+  font-size: 10px;
+  opacity: 0.55;
+}
+
+.work-tab-close:hover {
+  opacity: 1;
+}
+
+/* ---- 内容区与卡片 ---- */
+.content-inner {
+  animation: content-in 260ms var(--app-ease);
+}
+
+@keyframes content-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel-card.ant-card {
+  border: 1px solid var(--app-panel-border);
+  box-shadow: 0 1px 2px rgba(16, 26, 48, 0.04);
+  transition: box-shadow var(--app-transition) var(--app-ease), transform var(--app-transition) var(--app-ease);
+}
+
+.panel-card.ant-card:hover {
+  box-shadow: 0 6px 18px rgba(16, 26, 48, 0.07);
+}
+
+.panel-card .ant-card-head {
+  min-height: 44px;
+  padding: 0 16px;
+  background: var(--app-panel-head);
+  border-bottom: 1px solid var(--app-panel-border);
+}
+
+.panel-card .ant-card-head-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.panel-card .ant-card-body {
+  padding: 16px;
+}
+
+/* ---- 表格：数据看板质感 ---- */
+.ant-table-thead > tr > th {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #5b6b85 !important;
+  background: var(--app-panel-head) !important;
+  border-bottom: 1px solid var(--app-panel-border) !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom-color: #eef2f8 !important;
+}
+
+.ant-table-tbody > tr {
+  transition: background var(--app-transition);
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: #f8faff !important;
+}
+
+/* ---- 指标卡（实际 / 计划式） ---- */
+.metric-cell {
+  transition: background var(--app-transition);
+}
+
+.metric-cell:hover {
+  background: #f9fbff;
+}
+
+.metric-label::before {
+  display: inline-block;
+  width: 3px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  background: var(--app-accent);
+  border-radius: 2px;
+  content: '';
+}
+
+.metric-value.metric-pos {
+  color: var(--app-pos);
+}
+
+.metric-value.metric-neg {
+  color: var(--app-neg);
+}
+
+/* ---- 环形图 ---- */
+.donut {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto;
+}
+
+.donut svg {
+  transform: rotate(-90deg);
+}
+
+.donut-track {
+  stroke: #eef2f8;
+}
+
+.donut-value {
+  stroke: var(--app-accent);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 600ms var(--app-ease);
+}
+
+.donut-center {
+  position: absolute;
+  text-align: center;
+}
+
+.donut-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--app-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.donut-caption {
+  font-size: 11px;
+  color: var(--app-text-tertiary);
+}
+
+/* ---- 条形图 ---- */
+.distribution-fill {
+  background: linear-gradient(90deg, #4c86ff, #3370ff);
+  transition: width 600ms var(--app-ease);
+}
+
+/* ---- 焦点与按钮细节 ---- */
+.ant-btn {
+  transition: all var(--app-transition) var(--app-ease);
+}
+
+.ant-btn-primary:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(51, 112, 255, 0.28);
+}
+
+.ant-btn-primary:not(:disabled):active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.ant-input:focus,
+.ant-input-focused,
+.ant-select-focused .ant-select-selector {
+  box-shadow: 0 0 0 3px rgba(51, 112, 255, 0.12) !important;
+}
+
+/* ---- 登录页与考生页细节 ---- */
+.login-form-card,
+.attempt-question {
+  animation: content-in 300ms var(--app-ease);
+}
+
+.attempt-nav-item {
+  transition: transform var(--app-transition) var(--app-ease), background var(--app-transition), color var(--app-transition);
+}
+
+.attempt-nav-item:hover {
+  transform: translateY(-1px);
+  border-color: #cddcff;
+}
+
+.attempt-nav-active {
+  box-shadow: 0 4px 10px rgba(51, 112, 255, 0.28);
+}
+
+.notice-feed-item {
+  transition: transform var(--app-transition) var(--app-ease), box-shadow var(--app-transition);
+}
+
+.notice-feed-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(16, 26, 48, 0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-inner,
+  .login-form-card,
+  .attempt-question {
+    animation: none;
+  }
+  .donut-value,
+  .distribution-fill {
+    transition: none;
+  }
+}
+
+/* v0.7：工作台统计面板与页头细节 */
+.stat-panel.ant-card {
+  border: 1px solid var(--app-panel-border);
+  box-shadow: 0 1px 2px rgba(16, 26, 48, 0.04);
+}
+
+.stat-cell {
+  position: relative;
+  transition: background var(--app-transition);
+}
+
+.stat-cell:hover {
+  background: #f9fbff;
+}
+
+.stat-label::before {
+  display: inline-block;
+  width: 3px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  background: var(--app-accent);
+  border-radius: 2px;
+  content: '';
+}
+
+.stat-value {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.page-title {
+  letter-spacing: -0.01em;
+}
+
+.page-subtitle {
+  color: #6b7a90;
+}
+
+/* antd Layout.Header 用内联样式设置背景，深色顶栏必须提权 */
+.app-header.ant-layout-header {
+  height: 56px !important;
+  padding: 0 20px !important;
+  color: var(--app-header-text) !important;
+  background: linear-gradient(180deg, #26375c, #1b2a4a) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 2px 10px rgba(16, 26, 48, 0.18);
+}
+
+.app-header .ant-breadcrumb,
+.app-header .ant-breadcrumb a,
+.app-header .ant-breadcrumb li:last-child,
+.app-header .ant-breadcrumb-separator {
+  color: #9db0d2 !important;
+  font-size: 12px;
+}
+
+.app-header .ant-breadcrumb li:last-child {
+  color: #e7eefc !important;
+}
+
+.app-header .header-icon-btn.ant-btn,
+.app-header .user-chip-name,
+.app-header .user-chip-caret {
+  color: #e7eefc !important;
+}
+
+.app-header .header-icon-btn.ant-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.app-header .user-chip-role {
+  color: #93a6c9 !important;
+}
+
+.app-header .header-divider {
+  background: rgba(255, 255, 255, 0.18) !important;
+}

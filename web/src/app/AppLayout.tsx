@@ -34,6 +34,7 @@ import { canAccess, visibleNavigation } from './permissions'
 import { useAuthStore } from '../stores/auth'
 import { roleLabel } from '../utils/labels'
 import { findNavTrail, pageTitle } from './navigation'
+import { CloseOutlined } from '@ant-design/icons'
 
 const { Header, Sider, Content } = Layout
 
@@ -46,6 +47,14 @@ export default function AppLayout() {
 
   const [collapsed, setCollapsed] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [tabs, setTabs] = useState<{ path: string; label: string }[]>(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('online-exam.tabs') ?? '[]')
+      return Array.isArray(saved) ? saved.slice(-8) : []
+    } catch {
+      return []
+    }
+  })
 
   const user = useAuthStore((state) => state.user)
   const token = useAuthStore((state) => state.token)
@@ -79,6 +88,31 @@ export default function AppLayout() {
   useEffect(() => {
     setDrawerOpen(false)
   }, [location.pathname])
+
+  // 页签工作区：记录打开过的页面，像参考图那样可切换、可关闭。
+  useEffect(() => {
+    const label = pageTitle(location.pathname)
+    if (label === '页面不存在') return
+    setTabs((current) => {
+      const next = current.some((tab) => tab.path === location.pathname)
+        ? current
+        : [...current, { path: location.pathname, label }].slice(-8)
+      sessionStorage.setItem('online-exam.tabs', JSON.stringify(next))
+      return next
+    })
+  }, [location.pathname])
+
+  function closeTab(path: string) {
+    setTabs((current) => {
+      const next = current.filter((tab) => tab.path !== path)
+      sessionStorage.setItem('online-exam.tabs', JSON.stringify(next))
+      return next
+    })
+    if (path === location.pathname) {
+      const rest = tabs.filter((tab) => tab.path !== path)
+      navigate(rest.length > 0 ? rest[rest.length - 1].path : '/')
+    }
+  }
 
   const menuItems = useMemo<MenuProps['items']>(
     () =>
@@ -291,6 +325,27 @@ export default function AppLayout() {
             </Dropdown>
           </div>
         </Header>
+
+        <div className="work-tabs">
+          {tabs.map((tab) => (
+            <span
+              key={tab.path}
+              className={tab.path === location.pathname ? 'work-tab work-tab-active' : 'work-tab'}
+              onClick={() => navigate(tab.path)}
+            >
+              {tab.label}
+              {tab.path !== '/' && (
+                <CloseOutlined
+                  className="work-tab-close"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    closeTab(tab.path)
+                  }}
+                />
+              )}
+            </span>
+          ))}
+        </div>
 
         <Content className="app-content">
           <div className="content-inner" key={location.pathname}>
