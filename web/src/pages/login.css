@@ -168,17 +168,8 @@
   color: #344054;
 }
 
-.login-form .ant-input-affix-wrapper,
-.login-form .ant-input {
-  height: 44px;
-  border-radius: 8px;
-}
-
 .login-submit {
-  height: 44px;
   margin-top: 4px;
-  border-radius: 8px;
-  font-size: 15px;
   font-weight: 600;
 }
 

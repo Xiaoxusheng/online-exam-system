@@ -135,6 +135,7 @@ export default function LoginPage() {
               type="primary"
               htmlType="submit"
               block
+              size="large"
               className="login-submit"
               loading={mutation.isPending}
             >
