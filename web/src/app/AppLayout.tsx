@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   App,
   Avatar,
+  Badge,
   Breadcrumb,
   Button,
   Drawer,
@@ -10,6 +11,7 @@ import {
   Layout,
   Menu,
   Popover,
+  Spin,
 } from 'antd'
 import type { MenuProps } from 'antd'
 import {
@@ -21,12 +23,17 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import dayjs from 'dayjs'
 import { fetchMe, logout } from '../api/auth'
+import { listNotifications, markNotificationRead } from '../api/notification'
+import { queryKeys } from '../api/queryKeys'
 import EmptyState from '../components/EmptyState'
 import { queryClient } from './queryClient'
+import { canAccess, visibleNavigation } from './permissions'
 import { useAuthStore } from '../stores/auth'
 import { roleLabel } from '../utils/labels'
-import { findNavTrail, navigation, pageTitle } from './navigation'
+import { findNavTrail, pageTitle } from './navigation'
 
 const { Header, Sider, Content } = Layout
 
@@ -58,9 +65,13 @@ export default function AppLayout() {
     }
   }, [setUser])
 
+  const role = user?.role
+  const allowedHere = canAccess(role, location.pathname)
+
   useEffect(() => {
-    document.title = `${pageTitle(location.pathname)} · 在线考试系统`
-  }, [location.pathname])
+    const title = allowedHere ? pageTitle(location.pathname) : '无访问权限'
+    document.title = `${title} · 在线考试系统`
+  }, [location.pathname, allowedHere])
 
   useEffect(() => {
     setDrawerOpen(false)
@@ -68,7 +79,7 @@ export default function AppLayout() {
 
   const menuItems = useMemo<MenuProps['items']>(
     () =>
-      navigation.map((group) => ({
+      visibleNavigation(role).map((group) => ({
         type: 'group' as const,
         key: group.key,
         label: group.label,
@@ -78,8 +89,24 @@ export default function AppLayout() {
           label: item.label,
         })),
       })),
-    [],
+    [role],
   )
+
+  const notificationsQuery = useQuery({
+    queryKey: queryKeys.notifications({ page: 1, page_size: 6 }),
+    queryFn: () => listNotifications(1, 6),
+  })
+  const notices = notificationsQuery.data?.items ?? []
+  const hasUnread = notices.some((item) => item.status !== 'read')
+
+  async function handleReadNotice(id: string) {
+    try {
+      await markNotificationRead(id)
+      await notificationsQuery.refetch()
+    } catch {
+      message.error('标记已读失败，请稍后重试')
+    }
+  }
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key.startsWith('/')) {
@@ -117,11 +144,9 @@ export default function AppLayout() {
 
   const trail = findNavTrail(location.pathname)
   const breadcrumbItems =
-    location.pathname === '/'
-      ? [{ title: '工作台' }]
-      : trail
-        ? [{ title: '工作台' }, { title: trail.group.label }, { title: trail.item.label }]
-        : [{ title: '工作台' }]
+    allowedHere && location.pathname !== '/' && trail
+      ? [{ title: '工作台' }, { title: trail.group.label }, { title: trail.item.label }]
+      : [{ title: '工作台' }]
 
   const brand = (
     <div className={collapsed ? 'app-brand app-brand-collapsed' : 'app-brand'}>
@@ -145,7 +170,7 @@ export default function AppLayout() {
     />
   )
 
-  const notifications = (
+  const notificationPanel = (
     <div className="notice-popover">
       <div className="notice-head">
         <div>
@@ -153,12 +178,37 @@ export default function AppLayout() {
           <div className="notice-sub">考试提醒、阅卷任务与成绩发布</div>
         </div>
       </div>
-      <EmptyState
-        compact
-        icon={<BellOutlined />}
-        title="暂无新通知"
-        description="有新的考试安排或阅卷任务时，会在这里提醒你。"
-      />
+      {notificationsQuery.isPending ? (
+        <div className="notice-loading">
+          <Spin size="small" />
+        </div>
+      ) : notificationsQuery.isError ? (
+        <EmptyState
+          compact
+          icon={<BellOutlined />}
+          title="通知加载失败"
+          description="请稍后重试，或下拉刷新页面。"
+        />
+      ) : notices.length === 0 ? (
+        <EmptyState
+          compact
+          icon={<BellOutlined />}
+          title="暂无通知"
+          description="有新的考试安排或成绩发布时，会在这里提醒你。"
+        />
+      ) : (
+        <ul className="notice-list">
+          {notices.map((item) => (
+            <li key={item.id} className={item.status !== 'read' ? 'notice-item notice-unread' : 'notice-item'}>
+              <button type="button" className="notice-item-main" onClick={() => handleReadNotice(item.id)}>
+                <span className="notice-item-title">{item.title}</span>
+                <span className="notice-item-desc">{item.content}</span>
+                <span className="notice-item-time">{dayjs(item.created_at).format('MM-DD HH:mm')}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 
@@ -201,7 +251,7 @@ export default function AppLayout() {
 
           <div className="header-actions">
             <Popover
-              content={notifications}
+              content={notificationPanel}
               trigger="click"
               placement="bottomRight"
               arrow={false}
@@ -211,7 +261,11 @@ export default function AppLayout() {
                 type="text"
                 className="header-icon-btn"
                 aria-label="通知中心"
-                icon={<BellOutlined />}
+                icon={
+                  <Badge dot={hasUnread} offset={[-2, 2]}>
+                    <BellOutlined />
+                  </Badge>
+                }
               />
             </Popover>
 

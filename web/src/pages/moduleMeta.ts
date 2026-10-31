@@ -10,7 +10,7 @@ export interface ModuleMeta {
   features: ModuleFeature[]
 }
 
-export const moduleMeta: Record<string, ModuleMeta> = {
+export const moduleMeta = {
   questions: {
     title: '题库管理',
     subtitle: '维护题目、知识点与版本，支撑组卷与考试内容供给。',
@@ -142,4 +142,6 @@ export const moduleMeta: Record<string, ModuleMeta> = {
       { title: '发送记录', description: '记录发送状态与失败原因，支持重试。' },
     ],
   },
-}
+} satisfies Record<string, ModuleMeta>
+
+export type ModuleKey = keyof typeof moduleMeta
