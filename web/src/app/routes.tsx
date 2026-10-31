@@ -10,6 +10,9 @@ import NotificationsPage from '../pages/NotificationsPage'
 import QuestionsPage from '../pages/questions/QuestionsPage'
 import PapersPage from '../pages/papers/PapersPage'
 import ExamsPage from '../pages/exams/ExamsPage'
+import ReviewPage from '../pages/review/ReviewPage'
+import ScoresPage from '../pages/scores/ScoresPage'
+import AnalyticsPage from '../pages/analytics/AnalyticsPage'
 import UsersPage from '../pages/system/UsersPage'
 import OrgsPage from '../pages/system/OrgsPage'
 import AuditLogsPage from '../pages/system/AuditLogsPage'
@@ -42,9 +45,9 @@ export default function AppRoutes() {
         <Route path="papers" element={guarded('/papers', <PapersPage />)} />
         <Route path="exams" element={guarded('/exams', <ExamsPage />)} />
         <Route path="proctor" element={skeleton('/proctor', 'proctor')} />
-        <Route path="review" element={skeleton('/review', 'review')} />
-        <Route path="scores" element={skeleton('/scores', 'scores')} />
-        <Route path="analytics" element={skeleton('/analytics', 'analytics')} />
+        <Route path="review" element={guarded('/review', <ReviewPage />)} />
+        <Route path="scores" element={guarded('/scores', <ScoresPage />)} />
+        <Route path="analytics" element={guarded('/analytics', <AnalyticsPage />)} />
         <Route path="system/users" element={guarded('/system/users', <UsersPage />)} />
         <Route path="system/orgs" element={guarded('/system/orgs', <OrgsPage />)} />
         <Route path="system/audit-logs" element={guarded('/system/audit-logs', <AuditLogsPage />)} />
