@@ -2150,3 +2150,10 @@ body {
 [data-theme='dark'] .answer-code, [data-theme='dark'] .answer-code-input.ant-input, [data-theme='dark'] .case-list code { background: #121822; border-color: #232a38; color: #e6ebf5; }
 [data-theme='dark'] .notice-feed-item { border-color: #232a38; }
 [data-theme='dark'] .notice-feed-item.notice-unread { background: #172033; border-color: #2a3d5e; }
+
+
+/* 分数段条形：span 默认 inline，高度与宽度百分比都不生效，改为块级 */
+.distribution-bar,
+.distribution-fill {
+  display: block;
+}
