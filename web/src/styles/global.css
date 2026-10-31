@@ -2049,3 +2049,67 @@ body {
 .app-header .header-divider {
   background: rgba(255, 255, 255, 0.18) !important;
 }
+
+/* v0.7：判分概览环形面板 */
+.ring-panel {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.ring-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ring-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 130px;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.ring-label {
+  color: var(--app-text-tertiary);
+}
+
+.ring-track {
+  height: 8px;
+  overflow: hidden;
+  background: #eef2f8;
+  border-radius: 4px;
+}
+
+.ring-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #4c86ff, #3370ff);
+  border-radius: 4px;
+  transition: width 600ms var(--app-ease);
+}
+
+.ring-fill-alt {
+  background: linear-gradient(90deg, #34d399, #12b76a);
+}
+
+.ring-value {
+  text-align: right;
+  color: var(--app-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.ring-value-wide {
+  grid-column: 2 / span 2;
+}
+
+@media (max-width: 768px) {
+  .ring-panel {
+    grid-template-columns: 1fr;
+  }
+  .ring-row {
+    grid-template-columns: 70px minmax(0, 1fr) 110px;
+  }
+}

@@ -116,6 +116,66 @@ export default function AnalyticsPage() {
                 </div>
               </Card>
 
+              <Card className="panel-card" variant="borderless" title="判分概览">
+                <div className="ring-panel">
+                  <div className="donut" role="img" aria-label={`及格率 ${analytics.pass_rate}%`}>
+                    <svg width="132" height="132" viewBox="0 0 132 132">
+                      <circle className="donut-track" cx="66" cy="66" r="56" fill="none" strokeWidth="10" />
+                      <circle
+                        className="donut-value"
+                        cx="66"
+                        cy="66"
+                        r="56"
+                        fill="none"
+                        strokeWidth="10"
+                        strokeDasharray={2 * Math.PI * 56}
+                        strokeDashoffset={2 * Math.PI * 56 * (1 - Math.min(100, Math.max(0, analytics.pass_rate)) / 100)}
+                      />
+                    </svg>
+                    <div className="donut-center">
+                      <div className="donut-number">{formatScore(analytics.pass_rate, 1)}%</div>
+                      <div className="donut-caption">及格率</div>
+                    </div>
+                  </div>
+                  <div className="ring-metrics">
+                    <div className="ring-row">
+                      <span className="ring-label">平均分</span>
+                      <span className="ring-track">
+                        <span
+                          className="ring-fill"
+                          style={{
+                            width: `${analytics.total_score > 0 ? Math.min(100, (analytics.average / analytics.total_score) * 100) : 0}%`,
+                          }}
+                        />
+                      </span>
+                      <span className="ring-value">
+                        {formatScore(analytics.average, 1)} / {formatScore(analytics.total_score, 0)}
+                      </span>
+                    </div>
+                    <div className="ring-row">
+                      <span className="ring-label">已判分</span>
+                      <span className="ring-track">
+                        <span
+                          className="ring-fill ring-fill-alt"
+                          style={{
+                            width: `${analytics.candidate_count > 0 ? Math.min(100, (analytics.graded_count / analytics.candidate_count) * 100) : 0}%`,
+                          }}
+                        />
+                      </span>
+                      <span className="ring-value">
+                        {analytics.graded_count} / {analytics.candidate_count} 人
+                      </span>
+                    </div>
+                    <div className="ring-row">
+                      <span className="ring-label">最高 / 最低</span>
+                      <span className="ring-value ring-value-wide">
+                        {formatScore(analytics.highest, 1)} / {formatScore(analytics.lowest, 1)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
               <Card className="panel-card" variant="borderless" title="分数段分布（按得分率）">
                 <div className="distribution">
                   {analytics.distribution.map((bucket) => (
