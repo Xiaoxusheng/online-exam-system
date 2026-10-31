@@ -2346,7 +2346,8 @@ body {
   height: 22px;
 }
 .rate-fill {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 4px;
   max-width: 100%;
   height: 8px;
   border-radius: 999px;
@@ -2359,9 +2360,11 @@ body {
   background: linear-gradient(90deg, #45cd9a, #00a870);
 }
 .rate-text {
+  flex: none;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: #4e5969;
+  white-space: nowrap;
 }
 .option-bars {
   display: grid;
