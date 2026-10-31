@@ -222,6 +222,11 @@ export default function AttemptPage() {
       <div>
         <PageHeader title={state?.exam_title ?? '交卷成功'} subtitle="答卷已提交，感谢作答。" />
         <Card className="panel-card" variant="borderless">
+          <div className="result-hero">
+            <span className="result-badge">
+              <CheckCircleOutlined />
+            </span>
+          </div>
           <Alert
             type="success"
             showIcon

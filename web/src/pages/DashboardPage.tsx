@@ -16,7 +16,7 @@ import { fetchDashboardSummary } from '../api/dashboard'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
 import { useAuthStore } from '../stores/auth'
-import { activityLabel, examStatusLabels, roleLabel } from '../utils/labels'
+import { activityLabel, dataScopeLabel, examStatusLabels, roleLabel } from '../utils/labels'
 
 const quickActions = [
   {
@@ -111,8 +111,32 @@ export default function DashboardPage() {
         }
       />
 
+      {!isError && data && (
+        <Card className="panel-card" variant="borderless" title="基本信息">
+        <dl className="org-info-grid">
+          <dt>当前身份</dt>
+          <dd>{user ? `${user.name}（${roleLabel(user.role)}）` : '—'}</dd>
+          <dt>所属机构</dt>
+          <dd>{user?.org_id ? user.org_id.slice(0, 8) : '—'}</dd>
+          <dt>数据范围</dt>
+          <dd>{user?.data_scope ? dataScopeLabel(user.data_scope) : '—'}</dd>
+          <dt>今日</dt>
+          <dd>{dayjs().format('YYYY-MM-DD dddd')}</dd>
+          <dt>在读学员</dt>
+          <dd>{data.stats.students} 人</dd>
+          <dt>待办合计</dt>
+          <dd>{data.stats.pending_grading + data.stats.pending_review} 项（阅卷 {data.stats.pending_review} · 待判 {data.stats.pending_grading}）</dd>
+          <dt>进行中考试</dt>
+          <dd>{data.stats.exams_in_progress} 场</dd>
+          <dt>待开始考试</dt>
+          <dd>{data.upcoming_exams.length} 场</dd>
+        </dl>
+      </Card>
+      )}
+
       {isError ? (
-        <Card className="panel-card" variant="borderless">
+
+      <Card className="panel-card" variant="borderless">
           <EmptyState
             icon={<WarningOutlined />}
             title="工作台数据加载失败"

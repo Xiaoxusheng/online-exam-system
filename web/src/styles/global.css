@@ -2157,3 +2157,76 @@ body {
 .distribution-fill {
   display: block;
 }
+
+
+/* v0.9：基本信息网格（灰底标签）/ 交卷结果动效 / 题卡过渡 */
+.org-info-grid {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 132px minmax(0, 1fr);
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  background: #eef2f8;
+  border: 1px solid #eef2f8;
+  border-radius: 8px;
+}
+.org-info-grid dt {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #6b7a90;
+  background: #f7f9fc;
+}
+.org-info-grid dd {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--app-text);
+  background: #fff;
+}
+[data-theme='dark'] .org-info-grid,
+[data-theme='dark'] .org-info-grid dt {
+  background: #1a2130;
+  border-color: #232a38;
+  color: #a9b4c7;
+}
+[data-theme='dark'] .org-info-grid dd {
+  background: #161c27;
+  color: #e6ebf5;
+}
+
+.result-hero {
+  display: grid;
+  place-items: center;
+  padding: 8px 0 18px;
+}
+.result-badge {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  font-size: 26px;
+  color: #12b76a;
+  background: #ecfdf3;
+  border: 1px solid #abefc6;
+  border-radius: 50%;
+  animation: result-pop 420ms cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+@keyframes result-pop {
+  0% { opacity: 0; transform: scale(0.5); }
+  60% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+[data-theme='dark'] .result-badge {
+  background: #10261c;
+  border-color: #1f5d3d;
+}
+
+.attempt-question {
+  transition: opacity 180ms var(--app-ease);
+}
+
+@media (max-width: 900px) {
+  .org-info-grid {
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+}
