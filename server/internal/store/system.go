@@ -113,7 +113,7 @@ func (s *Store) ListAuditLogs(ctx context.Context, orgID string, f AuditFilter) 
 		FROM audit_logs a
 		LEFT JOIN users u ON u.id = a.actor_id
 		WHERE `+whereSQL+`
-		ORDER BY a.created_at DESC
+		ORDER BY a.created_at DESC, a.id DESC
 		LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list audit logs: %w", err)

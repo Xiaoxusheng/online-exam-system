@@ -116,7 +116,7 @@ func (s *Store) ListExams(ctx context.Context, orgID string, f ExamFilter) ([]Ex
 		FROM exams e
 		JOIN papers p ON p.id = e.paper_id
 		WHERE `+whereSQL+`
-		ORDER BY e.start_at DESC
+		ORDER BY e.start_at DESC, e.id DESC
 		LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list exams: %w", err)
@@ -298,7 +298,7 @@ func (s *Store) PublishExam(ctx context.Context, orgID, examID string) (Exam, er
 }
 
 func listCandidateUserIDs(ctx context.Context, db DBTX, examID string) ([]string, error) {
-	rows, err := db.Query(ctx, `SELECT user_id::text FROM exam_candidates WHERE exam_id = $1::uuid ORDER BY created_at`, examID)
+	rows, err := db.Query(ctx, `SELECT user_id::text FROM exam_candidates WHERE exam_id = $1::uuid ORDER BY created_at, user_id`, examID)
 	if err != nil {
 		return nil, fmt.Errorf("list exam candidate ids: %w", err)
 	}
@@ -452,7 +452,7 @@ func (s *Store) ListExamCandidates(ctx context.Context, orgID, examID string, pa
 		FROM exam_candidates ec
 		JOIN users u ON u.id = ec.user_id
 		WHERE ec.exam_id = $1
-		ORDER BY ec.created_at
+		ORDER BY ec.created_at, ec.user_id
 		LIMIT $2 OFFSET $3`, examID, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list exam candidates: %w", err)
@@ -568,7 +568,7 @@ func (s *Store) expandCandidates(ctx context.Context, orgID, paperType string, i
 		rows, err := s.pool.Query(ctx, `
 			SELECT id::text FROM users
 			WHERE org_id = $1 AND class_id = $2::uuid AND role = 'student' AND status = 'active'
-			ORDER BY created_at`, orgID, classID)
+			ORDER BY created_at, id`, orgID, classID)
 		if err != nil {
 			return nil, fmt.Errorf("load class users: %w", err)
 		}

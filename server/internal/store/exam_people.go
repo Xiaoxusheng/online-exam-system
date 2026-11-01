@@ -145,7 +145,7 @@ func (s *Store) listExamStaff(ctx context.Context, orgID, examID, kind string) (
 		JOIN users u ON u.id = es.user_id
 		JOIN exams e ON e.id = es.exam_id AND e.org_id = $2::uuid
 		WHERE es.exam_id = $1::uuid
-		ORDER BY es.created_at`, examID, orgID)
+		ORDER BY es.created_at, es.user_id`, examID, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("list exam %s: %w", kind, err)
 	}
@@ -198,7 +198,7 @@ func pickReviewer(ctx context.Context, db DBTX, examID string, exclude []string)
 			WHERE rt.reviewer_id = er.user_id AND rt.status IN ('pending', 'in_progress')
 		) lw ON true
 		WHERE er.exam_id = $1::uuid AND NOT (er.user_id::text = ANY($2::text[]))
-		ORDER BY lw.pending, er.created_at
+		ORDER BY lw.pending, er.created_at, er.user_id
 		LIMIT 1`, examID, exclude,
 	).Scan(&userID)
 	if err != nil {

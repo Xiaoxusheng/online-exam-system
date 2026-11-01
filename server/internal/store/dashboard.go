@@ -58,7 +58,7 @@ func (s *Store) DashboardSummary(ctx context.Context, orgID string) (DashboardSu
 		SELECT id::text, title, status, start_at, end_at
 		FROM exams
 		WHERE org_id = $1 AND status IN ('draft', 'pending_publish', 'pending_start')
-		ORDER BY start_at
+		ORDER BY start_at, id
 		LIMIT 5`, orgID)
 	if err != nil {
 		return summary, fmt.Errorf("load upcoming exams: %w", err)
@@ -80,7 +80,7 @@ func (s *Store) DashboardSummary(ctx context.Context, orgID string) (DashboardSu
 		FROM audit_logs a
 		LEFT JOIN users u ON u.id = a.actor_id
 		WHERE a.org_id = $1
-		ORDER BY a.created_at DESC
+		ORDER BY a.created_at DESC, a.id DESC
 		LIMIT 5`, orgID)
 	if err != nil {
 		return summary, fmt.Errorf("load recent activity: %w", err)

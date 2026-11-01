@@ -92,7 +92,7 @@ func (s *Store) ListPapers(ctx context.Context, orgID string, f PaperFilter) ([]
 		SELECT `+paperColumns+`
 		FROM papers p
 		WHERE `+whereSQL+`
-		ORDER BY p.updated_at DESC
+		ORDER BY p.updated_at DESC, p.id DESC
 		LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list papers: %w", err)

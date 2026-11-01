@@ -43,7 +43,7 @@ func (s *Store) ListNotifications(ctx context.Context, userID string, page, page
 		SELECT id::text, channel, title, content, status, source_type, source_id, sent_at, created_at
 		FROM notifications
 		WHERE user_id = $1::uuid
-		ORDER BY created_at DESC
+		ORDER BY created_at DESC, id DESC
 		LIMIT $2 OFFSET $3`, userID, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list notifications: %w", err)
@@ -89,7 +89,7 @@ func (s *Store) ListNotificationTemplates(ctx context.Context, orgID string) ([]
 		SELECT id::text, channel, code, title_tpl, content_tpl, enabled, created_at
 		FROM notification_templates
 		WHERE org_id = $1
-		ORDER BY created_at DESC`, orgID)
+		ORDER BY created_at DESC, id DESC`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("list notification templates: %w", err)
 	}
@@ -171,7 +171,7 @@ func (s *Store) ListNotificationLogs(ctx context.Context, orgID, status, keyword
 	rows, err := s.pool.Query(ctx, `
 		SELECT n.id::text, u.name, u.username, n.channel, n.title, n.content, n.status, n.source_type, n.sent_at, n.created_at
 		`+base+`
-		ORDER BY n.created_at DESC
+		ORDER BY n.created_at DESC, n.id DESC
 		LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list notification logs: %w", err)
@@ -302,15 +302,15 @@ func (s *Store) startDispatchWorker() {
 	s.dispatchWG.Add(1)
 	go func() {
 		defer s.dispatchWG.Done()
-	for job := range s.dispatchCh {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		err := s.processDispatchJob(ctx, job)
-		cancel()
-		if err != nil {
-			// Failures stay recorded in the ledger; the worker lives on.
-			continue
+		for job := range s.dispatchCh {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			err := s.processDispatchJob(ctx, job)
+			cancel()
+			if err != nil {
+				// Failures stay recorded in the ledger; the worker lives on.
+				continue
+			}
 		}
-	}
 	}()
 }
 

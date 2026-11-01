@@ -50,7 +50,7 @@ func (s *Store) ListQuestionsForExport(ctx context.Context, scope Scope, f Quest
 			q.score_rule, q.default_score::float8, q.status, q.version, q.created_at, q.updated_at
 		FROM questions q
 		WHERE `+strings.Join(where, " AND ")+`
-		ORDER BY q.updated_at DESC
+		ORDER BY q.updated_at DESC, q.id DESC
 		LIMIT $`+fmt.Sprint(len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("export questions: %w", err)
@@ -177,7 +177,7 @@ func (s *Store) ListScoresForExport(ctx context.Context, scope Scope, examID str
 		LEFT JOIN classes cl ON cl.id = u.class_id
 		WHERE a.exam_id = $1::uuid AND e.org_id = $2`+scopeSQL+`
 			AND a.status IN ('submitted', 'graded', 'published')
-		ORDER BY sr.total DESC NULLS LAST, u.name ASC
+		ORDER BY sr.total DESC NULLS LAST, u.name ASC, u.id ASC
 		LIMIT `+fmt.Sprint(exportRowLimit), args...)
 	if err != nil {
 		return nil, ExamExportMeta{}, fmt.Errorf("export scores: %w", err)
