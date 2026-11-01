@@ -1,5 +1,5 @@
 // 数学期中考试完整链路：创建→发布→30 人作答→阅卷→等结束→发布成绩；并补物理考试作答状态。
-const BASE = 'http://127.0.0.1:8081/api/v1'
+const BASE = process.env.DEMO_BASE ?? 'http://127.0.0.1:8081/api/v1'
 async function api(method, path, { token, body } = {}) {
   const headers = {}
   if (token) headers.Authorization = `Bearer ${token}`
@@ -15,7 +15,7 @@ const chance = (p) => Math.random() < p
 const rand = (arr) => arr[Math.floor(Math.random() * arr.length)]
 const iso = (ms) => new Date(ms).toISOString()
 
-const admin = (await api('POST', '/auth/login', { body: { account: 'admin', password: 'Admin@123456' } })).json.data.token
+const admin = (await api('POST', '/auth/login', { body: { account: process.env.DEMO_ADMIN ?? 'admin', password: process.env.DEMO_PASS ?? 'Admin@123456' } })).json.data.token
 console.log('admin ok')
 
 // —— 学生与元数据

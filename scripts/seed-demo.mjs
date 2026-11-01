@@ -1,7 +1,7 @@
 // 演示数据填充：走 API 造一套真实感数据（中文校区/班级/人名/题目/试卷/考试/成绩）。
 // 前置：本地 API :8081、种子管理员 admin / Admin@123456。数据可重复执行（按名称幂等）。
 // 用法：node scripts/seed-demo.mjs
-const BASE = 'http://127.0.0.1:8081/api/v1'
+const BASE = process.env.DEMO_BASE ?? 'http://127.0.0.1:8081/api/v1'
 const STUDENT_PWD = 'Student@123456'
 const STAFF_PWD = 'Staff@123456'
 
@@ -137,7 +137,7 @@ function qPayload(bankId, q) {
 }
 
 // ---------------------------------------------------------------- 主流程
-const admin = await login('admin', 'Admin@123456')
+const admin = await login(process.env.DEMO_ADMIN ?? 'admin', process.env.DEMO_PASS ?? 'Admin@123456')
 console.log('logged in as admin')
 
 async function findIn(path, nameKey, name) {
