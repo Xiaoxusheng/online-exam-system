@@ -275,7 +275,7 @@ export default function AppLayout() {
           {menu}
           {!collapsed && (
             <div className="app-sider-footer">
-              <span className="sider-version">v2.0</span>
+              <span className="sider-version">v2.1</span>
               <span className="sider-status">服务正常</span>
             </div>
           )}
@@ -389,7 +389,7 @@ export default function AppLayout() {
           {brand}
           {menu}
           <div className="app-sider-footer">
-              <span className="sider-version">v2.0</span>
+              <span className="sider-version">v2.1</span>
               <span className="sider-status">服务正常</span>
             </div>
         </Drawer>
