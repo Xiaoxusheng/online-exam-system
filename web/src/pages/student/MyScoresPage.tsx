@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, Descriptions, Drawer, Form, Input, Modal, Select, Table, Tabs, Tag } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { AuditOutlined, FileTextOutlined, TrophyOutlined } from '@ant-design/icons'
+import { App, Button, Card, Col, Descriptions, Drawer, Form, Input, Modal, Row, Select, Skeleton, Table, Tabs, Tag } from 'antd'
+import { AuditOutlined, ClockCircleOutlined, FileTextOutlined, TrophyOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
 import EmptyState from '../../components/EmptyState'
@@ -11,7 +10,7 @@ import { queryKeys } from '../../api/queryKeys'
 import { formatDateTime, formatScore } from '../../utils/format'
 import { questionTypeLabel, scoreStatusLabels, statusOf } from '../../utils/labels'
 import { errorText } from '../../utils/errors'
-import type { MyScore, ScoreAppeal } from '../../types'
+import type { ScoreAppeal, ScoreDetailItem } from '../../types'
 
 const appealStatus: Record<string, { label: string; color: string }> = {
   pending: { label: '待处理', color: 'gold' },
@@ -51,85 +50,8 @@ export default function MyScoresPage() {
   const record = recordQuery.data
   const questions = record?.detail.questions ?? []
 
-  const columns: ColumnsType<MyScore> = [
-    { title: '考试', dataIndex: 'exam_title' },
-    {
-      title: '成绩',
-      dataIndex: 'total',
-      width: 110,
-      render: (value: number) => <span className="score-value">{formatScore(value, 1)}</span>,
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      width: 110,
-      render: (value: string) => {
-        const status = statusOf(scoreStatusLabels, value)
-        return <Tag color={status.color}>{status.label}</Tag>
-      },
-    },
-    { title: '公布时间', dataIndex: 'published_at', width: 170, render: (value: string | null) => formatDateTime(value) },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 170,
-      render: (_value, row) => (
-        <>
-          <Button type="link" size="small" onClick={() => setAttemptId(row.attempt_id)}>
-            逐题明细
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<AuditOutlined />}
-            onClick={() => {
-              appealForm.resetFields()
-              setAppealAttempt(row.attempt_id)
-            }}
-          >
-            申诉
-          </Button>
-        </>
-      ),
-    },
-  ]
-
-  const appealColumns: ColumnsType<ScoreAppeal> = [
-    { title: '考试', dataIndex: 'exam_title' },
-    {
-      title: '范围',
-      key: 'scope',
-      width: 120,
-      render: (_value, row) => (row.question_id ? `第 ${row.question_id.slice(0, 6)} 题` : '整份答卷'),
-    },
-    { title: '申诉理由', dataIndex: 'reason', ellipsis: true },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      width: 100,
-      render: (value: string) => {
-        const meta = appealStatus[value] ?? { label: value, color: 'default' }
-        return <Tag color={meta.color}>{meta.label}</Tag>
-      },
-    },
-    {
-      title: '处理结果',
-      key: 'result',
-      width: 220,
-      render: (_value, row) =>
-        row.status === 'pending' ? (
-          <span className="cell-meta">等待考务处理</span>
-        ) : (
-          <div className="cell-stack">
-            <span className="cell-title">{row.handle_note}</span>
-            <span className="cell-meta">
-              {row.handler_name} · {formatDateTime(row.handled_at)}
-            </span>
-          </div>
-        ),
-    },
-    { title: '提交时间', dataIndex: 'created_at', width: 170, render: (value: string) => formatDateTime(value) },
-  ]
+  const scores = scoresQuery.data ?? []
+  const appeals = appealsQuery.data ?? []
 
   return (
     <div>
@@ -144,57 +66,143 @@ export default function MyScoresPage() {
             key: 'scores',
             label: '成绩列表',
             children: (
-              <Card className="panel-card" variant="borderless">
+              <>
                 <QueryError error={scoresQuery.error} onRetry={() => scoresQuery.refetch()} />
-                <Table
-                  rowKey="attempt_id"
-                  size="middle"
-                  loading={scoresQuery.isFetching}
-                  columns={columns}
-                  dataSource={scoresQuery.data ?? []}
-                  pagination={false}
-                  locale={{
-                    emptyText: scoresQuery.isError ? (
-                      ' '
-                    ) : (
-                      <EmptyState
-                        icon={<TrophyOutlined />}
-                        title="还没有已发布的成绩"
-                        description="成绩由考务统一发布，发布后会同时给你发送站内通知。"
-                      />
-                    ),
-                  }}
-                />
-              </Card>
+                {scoresQuery.isFetching && scores.length === 0 ? (
+                  <Row gutter={[12, 12]}>
+                    {[0, 1, 2].map((index) => (
+                      <Col key={index} xs={24} sm={12} xl={8}>
+                        <Card className="panel-card room-card" variant="borderless">
+                          <Skeleton active title paragraph={{ rows: 1 }} />
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                ) : scores.length === 0 ? (
+                  <Card className="panel-card" variant="borderless">
+                    <EmptyState
+                      icon={<TrophyOutlined />}
+                      title="还没有已发布的成绩"
+                      description="成绩由考务统一发布，发布后会同时给你发送站内通知。"
+                    />
+                  </Card>
+                ) : (
+                  <Row gutter={[12, 12]}>
+                    {scores.map((row) => {
+                      const status = statusOf(scoreStatusLabels, row.status)
+                      return (
+                        <Col key={row.attempt_id} xs={24} sm={12} xl={8}>
+                          <Card
+                            className="panel-card room-card is-interactive"
+                            variant="borderless"
+                            onClick={() => setAttemptId(row.attempt_id)}
+                          >
+                            <div className="room-card-head">
+                              <span className="room-card-title" title={row.exam_title}>
+                                {row.exam_title}
+                              </span>
+                              <Tag color={status.color}>{status.label}</Tag>
+                            </div>
+                            <div className="room-card-schedule">
+                              <ClockCircleOutlined />
+                              <span>公布于 {formatDateTime(row.published_at)}</span>
+                            </div>
+                            <div className="room-card-foot">
+                              <span className="score-value room-score">{formatScore(row.total, 1)} 分</span>
+                              <Button
+                                type="link"
+                                size="small"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  setAttemptId(row.attempt_id)
+                                }}
+                              >
+                                逐题明细
+                              </Button>
+                              <Button
+                                type="link"
+                                size="small"
+                                icon={<AuditOutlined />}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  appealForm.resetFields()
+                                  setAppealAttempt(row.attempt_id)
+                                }}
+                              >
+                                申诉
+                              </Button>
+                            </div>
+                          </Card>
+                        </Col>
+                      )
+                    })}
+                  </Row>
+                )}
+              </>
             ),
           },
           {
             key: 'appeals',
-            label: (appealsQuery.data?.length ?? 0) > 0 ? `我的申诉 (${appealsQuery.data?.length ?? 0})` : '我的申诉',
+            label: appeals.length > 0 ? `我的申诉 (${appeals.length})` : '我的申诉',
             children: (
-              <Card className="panel-card" variant="borderless">
+              <>
                 <QueryError error={appealsQuery.error} onRetry={() => appealsQuery.refetch()} />
-                <Table
-                  rowKey="id"
-                  size="middle"
-                  loading={appealsQuery.isFetching}
-                  columns={appealColumns}
-                  dataSource={appealsQuery.data ?? []}
-                  pagination={false}
-                  scroll={{ x: 880 }}
-                  locale={{
-                    emptyText: appealsQuery.isError ? (
-                      ' '
-                    ) : (
-                      <EmptyState
-                        icon={<FileTextOutlined />}
-                        title="还没有提交申诉"
-                        description="在成绩明细中可以对整份答卷或某一道题提出申诉。"
-                      />
-                    ),
-                  }}
-                />
-              </Card>
+                {appealsQuery.isFetching && appeals.length === 0 ? (
+                  <Row gutter={[12, 12]}>
+                    {[0, 1, 2].map((index) => (
+                      <Col key={index} xs={24} sm={12} xl={8}>
+                        <Card className="panel-card room-card" variant="borderless">
+                          <Skeleton active title paragraph={{ rows: 2 }} />
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                ) : appeals.length === 0 ? (
+                  <Card className="panel-card" variant="borderless">
+                    <EmptyState
+                      icon={<FileTextOutlined />}
+                      title="还没有提交申诉"
+                      description="在成绩明细中可以对整份答卷或某一道题提出申诉。"
+                    />
+                  </Card>
+                ) : (
+                  <Row gutter={[12, 12]}>
+                    {appeals.map((row: ScoreAppeal) => {
+                      const meta = appealStatus[row.status] ?? { label: row.status, color: 'default' }
+                      return (
+                        <Col key={row.id} xs={24} sm={12} xl={8}>
+                          <Card className="panel-card room-card" variant="borderless">
+                            <div className="room-card-head">
+                              <span className="room-card-title" title={row.exam_title}>
+                                {row.exam_title}
+                              </span>
+                              <Tag color={meta.color}>{meta.label}</Tag>
+                            </div>
+                            <div className="room-card-schedule">
+                              <AuditOutlined />
+                              <span>{row.question_id ? `第 ${row.question_id.slice(0, 6)} 题` : '整份答卷'}</span>
+                              <span className="room-card-sep">·</span>
+                              <span>提交于 {formatDateTime(row.created_at)}</span>
+                            </div>
+                            <div className="room-card-paper">
+                              <span title={row.reason}>{row.reason}</span>
+                            </div>
+                            <div className="room-card-foot">
+                              {row.status === 'pending' ? (
+                                <span className="cell-meta">等待考务处理</span>
+                              ) : (
+                                <span className="cell-meta">
+                                  {row.handle_note} · {row.handler_name} · {formatDateTime(row.handled_at)}
+                                </span>
+                              )}
+                            </div>
+                          </Card>
+                        </Col>
+                      )
+                    })}
+                  </Row>
+                )}
+              </>
             ),
           },
         ]}
@@ -247,7 +255,7 @@ export default function MyScoresPage() {
                   title: '判分方式',
                   key: 'auto',
                   width: 120,
-                  render: (_value, item) =>
+                  render: (_value: unknown, item: ScoreDetailItem) =>
                     item.needs_review ? (
                       <Tag color="gold">待人工</Tag>
                     ) : item.auto ? (
