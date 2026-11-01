@@ -37,3 +37,34 @@ export function handleProctorEvent(
 export function proctorSocketUrl(examId: string, token: string): string {
   return apiSocketUrl(`/proctor/exams/${examId}/ws?token=${encodeURIComponent(token)}`)
 }
+
+export interface ProctorTimelineItem {
+  id: number
+  type: string
+  level: string
+  note: string
+  snapshot_url: string
+  occurred_at: string
+  handled_by_name: string
+  action: string
+}
+
+export interface ProctorReportRow {
+  user_id: string
+  user_name: string
+  username: string
+  attempt_state: string
+  event_count: number
+  warning_count: number
+  critical_count: number
+  screen_switches: number
+  snapshots: number
+  handled_count: number
+  score_status: string
+  events: ProctorTimelineItem[]
+}
+
+/** M-10 post-exam monitoring report: per-candidate event trail. */
+export function getProctorReport(examId: string): Promise<ProctorReportRow[]> {
+  return apiRequest<ProctorReportRow[]>(`/proctor/exams/${examId}/report`)
+}

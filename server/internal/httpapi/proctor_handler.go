@@ -132,3 +132,25 @@ func (a *API) handleHandleProctorEvent(w http.ResponseWriter, r *http.Request) {
 	})
 	data(w, http.StatusOK, event)
 }
+
+// handleProctorReport serves the post-exam monitoring report (M-10): per
+// candidate event aggregates plus the full disposition timeline.
+func (a *API) handleProctorReport(w http.ResponseWriter, r *http.Request) {
+	claims, actor, ok := a.resolveAuth(w, r)
+	if !ok {
+		return
+	}
+	examID, ok := parseUUIDParam(w, pathParam(r, "examId"), "考试 ID")
+	if !ok {
+		return
+	}
+	if !a.canWatchExam(w, r, actor, examID) {
+		return
+	}
+	report, err := a.store.ProctorReport(r.Context(), claims.OrgID, examID)
+	if err != nil {
+		a.storeError(w, r, err, "监考报告不可用")
+		return
+	}
+	data(w, http.StatusOK, report)
+}

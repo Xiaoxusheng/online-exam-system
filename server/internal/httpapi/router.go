@@ -164,8 +164,9 @@ func (a *API) Router() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(a.requireRoles("proctor", "exam_admin"))
 				r.Get("/proctor/exams", a.handleProctorRooms)
-				r.Get("/proctor/exams/{examId}/overview", a.handleProctorOverview)
-				r.Get("/proctor/exams/{examId}/events", a.handleListProctorEvents)
+			r.Get("/proctor/exams/{examId}/overview", a.handleProctorOverview)
+			r.Get("/proctor/exams/{examId}/events", a.handleListProctorEvents)
+			r.Get("/proctor/exams/{examId}/report", a.handleProctorReport)
 				r.Post("/proctor/events/{eventId}/handle", a.handleHandleProctorEvent)
 			})
 

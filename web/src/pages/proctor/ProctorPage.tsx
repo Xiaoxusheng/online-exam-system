@@ -9,6 +9,7 @@ import MetricGrid from '../../components/MetricGrid'
 import QueryError from '../../components/QueryError'
 import EmptyState from '../../components/EmptyState'
 import { handleProctorEvent, listProctorEvents, listProctorRooms, getProctorOverview, type ProctorEventParams } from '../../api/proctor'
+import ProctorReportDrawer, { ReportButton } from './ProctorReportDrawer'
 import { queryKeys } from '../../api/queryKeys'
 import { useProctorSocket, type SocketStatus } from '../../hooks/useProctorSocket'
 import { useAuthStore } from '../../stores/auth'
@@ -39,6 +40,7 @@ export default function ProctorPage() {
   const [query, setQuery] = useState<ProctorEventParams>({ page: 1, page_size: 20 })
   const [handling, setHandling] = useState<ProctorEvent | null>(null)
   const [live, setLive] = useState<LiveItem[]>([])
+  const [reportOpen, setReportOpen] = useState(false)
   const [form] = Form.useForm<{ action: string; note?: string }>()
   const debounceRef = useRef<number | undefined>(undefined)
 
@@ -160,7 +162,7 @@ export default function ProctorPage() {
             <Select
               placeholder="选择考场"
               style={{ width: 300 }}
-              loading={roomsQuery.isPending}
+              loading={roomsQuery.isFetching}
               value={examId}
               onChange={setExamId}
               options={rooms.map((room) => ({
@@ -169,6 +171,7 @@ export default function ProctorPage() {
               }))}
               notFoundContent="没有可监考的考试"
             />
+            <ReportButton onClick={() => setReportOpen(true)} />
             <Tooltip title={status === 'open' ? '事件通过 WebSocket 实时推送' : '连接不可用时每 15 秒轮询一次'}>
               <Badge status={statusLabels[status].status} text={statusLabels[status].label} className="socket-badge" />
             </Tooltip>
@@ -179,7 +182,7 @@ export default function ProctorPage() {
       {!examId ? (
         <RoomPicker
           rooms={rooms}
-          loading={roomsQuery.isPending}
+          loading={roomsQuery.isFetching}
           error={roomsQuery.error}
           onRetry={() => roomsQuery.refetch()}
           onPick={setExamId}
@@ -288,7 +291,7 @@ export default function ProctorPage() {
             <Table
               rowKey="id"
               size="middle"
-              loading={eventsQuery.isPending}
+              loading={eventsQuery.isFetching}
               columns={columns}
               dataSource={eventsQuery.data?.items ?? []}
               pagination={{
@@ -331,6 +334,12 @@ export default function ProctorPage() {
           )}
         </Form>
       </Modal>
+
+      <ProctorReportDrawer
+        examId={reportOpen ? examId ?? null : null}
+        examTitle={rooms.find((room) => room.exam_id === examId)?.title}
+        onClose={() => setReportOpen(false)}
+      />
     </div>
   )
 }

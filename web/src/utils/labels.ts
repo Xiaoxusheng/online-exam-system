@@ -111,6 +111,8 @@ export const proctorEventTypeLabels: Record<string, string> = {
 export const proctorActionLabels: Record<string, string> = {
   warning: '口头警告',
   warn_and_watch: '警告并重点观察',
+  mark_violation: '标记疑似违规（成绩挂起）',
+  dismiss_violation: '复核误报（解除挂起）',
   mark_cheating: '标记疑似违规',
   force_submit: '强制交卷',
   ignore: '忽略（误报）',
