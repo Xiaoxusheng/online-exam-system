@@ -161,9 +161,18 @@ func (s *Store) ListQuestions(ctx context.Context, scope Scope, f QuestionFilter
 	return questions, total, nil
 }
 
-func (s *Store) GetQuestion(ctx context.Context, orgID, id string) (Question, error) {
+// GetQuestion applies the same bank visibility as the list query. Without it any teacher
+// in the organization could read another teacher's personal question — including the
+// standard answer — simply by knowing its UUID.
+func (s *Store) GetQuestion(ctx context.Context, scope Scope, id string) (Question, error) {
+	visSQL, visArgs := scope.bankVisibility("b", 3)
 	var q Question
-	err := s.pool.QueryRow(ctx, `SELECT `+questionColumns+` FROM questions WHERE id = $1 AND org_id = $2`, id, orgID).
+	err := s.pool.QueryRow(ctx, `
+		SELECT `+questionColumns+`
+		FROM questions
+		WHERE id = $1 AND org_id = $2
+			AND EXISTS (SELECT 1 FROM question_banks b WHERE b.id = questions.bank_id`+visSQL+`)`,
+		append([]any{id, scope.OrgID}, visArgs...)...).
 		Scan(questionScanDest(&q)...)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -187,9 +196,15 @@ type CreateQuestionParams struct {
 	CreatedBy      string
 }
 
-func (s *Store) CreateQuestion(ctx context.Context, p CreateQuestionParams) (Question, error) {
+func (s *Store) CreateQuestion(ctx context.Context, scope Scope, p CreateQuestionParams) (Question, error) {
+	// The target bank must be visible to the caller too, otherwise a teacher could file
+	// questions into another teacher's personal bank by guessing its ID.
+	visSQL, visArgs := scope.bankVisibility("b", 3)
 	var bankExists bool
-	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM question_banks WHERE id = $1::uuid AND org_id = $2)`, p.BankID, p.OrgID).Scan(&bankExists); err != nil {
+	if err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM question_banks b
+			WHERE b.id = $1 AND b.org_id = $2`+visSQL+`)`,
+		append([]any{p.BankID, scope.OrgID}, visArgs...)...).Scan(&bankExists); err != nil {
 		return Question{}, fmt.Errorf("validate question bank: %w", err)
 	}
 	if !bankExists {
@@ -233,8 +248,8 @@ type UpdateQuestionParams struct {
 	ActorID        string
 }
 
-func (s *Store) UpdateQuestion(ctx context.Context, orgID, id string, p UpdateQuestionParams) (Question, error) {
-	q, err := s.GetQuestion(ctx, orgID, id)
+func (s *Store) UpdateQuestion(ctx context.Context, scope Scope, id string, p UpdateQuestionParams) (Question, error) {
+	q, err := s.GetQuestion(ctx, scope, id)
 	if err != nil {
 		return Question{}, err
 	}
@@ -273,7 +288,7 @@ func (s *Store) UpdateQuestion(ctx context.Context, orgID, id string, p UpdateQu
 			score_rule = $6::jsonb, default_score = $7, version = $8
 		WHERE id = $9 AND org_id = $10`,
 		q.Type, q.KnowledgePoint, q.Difficulty, string(q.Content), string(q.Answer),
-		string(q.ScoreRule), q.DefaultScore, q.Version, id, orgID,
+		string(q.ScoreRule), q.DefaultScore, q.Version, id, scope.OrgID,
 	)
 	if err != nil {
 		return Question{}, fmt.Errorf("update question: %w", err)
@@ -284,23 +299,26 @@ func (s *Store) UpdateQuestion(ctx context.Context, orgID, id string, p UpdateQu
 	if err := tx.Commit(ctx); err != nil {
 		return Question{}, fmt.Errorf("commit update question: %w", err)
 	}
-	return s.GetQuestion(ctx, orgID, id)
+	return s.GetQuestion(ctx, scope, id)
 }
 
-func (s *Store) PublishQuestion(ctx context.Context, orgID, id, actorID string) (Question, error) {
+func (s *Store) PublishQuestion(ctx context.Context, scope Scope, id, actorID string) (Question, error) {
+	visSQL, visArgs := scope.bankVisibility("b", 3)
 	tag, err := s.pool.Exec(ctx, `
 		UPDATE questions SET status = 'published'
-		WHERE id = $1 AND org_id = $2 AND status IN ('draft', 'pending_review')`, id, orgID)
+		WHERE id = $1 AND org_id = $2 AND status IN ('draft', 'pending_review')
+			AND EXISTS (SELECT 1 FROM question_banks b WHERE b.id = questions.bank_id`+visSQL+`)`,
+		append([]any{id, scope.OrgID}, visArgs...)...)
 	if err != nil {
 		return Question{}, fmt.Errorf("publish question: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		if _, err := s.GetQuestion(ctx, orgID, id); err != nil {
+		if _, err := s.GetQuestion(ctx, scope, id); err != nil {
 			return Question{}, err
 		}
 		return Question{}, ErrInvalidState
 	}
-	return s.GetQuestion(ctx, orgID, id)
+	return s.GetQuestion(ctx, scope, id)
 }
 
 func insertQuestionRevision(ctx context.Context, db DBTX, q Question, actorID string) error {

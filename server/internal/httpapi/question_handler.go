@@ -174,7 +174,7 @@ func (a *API) handleCreateQuestion(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
 		return
 	}
-	question, err := a.store.CreateQuestion(r.Context(), store.CreateQuestionParams{
+	question, err := a.store.CreateQuestion(r.Context(), scopeFrom(r.Context()), store.CreateQuestionParams{
 		OrgID: claims.OrgID, BankID: req.BankID, Type: req.Type,
 		KnowledgePoint: strings.TrimSpace(req.KnowledgePoint), Difficulty: req.Difficulty,
 		Content: req.Content, Answer: req.Answer, ScoreRule: req.ScoreRule,
@@ -192,12 +192,11 @@ func (a *API) handleCreateQuestion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) handleGetQuestion(w http.ResponseWriter, r *http.Request) {
-	claims, _ := claimsFrom(r.Context())
 	questionID, ok := parseUUIDParam(w, pathParam(r, "id"), "题目 ID")
 	if !ok {
 		return
 	}
-	question, err := a.store.GetQuestion(r.Context(), claims.OrgID, questionID)
+	question, err := a.store.GetQuestion(r.Context(), scopeFrom(r.Context()), questionID)
 	if err != nil {
 		a.storeError(w, r, err, "题目不存在")
 		return
@@ -225,7 +224,7 @@ func (a *API) handleUpdateQuestion(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	existing, err := a.store.GetQuestion(r.Context(), claims.OrgID, questionID)
+	existing, err := a.store.GetQuestion(r.Context(), scopeFrom(r.Context()), questionID)
 	if err != nil {
 		a.storeError(w, r, err, "题目不存在")
 		return
@@ -267,7 +266,7 @@ func (a *API) handleUpdateQuestion(w http.ResponseWriter, r *http.Request) {
 		value := strings.TrimSpace(*req.KnowledgePoint)
 		params.KnowledgePoint = &value
 	}
-	question, err := a.store.UpdateQuestion(r.Context(), claims.OrgID, questionID, params)
+	question, err := a.store.UpdateQuestion(r.Context(), scopeFrom(r.Context()), questionID, params)
 	if err != nil {
 		a.storeError(w, r, err, "题目不存在")
 		return
@@ -285,7 +284,7 @@ func (a *API) handlePublishQuestion(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	question, err := a.store.PublishQuestion(r.Context(), claims.OrgID, questionID, claims.Subject)
+	question, err := a.store.PublishQuestion(r.Context(), scopeFrom(r.Context()), questionID, claims.Subject)
 	if err != nil {
 		a.storeError(w, r, err, "题目不存在")
 		return

@@ -581,7 +581,7 @@ func (a *API) handleQuestionImport(w http.ResponseWriter, r *http.Request) {
 			report = append(report, importReportRow{Line: line, Stem: draft.Stem, Status: "failed", Message: err.Error()})
 			continue
 		}
-		question, err := a.store.CreateQuestion(r.Context(), store.CreateQuestionParams{
+		question, err := a.store.CreateQuestion(r.Context(), scope, store.CreateQuestionParams{
 			OrgID: claims.OrgID, BankID: target.ID, Type: draft.Type, KnowledgePoint: draft.KnowledgePoint,
 			Difficulty: draft.Difficulty, Content: rawContent, Answer: rawAnswer, ScoreRule: rawRule,
 			DefaultScore: draft.Score, CreatedBy: claims.Subject,
@@ -593,7 +593,7 @@ func (a *API) handleQuestionImport(w http.ResponseWriter, r *http.Request) {
 		}
 		created++
 		if draft.Status == "published" {
-			if _, err := a.store.PublishQuestion(r.Context(), claims.OrgID, question.ID, claims.Subject); err == nil {
+			if _, err := a.store.PublishQuestion(r.Context(), scope, question.ID, claims.Subject); err == nil {
 				published++
 			} else {
 				report = append(report, importReportRow{Line: line, Stem: draft.Stem, Status: "created", Message: "已导入，但自动发布失败，请手动发布"})
