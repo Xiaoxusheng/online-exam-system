@@ -2,6 +2,16 @@
 
 > 唯一计划/进度文件。后续任务在本文件追加或更新，不新建任务文档。
 
+## v2.2 修复线上部署（2026-11-01 完成）
+
+- 部署内容：`0de82be`（v2.2 两轮修复）——AB 卷分组满分、阅卷收尾竞态与孤儿任务、题目详情越权、`security_stamp` 令牌即时失效、JWT fail-closed、成绩发布/导出口径、考生答案不丢失、填空判分开关、保存答案与交卷互斥、更正与阅卷轮次校验、分页排序、媒体鉴权、前端加载态与成绩缓存键。
+- 构建：从干净 worktree 按 HEAD 构建，**不含并行工作线未提交的改动**；后端 `CGO_ENABLED=0 GOOS=linux -trimpath -ldflags "-s -w"`，前端 `npm ci && npm run build`，产物 38 文件，入口 `index-CS7aBFWV.js`、样式 `index-BlZKxcEl.css`。
+- 校验：上传后本地与服务器 sha256 一致（api `f6df4ca4…`、migrate `1447d123…`、seed `357a0992…`、web `34817e93…`）。
+- 数据库：先 `pg_dump | gzip` 备份至 `/opt/online-exam/backup/online_exam-20261101-2337.sql.gz`；`schema_migrations` 最新为 `0012`，0011/0012 已由当日 23:31 的并行部署应用，本次未改库。注意：`/opt/online-exam/.env` 若含 `$` 等字符，shell `source` 会被展开导致 migrate 认证失败，需用 systemd 的真实环境变量运行。
+- 切换：`mv bin/api bin/api.prev` → 安装新二进制 → `systemctl restart online-exam`；前端备份 `web.prev` 后 `mv` 原子切换。
+- 复验：`/healthz`、`/readyz` 200；首页引用新资源且 `Cache-Control: no-cache`；新 JS/CSS 200 且 `immutable`；`/proctor`、`/my/exams` 200；未登录 `questions/import-template` 401；不存在账号登录返回 401（证明 `security_stamp` 列可用）；服务日志无报错。
+- 回滚：`cd /opt/online-exam && mv web web.failed && mv web.prev web && mv bin/api bin/api.failed && mv bin/api.prev bin/api && systemctl restart online-exam`。上一版前端另存为 `web.prev-20261101-2331`。
+
 ## 2026-11-01 深夜：基础能力 + 音视频闭环 + 监考增强全量上线（23:27 完成，含 v2.4 内容）
 
 - **本次为前后端联合部署**（本轮含后端新接口与迁移，非纯前端替换），构建自最新工作区，前端产物已包含上方 v2.4 的 RoomPicker 与侧栏精修，并补齐 v2.4 备注中缺失的 media 后端路由。
