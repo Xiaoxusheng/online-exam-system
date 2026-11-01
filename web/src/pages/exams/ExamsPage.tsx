@@ -7,6 +7,7 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
+import SectionFold from '../../components/SectionFold'
 import ExamDetail from './ExamDetail'
 import { createExam, listExams, publishExam, type ExamInput, type ExamListParams } from '../../api/exam'
 import { listPapers } from '../../api/paper'
@@ -309,54 +310,74 @@ export default function ExamsPage() {
             </Form.Item>
           </div>
 
-          <div className="form-grid">
-            <Form.Item name="show_score" label="对考生显示成绩" valuePropName="checked" tooltip="关闭后考生查完成绩也不可见，需成绩发布">
-              <Switch />
-            </Form.Item>
-            <Form.Item name="anonymous_review" label="匿名阅卷" valuePropName="checked">
-              <Switch />
-            </Form.Item>
-          </div>
+          <SectionFold
+            defaultActiveKey={['rule', 'students']}
+            items={[
+              {
+                key: 'rule',
+                title: '成绩与阅卷',
+                children: (
+                  <>
+                    <div className="form-grid">
+                      <Form.Item name="show_score" label="对考生显示成绩" valuePropName="checked" tooltip="关闭后考生查完成绩也不可见，需成绩发布">
+                        <Switch />
+                      </Form.Item>
+                      <Form.Item name="anonymous_review" label="匿名阅卷" valuePropName="checked">
+                        <Switch />
+                      </Form.Item>
+                    </div>
 
-          <div className="form-grid">
-            <Form.Item name="review_mode" label="阅卷方式" tooltip="双评：同一题两位教师独立评分，分差超阈值进入三评仲裁">
-              <Select
-                options={[
-                  { value: 'single', label: '单评' },
-                  { value: 'double', label: '双评 + 仲裁' },
-                ]}
-              />
-            </Form.Item>
-            {reviewMode === 'double' && (
-              <Form.Item name="review_threshold" label="分差阈值（分）" extra="留空按该题满分 20% 计算">
-                <InputNumber min={0} max={100} step={0.5} style={{ width: '100%' }} />
-              </Form.Item>
-            )}
-          </div>
+                    <div className="form-grid">
+                      <Form.Item name="review_mode" label="阅卷方式" tooltip="双评：同一题两位教师独立评分，分差超阈值进入三评仲裁">
+                        <Select
+                          options={[
+                            { value: 'single', label: '单评' },
+                            { value: 'double', label: '双评 + 仲裁' },
+                          ]}
+                        />
+                      </Form.Item>
+                      {reviewMode === 'double' && (
+                        <Form.Item name="review_threshold" label="分差阈值（分）" extra="留空按该题满分 20% 计算">
+                          <InputNumber min={0} max={100} step={0.5} style={{ width: '100%' }} />
+                        </Form.Item>
+                      )}
+                    </div>
+                  </>
+                ),
+              },
+              {
+                key: 'students',
+                title: '考生编排',
+                children: (
+                  <>
+                    <Form.Item name="class_ids" label="按班级编排" tooltip="班级内启用状态的学员会被全部加入">
+                      <Select mode="multiple" allowClear placeholder="选择班级" options={classOptions} loading={classesQuery.isPending} />
+                    </Form.Item>
 
-          <Form.Item name="class_ids" label="按班级编排" tooltip="班级内启用状态的学员会被全部加入">
-            <Select mode="multiple" allowClear placeholder="选择班级" options={classOptions} loading={classesQuery.isPending} />
-          </Form.Item>
-
-          <Form.Item
-            name="student_ids"
-            label="单独添加考生"
-            extra={
-              (studentsQuery.data?.items ?? []).length >= 100
-                ? '列表仅展示前 100 名学员，整班考生请用「按班级编排」'
-                : undefined
-            }
-          >
-            <Select
-              mode="multiple"
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              placeholder="选择学员"
-              options={studentOptions}
-              loading={studentsQuery.isPending}
-            />
-          </Form.Item>
+                    <Form.Item
+                      name="student_ids"
+                      label="单独添加考生"
+                      extra={
+                        (studentsQuery.data?.items ?? []).length >= 100
+                          ? '列表仅展示前 100 名学员，整班考生请用「按班级编排」'
+                          : undefined
+                      }
+                    >
+                      <Select
+                        mode="multiple"
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="选择学员"
+                        options={studentOptions}
+                        loading={studentsQuery.isPending}
+                      />
+                    </Form.Item>
+                  </>
+                ),
+              },
+            ]}
+          />
         </Form>
       </Drawer>
 

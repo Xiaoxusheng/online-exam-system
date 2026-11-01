@@ -567,7 +567,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 22px 0 12px;
+  margin: 26px 0 14px;
 }
 
 .section-head h2 {
@@ -575,6 +575,7 @@ body {
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
+  letter-spacing: -0.01em;
   color: var(--app-text);
 }
 
@@ -599,22 +600,23 @@ body {
 }
 
 .panel-card.ant-card > .ant-card-head {
-  min-height: 44px;
-  padding: 0 16px;
+  min-height: 46px;
+  padding: 0 18px;
   border-bottom: 1px solid var(--app-border-soft);
 }
 
 .panel-card.ant-card > .ant-card-head .ant-card-head-title {
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--app-text);
 }
 
 .panel-card.ant-card > .ant-card-body {
-  padding: 14px 16px;
+  padding: 16px 18px 18px;
 }
 
-/* 卡片 hover 反馈：所有面板卡边框微亮 + 阴影微升，不动位移以免表格晃眼 */
+/* 卡片 hover 反馈：安静型——只加深边框与阴影的灰度，不引入彩色 */
 .panel-card.ant-card {
   transition: border-color 200ms var(--app-ease), box-shadow 200ms var(--app-ease);
 }
@@ -626,7 +628,7 @@ body {
 
 /* 可交互卡片才有抬升，避免表格类卡片抖动 */
 .panel-card.is-interactive:hover {
-  border-color: var(--app-primary-line) !important;
+  border-color: #cbd6e6 !important;
   box-shadow: var(--app-shadow-lift) !important;
   transform: translateY(-1px);
 }
@@ -648,16 +650,16 @@ body {
   padding: 13px 15px;
 }
 
-/* 指标卡 hover：明显抬升 + 主色描边 + 数字加深 */
+/* 指标卡 hover：安静型抬升——灰阶描边 + 阴影加深，不靠主色堆砌 */
 .stat-card.ant-card {
   transition: border-color 200ms var(--app-ease), box-shadow 220ms var(--app-ease),
     transform 220ms var(--app-ease);
 }
 
 .stat-card.ant-card:hover {
-  border-color: var(--app-primary-line) !important;
-  box-shadow: var(--app-shadow-lift) !important;
-  transform: translateY(-3px);
+  border-color: #cbd6e6 !important;
+  box-shadow: 0 8px 22px -12px rgba(15, 23, 42, 0.2) !important;
+  transform: translateY(-2px);
 }
 
 .stat-card.ant-card:hover .stat-card-icon {
@@ -690,9 +692,10 @@ body {
 }
 
 .stat-card-label {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--app-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--app-text-tertiary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -912,6 +915,178 @@ body {
   border-color: var(--app-primary-line) !important;
 }
 
+/* iOS 式开关：胶囊轨道 + 白色把手 + 弹性滑动；开启态用玉青绿（对齐参考稿） */
+.ant-switch {
+  min-width: 40px !important;
+  height: 22px !important;
+  background: #d8dfe9 !important;
+  border-radius: 999px !important;
+  transition: background 200ms var(--app-ease) !important;
+}
+
+.ant-switch:hover:not(.ant-switch-disabled) {
+  background: #cbd4e2 !important;
+}
+
+.ant-switch .ant-switch-handle {
+  box-shadow:
+    0 2px 5px rgba(15, 23, 42, 0.22),
+    0 0 1px rgba(15, 23, 42, 0.16) !important;
+  transition: inset-inline-start 240ms var(--app-ease-spring) !important;
+}
+
+.ant-switch-inner {
+  transition: opacity 200ms var(--app-ease), margin 200ms var(--app-ease) !important;
+}
+
+.ant-switch.ant-switch-checked {
+  background: var(--app-success) !important;
+}
+
+.ant-switch.ant-switch-checked:hover:not(.ant-switch-disabled) {
+  background: #0e8a41 !important;
+}
+
+.ant-switch.ant-switch-small {
+  min-width: 32px !important;
+  height: 18px !important;
+}
+
+[data-theme='dark'] .ant-switch {
+  background: #333d4e !important;
+}
+
+[data-theme='dark'] .ant-switch:hover:not(.ant-switch-disabled) {
+  background: #3d495d !important;
+}
+
+[data-theme='dark'] .ant-switch .ant-switch-handle {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5), 0 0 1px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ---------------------------------------------------------------- 分区折叠 */
+/* 小标题 + 折叠：安静的分区头——灰色小标题、右侧细箭头、无卡片边框 */
+.section-fold.ant-collapse {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.section-fold.ant-collapse > .ant-collapse-item {
+  border: none;
+  background: transparent;
+}
+
+.section-fold.ant-collapse > .ant-collapse-item > .ant-collapse-header {
+  align-items: center;
+  padding: 12px 2px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--app-text-secondary);
+  transition: color 150ms var(--app-ease);
+}
+
+.section-fold.ant-collapse
+  > .ant-collapse-item
+  > .ant-collapse-header:hover {
+  color: var(--app-text);
+}
+
+.section-fold .ant-collapse-expand-icon {
+  color: var(--app-text-tertiary) !important;
+}
+
+.section-fold .ant-collapse-content {
+  background: transparent;
+  border: none;
+}
+
+.section-fold .ant-collapse-content > .ant-collapse-content-box {
+  padding: 2px 2px 10px;
+}
+
+/* 折叠分区之间的细分隔线（与卡片内的 border-soft 同级） */
+.section-fold.ant-collapse > .ant-collapse-item + .ant-collapse-item {
+  border-top: 1px solid var(--app-border-soft);
+}
+
+/* ---------------------------------------------------------------- 运行记录 */
+/* 紧凑表格 + 时间线混合：行首状态圆点（带柔和光环）+ 紧凑时间列 */
+.runlog-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+}
+
+.runlog-dot {
+  position: relative;
+  top: 3.5px;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--app-text-tertiary);
+  box-shadow: 0 0 0 3px rgba(139, 148, 171, 0.14);
+}
+
+.runlog-dot-primary {
+  background: var(--app-primary);
+  box-shadow: 0 0 0 3px rgba(33, 117, 255, 0.13);
+}
+
+.runlog-dot-success {
+  background: var(--app-success);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.13);
+}
+
+.runlog-dot-warning {
+  background: var(--app-warning);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+.runlog-dot-danger {
+  background: var(--app-danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14);
+}
+
+[data-theme='dark'] .runlog-dot {
+  background: var(--app-text-tertiary);
+  box-shadow: 0 0 0 3px rgba(139, 148, 171, 0.18);
+}
+
+[data-theme='dark'] .runlog-dot-primary {
+  box-shadow: 0 0 0 3px rgba(109, 154, 255, 0.2);
+}
+
+[data-theme='dark'] .runlog-dot-success {
+  box-shadow: 0 0 0 3px rgba(61, 219, 158, 0.18);
+}
+
+[data-theme='dark'] .runlog-dot-warning {
+  box-shadow: 0 0 0 3px rgba(245, 176, 76, 0.2);
+}
+
+[data-theme='dark'] .runlog-dot-danger {
+  box-shadow: 0 0 0 3px rgba(248, 122, 122, 0.2);
+}
+
+.runlog-time {
+  font-size: 12.5px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-text);
+  white-space: nowrap;
+}
+
+.runlog-text {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--app-text);
+  white-space: nowrap;
+}
+
 /* 状态标签：细边框 + 柔和底 */
 .ant-tag {
   border-radius: 5px;
@@ -1128,7 +1303,7 @@ body {
 }
 
 .quick-card.ant-card:hover {
-  border-color: var(--app-primary-line) !important;
+  border-color: #cbd6e6 !important;
   box-shadow: var(--app-shadow-lift) !important;
   transform: translateY(-2px);
 }

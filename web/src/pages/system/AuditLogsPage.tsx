@@ -35,6 +35,16 @@ interface Draft {
   range?: [Dayjs | null, Dayjs | null] | null
 }
 
+/** 审计动作 → 时间线状态点颜色：靠灰度与语义点色建立层级，不铺彩色标签 */
+function auditDotTone(action: string): string {
+  if (action === 'auth.login_failed' || action === 'proctor.event_handled') return 'runlog-dot-danger'
+  if (action.endsWith('.published') || action === 'paper.approved' || action === 'attempt.submitted' || action === 'review.submitted') {
+    return 'runlog-dot-success'
+  }
+  if (action.startsWith('auth.')) return 'runlog-dot-primary'
+  return ''
+}
+
 export default function AuditLogsPage() {
   const [draft, setDraft] = useState<Draft>({})
   const [query, setQuery] = useState<AuditLogParams>({ page: 1, page_size: 20 })
@@ -55,7 +65,17 @@ export default function AuditLogsPage() {
   }
 
   const columns: ColumnsType<AuditLog> = [
-    { title: '时间', dataIndex: 'created_at', width: 170, render: (value: string) => formatDateTime(value) },
+    {
+      title: '时间',
+      dataIndex: 'created_at',
+      width: 180,
+      render: (value: string, record) => (
+        <span className="runlog-cell">
+          <span className={`runlog-dot ${auditDotTone(record.action)}`} />
+          <span className="runlog-time">{formatDateTime(value)}</span>
+        </span>
+      ),
+    },
     {
       title: '操作者',
       dataIndex: 'actor_name',

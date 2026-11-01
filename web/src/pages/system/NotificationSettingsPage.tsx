@@ -26,11 +26,11 @@ const codeHints: Record<string, string> = {
   review_pending: '{exam} 考试名 · {count} 待阅份数',
 }
 
-const statusLabels: Record<string, { label: string; color: string }> = {
-  pending: { label: '待发送', color: 'gold' },
-  sent: { label: '已发送', color: 'green' },
-  failed: { label: '发送失败', color: 'red' },
-  read: { label: '已读', color: 'blue' },
+const statusLabels: Record<string, { label: string; color: string; dot: string }> = {
+  pending: { label: '待发送', color: 'gold', dot: 'runlog-dot-warning' },
+  sent: { label: '已发送', color: 'green', dot: 'runlog-dot-success' },
+  failed: { label: '发送失败', color: 'red', dot: 'runlog-dot-danger' },
+  read: { label: '已读', color: 'blue', dot: 'runlog-dot-primary' },
 }
 
 const logStatusOptions = [
@@ -233,10 +233,15 @@ function DispatchLogPanel() {
     {
       title: '状态',
       dataIndex: 'status',
-      width: 96,
+      width: 110,
       render: (value: string) => {
-        const meta = statusLabels[value] ?? { label: value, color: 'default' }
-        return <Tag color={meta.color}>{meta.label}</Tag>
+        const meta = statusLabels[value] ?? { label: value, dot: '', color: 'default' }
+        return (
+          <span className="runlog-cell">
+            <span className={`runlog-dot ${meta.dot}`} />
+            <span className="runlog-text">{meta.label}</span>
+          </span>
+        )
       },
     },
     { title: '发送时间', dataIndex: 'sent_at', width: 170, render: (value: string | null) => formatDateTime(value) },
