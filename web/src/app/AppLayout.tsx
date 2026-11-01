@@ -9,9 +9,11 @@ import {
   Dropdown,
   Grid,
   Layout,
+  List,
   Menu,
   Popover,
   Spin,
+  Tabs,
 } from 'antd'
 import type { MenuProps } from 'antd'
 import {
@@ -35,7 +37,7 @@ import { useAuthStore } from '../stores/auth'
 import { useThemeMode } from './useThemeMode'
 import { roleLabel } from '../utils/labels'
 import { findNavTrail, pageTitle } from './navigation'
-import { CloseOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
+import { MoonOutlined, SunOutlined } from '@ant-design/icons'
 
 const { Header, Sider, Content } = Layout
 
@@ -240,17 +242,19 @@ export default function AppLayout() {
           description="有新的考试安排或成绩发布时，会在这里提醒你。"
         />
       ) : (
-        <ul className="notice-list">
-          {notices.map((item) => (
-            <li key={item.id} className={item.status !== 'read' ? 'notice-item notice-unread' : 'notice-item'}>
+        <List
+          className="notice-list"
+          dataSource={notices}
+          renderItem={(item) => (
+            <List.Item className={item.status !== 'read' ? 'notice-item notice-unread' : 'notice-item'}>
               <button type="button" className="notice-item-main" onClick={() => handleReadNotice(item.id)}>
                 <span className="notice-item-title">{item.title}</span>
                 <span className="notice-item-desc">{item.content}</span>
                 <span className="notice-item-time">{dayjs(item.created_at).format('MM-DD HH:mm')}</span>
               </button>
-            </li>
-          ))}
-        </ul>
+            </List.Item>
+          )}
+        />
       )}
     </div>
   )
@@ -341,28 +345,22 @@ export default function AppLayout() {
 
         <Content className="app-content">
           <div className="content-shell">
-            <div className="work-tabs" role="tablist" aria-label="已打开页面">
-              {visibleTabs.map((tab) => (
-                <span
-                  key={tab.path}
-                  role="tab"
-                  aria-selected={tab.path === location.pathname}
-                  className={tab.path === location.pathname ? 'work-tab work-tab-active' : 'work-tab'}
-                  onClick={() => navigate(tab.path)}
-                >
-                  {tab.label}
-                  {tab.path !== '/' && (
-                    <CloseOutlined
-                      className="work-tab-close"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        closeTab(tab.path)
-                      }}
-                    />
-                  )}
-                </span>
-              ))}
-            </div>
+            <Tabs
+              className="work-tabs"
+              type="card"
+              hideAdd
+              size="small"
+              activeKey={visibleTabs.some((tab) => tab.path === location.pathname) ? location.pathname : undefined}
+              onChange={(key) => navigate(key)}
+              onEdit={(key, action) => {
+                if (action === 'remove') closeTab(String(key))
+              }}
+              items={visibleTabs.map((tab) => ({
+                key: tab.path,
+                label: tab.label,
+                closable: tab.path !== '/',
+              }))}
+            />
 
             <div className="content-inner" key={location.pathname}>
               <Suspense

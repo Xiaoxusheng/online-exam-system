@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Button, Card, DatePicker, Input, Select, Table, Tag } from 'antd'
+import { Button, Card, DatePicker, Flex, Input, Select, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
@@ -105,7 +105,7 @@ export default function AuditLogsPage() {
       <PageHeader title="审计日志" subtitle="登录、组卷、发布、改分与处置等关键操作全量留痕。" />
 
       <Card className="panel-card" variant="borderless">
-        <div className="filter-bar">
+        <Flex className="filter-bar" gap={12} wrap align="flex-end">
           <Select
             allowClear
             showSearch
@@ -150,7 +150,7 @@ export default function AuditLogsPage() {
           >
             重置
           </Button>
-        </div>
+        </Flex>
 
         <QueryError error={logsQuery.error} onRetry={() => logsQuery.refetch()} />
 

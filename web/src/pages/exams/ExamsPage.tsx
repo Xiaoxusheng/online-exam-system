@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, DatePicker, Drawer, Form, Input, InputNumber, Select, Space, Switch, Table, Tag, Tooltip } from 'antd'
+import { App, Button, Card, DatePicker, Drawer, Flex, Form, Input, InputNumber, Select, Space, Switch, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
@@ -201,7 +201,7 @@ export default function ExamsPage() {
       />
 
       <Card className="panel-card" variant="borderless">
-        <div className="filter-bar">
+        <Flex className="filter-bar" gap={12} wrap align="flex-end">
           <Select
             allowClear
             placeholder="状态"
@@ -230,7 +230,7 @@ export default function ExamsPage() {
           >
             重置
           </Button>
-        </div>
+        </Flex>
 
         <QueryError error={examsQuery.error} onRetry={() => examsQuery.refetch()} />
 

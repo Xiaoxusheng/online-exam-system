@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, Drawer, Empty, Form, Input, InputNumber, Select, Space, Table, Tag } from 'antd'
+import { App, Button, Card, Drawer, Empty, Flex, Form, Input, InputNumber, Select, Space, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import QueryError from '../../components/QueryError'
@@ -421,7 +421,7 @@ export default function PaperEditor({
         ) : (
           <div className="paper-picker">
             <Card className="panel-card" variant="borderless" title="题库选题">
-              <div className="filter-bar">
+              <Flex className="filter-bar" gap={12} wrap align="flex-end">
                 <Select
                   allowClear
                   placeholder="题库"
@@ -449,7 +449,7 @@ export default function PaperEditor({
                 <Button icon={<SearchOutlined />} type="primary" onClick={() => setCatalogQuery({ page: 1, page_size: 6 })}>
                   查询
                 </Button>
-              </div>
+              </Flex>
               <QueryError error={catalogState.error} onRetry={() => catalogState.refetch()} />
               <Table
                 rowKey="id"

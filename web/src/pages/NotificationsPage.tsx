@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, Pagination, Tag } from 'antd'
+import { App, Badge, Button, Card, Flex, List, Pagination, Skeleton, Space, Tag } from 'antd'
 import { BellOutlined } from '@ant-design/icons'
 import PageHeader from '../components/PageHeader'
 import QueryError from '../components/QueryError'
@@ -43,7 +43,7 @@ export default function NotificationsPage() {
         <QueryError error={notificationsQuery.error} onRetry={() => notificationsQuery.refetch()} />
 
         {notificationsQuery.isPending ? (
-          <div className="notice-loading">加载中…</div>
+          <Skeleton active paragraph={{ rows: 4 }} />
         ) : items.length === 0 ? (
           <EmptyState
             icon={<BellOutlined />}
@@ -51,30 +51,48 @@ export default function NotificationsPage() {
             description="考试发布、成绩发布等关键节点会自动给你发送站内通知。"
           />
         ) : (
-          <ul className="notice-feed">
-            {items.map((item) => (
-              <li key={item.id} className={item.status !== 'read' ? 'notice-feed-item notice-unread' : 'notice-feed-item'}>
-                <div className="notice-feed-head">
-                  <h3>{item.title}</h3>
-                  {sourceLabels[item.source_type] && <Tag className="soft-tag">{sourceLabels[item.source_type]}</Tag>}
-                </div>
-                <p className="notice-feed-body">{item.content}</p>
-                <div className="notice-feed-foot">
-                  <span>{formatDateTime(item.created_at)}</span>
-                  {item.status !== 'read' && (
-                    <Button
-                      type="link"
-                      size="small"
-                      loading={readMutation.isPending && readMutation.variables === item.id}
-                      onClick={() => readMutation.mutate(item.id)}
-                    >
-                      标记已读
-                    </Button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+          <List
+            className="notice-feed"
+            dataSource={items}
+            renderItem={(item) => (
+              <List.Item
+                className={item.status !== 'read' ? 'notice-feed-item notice-unread' : 'notice-feed-item'}
+                actions={
+                  item.status !== 'read'
+                    ? [
+                        <Button
+                          key="read"
+                          type="link"
+                          size="small"
+                          loading={readMutation.isPending && readMutation.variables === item.id}
+                          onClick={() => readMutation.mutate(item.id)}
+                        >
+                          标记已读
+                        </Button>,
+                      ]
+                    : []
+                }
+              >
+                <List.Item.Meta
+                  title={
+                    <Flex align="center" gap={8}>
+                      {item.status !== 'read' && <Badge status="processing" />}
+                      <span>{item.title}</span>
+                    </Flex>
+                  }
+                  description={
+                    <Space direction="vertical" size={2}>
+                      <span className="notice-feed-body">{item.content}</span>
+                      <span className="notice-feed-time">{formatDateTime(item.created_at)}</span>
+                    </Space>
+                  }
+                />
+                {sourceLabels[item.source_type] && (
+                  <Tag className="soft-tag">{sourceLabels[item.source_type]}</Tag>
+                )}
+              </List.Item>
+            )}
+          />
         )}
 
         {total > pageSize && (

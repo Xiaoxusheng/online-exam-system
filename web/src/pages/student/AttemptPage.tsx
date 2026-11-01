@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Card, Checkbox, Input, Modal, Radio, Select, Space, Spin, Tag } from 'antd'
-import { CheckCircleOutlined, FlagOutlined } from '@ant-design/icons'
+import { Alert, App, Badge, Button, Card, Checkbox, Input, Modal, Radio, Result, Select, Space, Spin, Tag } from 'antd'
+import { FlagOutlined } from '@ant-design/icons'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
@@ -222,25 +222,22 @@ export default function AttemptPage() {
       <div>
         <PageHeader title={state?.exam_title ?? '交卷成功'} subtitle="答卷已提交，感谢作答。" />
         <Card className="panel-card" variant="borderless">
-          <div className="result-hero">
-            <span className="result-badge">
-              <CheckCircleOutlined />
-            </span>
-          </div>
-          <Alert
-            type="success"
-            showIcon
-            icon={<CheckCircleOutlined />}
-            message={result.visible ? `本场得分 ${result.total ?? 0} 分` : '成绩将在发布后公布'}
-            description={
+          <Result
+            status="success"
+            title={result.visible ? `本场得分 ${result.total ?? 0} 分` : '成绩将在发布后公布'}
+            subTitle={
               result.pending > 0
                 ? `还有 ${result.pending} 道主观题等待阅卷，最终成绩以阅卷结果为准。`
                 : '客观题已自动判分，无需等待阅卷。'
             }
-            action={
+            extra={
               <Space>
-                <Link to="/my/exams">我的考试</Link>
-                <Link to="/my/scores">我的成绩</Link>
+                <Link to="/my/exams">
+                  <Button type="primary">我的考试</Button>
+                </Link>
+                <Link to="/my/scores">
+                  <Button>我的成绩</Button>
+                </Link>
               </Space>
             }
           />
@@ -275,21 +272,32 @@ export default function AttemptPage() {
                 <div className="attempt-nav-items">
                   {questions.map((question, index) => {
                     const answered = !isEmpty(question, answers[question.question_id] ?? {})
+                    const active = question.question_id === currentId
                     return (
-                      <button
-                        type="button"
+                      <Badge
                         key={question.question_id}
-                        className={
-                          question.question_id === currentId
-                            ? 'attempt-nav-item attempt-nav-active'
-                            : answered
-                              ? 'attempt-nav-item attempt-nav-done'
-                              : 'attempt-nav-item'
+                        count={index + 1}
+                        overflowCount={999}
+                        color={
+                          active ? 'var(--app-primary)' : answered ? 'var(--app-success)' : '#E3E8EF'
                         }
-                        onClick={() => setCurrentId(question.question_id)}
+                        style={
+                          active
+                            ? { color: '#fff', fontWeight: 600, boxShadow: '0 0 0 2px #fff' }
+                            : answered
+                              ? { color: '#fff', fontWeight: 600, boxShadow: '0 0 0 2px #fff' }
+                              : { color: 'var(--app-text-secondary)', fontWeight: 500, boxShadow: '0 0 0 2px #fff' }
+                        }
+                        offset={[0, 0]}
                       >
-                        {index + 1}
-                      </button>
+                        <button
+                          type="button"
+                          className={active ? 'attempt-nav-slot attempt-nav-slot-active' : 'attempt-nav-slot'}
+                          aria-label={`第 ${index + 1} 题`}
+                          aria-current={active}
+                          onClick={() => setCurrentId(question.question_id)}
+                        />
+                      </Badge>
                     )
                   })}
                 </div>

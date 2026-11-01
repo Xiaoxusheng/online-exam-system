@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, Col, Form, Input, Modal, Row, Select, Table } from 'antd'
+import { App, Button, Card, Col, Flex, Form, Input, Modal, Row, Select, Table } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
@@ -112,7 +112,7 @@ export default function OrgsPage() {
               </Button>
             }
           >
-            <div className="filter-bar">
+            <Flex className="filter-bar" gap={12} wrap align="flex-end">
               <Select
                 allowClear
                 placeholder="按校区筛选"
@@ -121,7 +121,7 @@ export default function OrgsPage() {
                 options={campusOptions}
                 onChange={(value) => setCampusFilter(value)}
               />
-            </div>
+            </Flex>
             <QueryError error={classesQuery.error} onRetry={() => classesQuery.refetch()} />
             <Table
               rowKey="id"

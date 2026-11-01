@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, Form, Input, Modal, Select, Space, Table, Tag, Tooltip } from 'antd'
+import { App, Button, Card, Flex, Form, Input, Modal, Select, Space, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { CheckCircleOutlined, MessageOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import QueryError from '../../components/QueryError'
@@ -115,7 +115,7 @@ export default function AppealsPanel() {
 
   return (
     <Card className="panel-card" variant="borderless">
-      <div className="filter-bar">
+      <Flex className="filter-bar" gap={12} wrap align="flex-end">
         <Select
           placeholder="处理状态"
           style={{ width: 150 }}
@@ -141,7 +141,7 @@ export default function AppealsPanel() {
             <SearchOutlined /> 处理入口仅考务管理员可见
           </span>
         </Tooltip>
-      </div>
+      </Flex>
 
       <QueryError error={appealsQuery.error} onRetry={() => appealsQuery.refetch()} />
 

@@ -2,6 +2,49 @@
 
 > 唯一计划/进度文件。后续任务在本文件追加或更新，不新建任务文档。
 
+## v1.3 视觉重整：「卷墨」风格 + 全量组件库化（2026-11-01 完成）
+
+- 背景：用户在 v1.2 之后要求「重新设计前端页面，只用组件库的组件，还是要有自己的风格，并且要精致现代，符合这考试系统」。
+- 结果：自绘 DOM 全部收敛到 antd 5.29 组件；建立「卷墨」配色（靛墨主色 + 批改朱语义色 + 玉/琥珀/靛紫等级色）与组件级 token；`global.css` 2539 → 1253 行，仅保留业务组件样式。冒烟 47 项、视觉验收 20 项全过，控制台无报错。
+
+### 做什么
+
+1. 令牌层（`theme.ts`）：重写为「卷墨」配色——主色靛墨 `#2F54EB`、成功玉青 `#0F9D76`、警告琥珀 `#D98A26`、危险批改朱 `#D64545`、靛紫 `#7A5AF8`；圆角收敛到 6/10/4/3（偏方，接近印刷品）、控件高 32、字号 13；补齐 `Statistic`/`Descriptions`/`Timeline`/`Progress`/`Empty`/`Result`/`Upload`/`Tabs`/`Card`/`Table` 等组件级 token，深色主题同语义重调。
+2. 组件库化（不再手绘结构）：
+   - `StatCard` → antd `Card` + `Statistic`（`title` 插槽放图标标签、`formatter` 接 `AnimatedNumber` 计数动画、`suffix` 放单位、`loading` 用组件自带骨架）
+   - 新增 `MetricGrid` → antd `Row`/`Col`/`Statistic`，1px 细线分隔的指标栅格
+   - `EmptyState` → antd `Empty`（`image` 插槽支持传入图标作为插图）
+   - 工作台「基本信息」→ antd `Descriptions`（`items` API + 响应式 `column`）
+   - 工作台「最近动态」→ antd `Timeline`
+   - 快捷入口 → antd `Card hoverable` + `Flex`
+   - 判分概览环形图（自绘 SVG）→ antd `Progress type="circle"`；平均分/已判分条 → `Progress`；分数段分布 → `Progress`
+   - 外壳页签条 → antd `Tabs type="card"` + `closable`，保留 sessionStorage 持久化与按角色过滤
+   - 404 页 → antd `Result`；交卷成功 → antd `Result`；批量导入拖拽区 → antd `Upload.Dragger`
+   - 考生端题号导航 → antd `Badge`（编号 + 状态色），底衬按钮负责点击与焦点
+   - 通知中心 → antd `List` + `Badge`；顶栏通知气泡 → antd `List`
+   - 12 处筛选栏 → antd `Flex`（`gap`/`wrap`/`align`），不再手写 flex 样式
+3. 样式层收敛：`design-v2.css` 重写为唯一视觉层，`global.css` 只留业务组件（题目编辑、组卷、判分、导入、分析、申诉等）样式，删除空态/404/通知/环形图/分布条等已由组件承担的块。
+4. 移动端与窄屏：指标卡 2 列紧凑（<560px 隐藏脚注、缩小数字），信息栅格保持「标签/值」成对两列。
+
+### 不做什么（v1.3 明确排除）
+
+- 不引入第二套组件库、不新增依赖；继续用 antd 5.29 + `@ant-design/icons`。
+- 不改路由、权限、接口与业务流程；不动后端。
+- 不改登录页的左右分栏结构（仅统一色彩与圆角）。
+
+### 验收标准（v1.3）
+
+- [x] `npm run typecheck`、`npm run build`（无 CSS 语法告警）、`npm run smoke`（47 项）、`verify-v1-ui`（20 项）全部通过。
+- [x] 管理端 8 页 + 考生端 + 深色 + 1024/390 宽度逐屏截图复核，控制台无报错。
+- [x] 冒烟/验收脚本的选择器断言同步更新到组件库结构（`.ant-result`、`.ant-upload-drag`）。
+- [x] 考生端题号徽标实测：26×26、主色填充、白字居中，无偏移。
+
+### 踩坑记录
+
+- 用正则批量替换 JSX 会因嵌套标签误吞内容（本轮曾把筛选栏内容清空）；改为按行缩进配对定位后每页只差 6 行，稳妥得多。
+- antd `Descriptions` 的响应式 `column` 用 `matchScreen` 匹配断点，只写 `lg` 时 `xxl` 会回落到默认的 3 列，需显式给出全部断点。
+- antd `Badge` 默认是右上角浮标（`translateX(-50%)`），直接用作题号会偏左，需覆盖为铺满底衬。
+
 ## v1.2 视觉重整：浅色扁平控制台风格（2026-11-01 完成）
 
 - 背景：用户反馈「整个页面很丑」，并给出 `Xiaoxusheng/server-status` 作为风格参照。经逐屏截图比对，定位到四类结构性问题：CSS 多轮覆盖互相打架、卡片套卡片、指标数字无色彩层次、页签条紧贴容器边框且与面包屑重复。

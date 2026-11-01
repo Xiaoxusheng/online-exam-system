@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Descriptions, Drawer, Select, Table, Tabs, Tag } from 'antd'
+import { Alert, App, Button, Descriptions, Drawer, Flex, Select, Table, Tabs, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import QueryError from '../../components/QueryError'
 import {
@@ -190,7 +190,7 @@ export default function ExamDetail({ examId, onClose }: { examId: string | null;
                   <>
                     {editable ? (
                       <div className="staff-editor">
-                        <div className="filter-bar">
+                        <Flex className="filter-bar" gap={12} wrap align="flex-end">
                           <Select
                             mode="multiple"
                             allowClear
@@ -219,7 +219,7 @@ export default function ExamDetail({ examId, onClose }: { examId: string | null;
                           >
                             添加
                           </Button>
-                        </div>
+                        </Flex>
                       </div>
                     ) : (
                       <Alert

@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react'
-import { Button, Card, Col, List, Row, Skeleton, Tag } from 'antd'
+import { Button, Card, Col, Descriptions, Flex, List, Row, Skeleton, Tag, Timeline } from 'antd'
 import {
   ArrowRightOutlined,
   BookOutlined,
   CalendarOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
-  HistoryOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
   WarningOutlined,
@@ -15,7 +14,6 @@ import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import { fetchDashboardSummary } from '../api/dashboard'
-import AnimatedNumber from '../components/AnimatedNumber'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
 import StatCard, { type StatTone } from '../components/StatCard'
@@ -105,7 +103,7 @@ export default function DashboardPage() {
       unit: '份',
       foot: '待考务审核',
       icon: <FileTextOutlined />,
-      tone: 'purple',
+      tone: 'violet',
     },
   ]
 
@@ -118,17 +116,30 @@ export default function DashboardPage() {
         : `当前身份：${roleLabel(user?.role)} · 数据暂不可用`
   }`
 
+  const infoItems = data
+    ? [
+        { key: 'role', label: '当前身份', children: user ? `${user.name}（${roleLabel(user.role)}）` : '—' },
+        { key: 'org', label: '所属机构', children: user?.org_id ? user.org_id.slice(0, 8) : '—' },
+        { key: 'scope', label: '数据范围', children: user?.data_scope ? dataScopeLabel(user.data_scope) : '—' },
+        { key: 'today', label: '今日', children: dayjs().format('YYYY-MM-DD dddd') },
+        { key: 'students', label: '在读学员', children: `${data.stats.students} 人` },
+        {
+          key: 'todo',
+          label: '待办合计',
+          children: `${data.stats.pending_grading + data.stats.pending_review} 项（阅卷 ${data.stats.pending_review} · 待判 ${data.stats.pending_grading}）`,
+        },
+        { key: 'running', label: '进行中考试', children: `${data.stats.exams_in_progress} 场` },
+        { key: 'upcoming', label: '待开始考试', children: `${data.upcoming_exams.length} 场` },
+      ]
+    : []
+
   return (
     <div>
       <PageHeader
         title={`${greeting()}，${user?.name ?? '管理员'}`}
         subtitle={subtitle}
         extra={
-          <Button
-            type="primary"
-            icon={<CalendarOutlined />}
-            onClick={() => navigate('/exams')}
-          >
+          <Button type="primary" icon={<CalendarOutlined />} onClick={() => navigate('/exams')}>
             进入考试管理
           </Button>
         }
@@ -154,7 +165,7 @@ export default function DashboardPage() {
               key={stat.label}
               icon={stat.icon}
               label={stat.label}
-              value={<AnimatedNumber value={stat.value} />}
+              value={stat.value}
               unit={stat.unit}
               foot={stat.foot}
               tone={stat.tone}
@@ -165,48 +176,20 @@ export default function DashboardPage() {
       )}
 
       {!isError && data && (
-        <section className="info-strip">
-          <div className="info-strip-head">
-            <h2>基本信息</h2>
-            <span className="panel-sub">当前登录身份的权限与范围</span>
-          </div>
-          <dl className="org-info-grid">
-            <dt>当前身份</dt>
-            <dd>{user ? `${user.name}（${roleLabel(user.role)}）` : '—'}</dd>
-            <dt>所属机构</dt>
-            <dd>{user?.org_id ? user.org_id.slice(0, 8) : '—'}</dd>
-            <dt>数据范围</dt>
-            <dd>{user?.data_scope ? dataScopeLabel(user.data_scope) : '—'}</dd>
-            <dt>今日</dt>
-            <dd>{dayjs().format('YYYY-MM-DD dddd')}</dd>
-            <dt>在读学员</dt>
-            <dd>{data.stats.students} 人</dd>
-            <dt>待办合计</dt>
-            <dd>
-              {data.stats.pending_grading + data.stats.pending_review} 项（阅卷 {data.stats.pending_review} · 待判{' '}
-              {data.stats.pending_grading}）
-            </dd>
-            <dt>进行中考试</dt>
-            <dd>{data.stats.exams_in_progress} 场</dd>
-            <dt>待开始考试</dt>
-            <dd>{data.upcoming_exams.length} 场</dd>
-          </dl>
-        </section>
+        <Card className="panel-card dashboard-info" variant="borderless" title="基本信息">
+          <Descriptions
+            size="small"
+            column={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 4, xxl: 4 }}
+            items={infoItems}
+            styles={{ label: { width: 72 } }}
+          />
+        </Card>
       )}
 
       {!isError && (
-        <Row gutter={[16, 16]} className="dashboard-row">
+        <Row gutter={[12, 12]} className="dashboard-row">
           <Col xs={24} xl={15}>
-            <Card
-              className="panel-card dashboard-card"
-              variant="borderless"
-              title="待开始考试"
-              extra={
-                <Button type="link" size="small" onClick={() => navigate('/exams')}>
-                  全部考试
-                </Button>
-              }
-            >
+            <Card className="panel-card" variant="borderless" title="待开始考试">
               {isLoading ? (
                 <Skeleton active paragraph={{ rows: 3 }} />
               ) : data && data.upcoming_exams.length > 0 ? (
@@ -216,19 +199,18 @@ export default function DashboardPage() {
                   renderItem={(exam) => {
                     const status = examStatusLabels[exam.status]
                     return (
-                      <List.Item>
+                      <List.Item
+                        extra={
+                          <Tag color={status?.color ?? 'default'}>{status?.label ?? exam.status}</Tag>
+                        }
+                      >
                         <div className="exam-item">
-                          <div style={{ minWidth: 0 }}>
-                            <div className="exam-item-title">{exam.title}</div>
-                            <div className="exam-item-meta">
-                              <ClockCircleOutlined />
-                              {dayjs(exam.start_at).format('MM-DD HH:mm')} -{' '}
-                              {dayjs(exam.end_at).format('MM-DD HH:mm')}
-                            </div>
+                          <div className="exam-item-title">{exam.title}</div>
+                          <div className="exam-item-meta">
+                            <ClockCircleOutlined />
+                            {dayjs(exam.start_at).format('MM-DD HH:mm')} -{' '}
+                            {dayjs(exam.end_at).format('MM-DD HH:mm')}
                           </div>
-                          <Tag color={status?.color ?? 'default'}>
-                            {status?.label ?? exam.status}
-                          </Tag>
                         </div>
                       </List.Item>
                     )
@@ -236,7 +218,6 @@ export default function DashboardPage() {
                 />
               ) : (
                 <EmptyState
-                  icon={<CalendarOutlined />}
                   title="暂无待开始考试"
                   description="创建考试计划后，即将开始的场次会显示在这里。"
                   action={
@@ -255,56 +236,50 @@ export default function DashboardPage() {
             <Row gutter={[12, 12]}>
               {quickActions.map((action) => (
                 <Col key={action.path} xs={12} sm={12} xl={12}>
-                  <button type="button" className="quick-card" onClick={() => navigate(action.path)}>
-                    <span className="quick-icon">{action.icon}</span>
-                    <span>
-                      <span className="quick-title" style={{ display: 'block' }}>
-                        {action.title}
-                      </span>
-                      <span className="quick-desc" style={{ display: 'block' }}>
-                        {action.description}
-                      </span>
-                    </span>
-                    <ArrowRightOutlined className="quick-arrow" />
-                  </button>
+                  <Card
+                    className="quick-card"
+                    variant="borderless"
+                    hoverable
+                    onClick={() => navigate(action.path)}
+                  >
+                    <Flex align="center" gap={10}>
+                      <span className="quick-icon">{action.icon}</span>
+                      <div className="quick-body">
+                        <div className="quick-title">{action.title}</div>
+                        <div className="quick-desc">{action.description}</div>
+                      </div>
+                      <ArrowRightOutlined className="quick-arrow" />
+                    </Flex>
+                  </Card>
                 </Col>
               ))}
             </Row>
           </Col>
 
           <Col xs={24} xl={9}>
-            <Card
-              className="panel-card dashboard-card"
-              variant="borderless"
-              title="最近动态"
-              extra={<span className="panel-sub">近 5 条</span>}
-            >
+            <Card className="panel-card" variant="borderless" title="最近动态">
               {isLoading ? (
                 <Skeleton active paragraph={{ rows: 4 }} />
               ) : data && data.recent_activity.length > 0 ? (
-                <List
-                  className="dashboard-list"
-                  dataSource={data.recent_activity}
-                  renderItem={(item) => (
-                    <List.Item>
-                      <div className="activity-line">
-                        <span className="activity-dot" />
-                        <div>
-                          <div className="activity-main">
-                            <strong>{item.actor_name}</strong> {activityLabel(item.action)}
-                          </div>
-                          <div className="activity-time">
-                            {dayjs(item.created_at).format('MM-DD HH:mm:ss')}
-                          </div>
+                <Timeline
+                  className="dashboard-timeline"
+                  items={data.recent_activity.map((item) => ({
+                    color: 'blue',
+                    children: (
+                      <>
+                        <div className="activity-main">
+                          <strong>{item.actor_name}</strong> {activityLabel(item.action)}
                         </div>
-                      </div>
-                    </List.Item>
-                  )}
+                        <div className="activity-time">
+                          {dayjs(item.created_at).format('MM-DD HH:mm:ss')}
+                        </div>
+                      </>
+                    ),
+                  }))}
                 />
               ) : (
                 <EmptyState
                   compact
-                  icon={<HistoryOutlined />}
                   title="暂无操作动态"
                   description="登录、组卷与发布等操作会记录在这里。"
                 />

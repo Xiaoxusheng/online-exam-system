@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Badge, Button, Card, Form, Input, Modal, Select, Table, Tag, Tooltip } from 'antd'
+import { Alert, Badge, Button, Card, Flex, Form, Input, Modal, Select, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { DotChartOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
+import MetricGrid from '../../components/MetricGrid'
 import QueryError from '../../components/QueryError'
 import EmptyState from '../../components/EmptyState'
 import { handleProctorEvent, listProctorEvents, listProctorRooms, getProctorOverview, type ProctorEventParams } from '../../api/proctor'
@@ -196,54 +197,35 @@ export default function ProctorPage() {
 
           {overviewQuery.data && (
             <Card className="panel-card" variant="borderless">
-              <div className="metric-grid">
-                <div className="metric-cell">
-                  <div className="metric-label">编排考生</div>
-                  <div className="metric-value">{overviewQuery.data.candidates}</div>
-                </div>
-                <div className="metric-cell">
-                  <div className="metric-label">未入场</div>
-                  <div className="metric-value">
-                    {Math.max(0, overviewQuery.data.candidates - overviewQuery.data.testing - overviewQuery.data.submitted - overviewQuery.data.absent)}
-                  </div>
-                </div>
-                <div className="metric-cell">
-                  <div className="metric-label">作答中</div>
-                  <div className="metric-value">{overviewQuery.data.testing}</div>
-                </div>
-                <div className="metric-cell">
-                  <div className="metric-label">已交卷</div>
-                  <div className="metric-value">{overviewQuery.data.submitted}</div>
-                </div>
-                <div className="metric-cell">
-                  <div className="metric-label">缺考</div>
-                  <div className="metric-value">{overviewQuery.data.absent}</div>
-                </div>
-                <div className="metric-cell">
-                  <div className="metric-label">在线答卷</div>
-                  <div className="metric-value">{overviewQuery.data.online}</div>
-                </div>
-                <div className="metric-cell">
-                  <div className="metric-label">未处置告警</div>
-                  <div
-                    className={`metric-value${
-                      overviewQuery.data.unhandled_events > 0 ? ' metric-accent-warning' : ''
-                    }`}
-                  >
-                    {overviewQuery.data.unhandled_events}
-                  </div>
-                </div>
-                <div className="metric-cell">
-                  <div className="metric-label">严重告警</div>
-                  <div
-                    className={`metric-value${
-                      overviewQuery.data.critical_events > 0 ? ' metric-accent-danger' : ''
-                    }`}
-                  >
-                    {overviewQuery.data.critical_events}
-                  </div>
-                </div>
-              </div>
+              <MetricGrid
+                items={[
+                  { label: '编排考生', value: overviewQuery.data.candidates },
+                  {
+                    label: '未入场',
+                    value: Math.max(
+                      0,
+                      overviewQuery.data.candidates -
+                        overviewQuery.data.testing -
+                        overviewQuery.data.submitted -
+                        overviewQuery.data.absent,
+                    ),
+                  },
+                  { label: '作答中', value: overviewQuery.data.testing },
+                  { label: '已交卷', value: overviewQuery.data.submitted, tone: 'success' },
+                  { label: '缺考', value: overviewQuery.data.absent, tone: 'danger' },
+                  { label: '在线答卷', value: overviewQuery.data.online },
+                  {
+                    label: '未处置告警',
+                    value: overviewQuery.data.unhandled_events,
+                    tone: overviewQuery.data.unhandled_events > 0 ? 'warning' : 'default',
+                  },
+                  {
+                    label: '严重告警',
+                    value: overviewQuery.data.critical_events,
+                    tone: overviewQuery.data.critical_events > 0 ? 'danger' : 'default',
+                  },
+                ]}
+              />
             </Card>
           )}
 
@@ -264,7 +246,7 @@ export default function ProctorPage() {
           )}
 
           <Card className="panel-card" variant="borderless" title="告警与事件">
-            <div className="filter-bar">
+            <Flex className="filter-bar" gap={12} wrap align="flex-end">
               <Select
                 allowClear
                 placeholder="级别"
@@ -298,7 +280,7 @@ export default function ProctorPage() {
               >
                 重置
               </Button>
-            </div>
+            </Flex>
 
             <QueryError error={eventsQuery.error} onRetry={() => eventsQuery.refetch()} />
 

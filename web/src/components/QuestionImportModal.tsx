@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { App, Alert, Button, Modal, Select, Space, Table, Tag, Typography } from 'antd'
+import { App, Alert, Button, Modal, Select, Space, Table, Tag, Typography, Upload } from 'antd'
 import { DownloadOutlined, InboxOutlined, UploadOutlined } from '@ant-design/icons'
 import { errorText } from '../utils/errors'
 import { downloadQuestionTemplate, importQuestions, type ImportReportRow, type ImportResult } from '../api/question'
@@ -119,28 +119,36 @@ export default function QuestionImportModal({ open, banks, onClose, onImported }
               onChange={setBankId}
               options={banks.map((bank) => ({ value: bank.id, label: `${bank.name}（${bank.question_count} 题）` }))}
             />
-            <div
-              className="drop-zone"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault()
-                const dropped = event.dataTransfer.files?.[0]
-                if (dropped) setFile(dropped)
+            <Upload.Dragger
+              accept=".xlsx"
+              multiple={false}
+              showUploadList={false}
+              fileList={file ? [{ uid: '1', name: file.name, status: 'done' }] : []}
+              beforeUpload={(next) => {
+                setFile(next)
+                return false
+              }}
+              onRemove={() => {
+                setFile(null)
+                return true
               }}
             >
-              <InboxOutlined className="drop-icon" />
-              <div className="drop-text">{file ? file.name : '把 Excel 拖到这里，或点击右侧按钮选择文件'}</div>
-              <Space size={8}>
-                <Button
-                  icon={<UploadOutlined />}
-                  onClick={() => document.getElementById('question-import-file')?.click()}
-                >
-                  选择文件
-                </Button>
-                <Button type="link" icon={<DownloadOutlined />} loading={downloading} onClick={downloadTemplate}>
-                  下载模板
-                </Button>
-              </Space>
+              <p className="ant-upload-drag-icon">
+                <InboxOutlined />
+              </p>
+              <p className="ant-upload-text">{file ? file.name : '把 Excel 拖到这里，或点击选择文件'}</p>
+              <p className="ant-upload-hint">单文件不超过 12 MB，仅支持 .xlsx</p>
+            </Upload.Dragger>
+            <Space size={8}>
+              <Button
+                icon={<UploadOutlined />}
+                onClick={() => document.getElementById('question-import-file')?.click()}
+              >
+                选择文件
+              </Button>
+              <Button type="link" icon={<DownloadOutlined />} loading={downloading} onClick={downloadTemplate}>
+                下载模板
+              </Button>
               <input
                 id="question-import-file"
                 type="file"
@@ -148,7 +156,7 @@ export default function QuestionImportModal({ open, banks, onClose, onImported }
                 hidden
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
-            </div>
+            </Space>
           </Space>
         </div>
       )}

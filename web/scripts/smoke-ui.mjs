@@ -81,7 +81,7 @@ for (const route of routes) {
 // Unknown deep link must land on the 404 page, not a blank screen.
 await page.goto(`${BASE}/definitely-not-a-route`, { waitUntil: 'networkidle' })
 await page.waitForTimeout(700)
-const notFound = await page.locator('.not-found').count()
+const notFound = await page.locator('.ant-result').count()
 check(notFound === 1, 'unknown routes render the 404 page')
 
 // Session refresh: expire the access token but keep the refresh token, then reload.
@@ -110,7 +110,7 @@ await page.goto(`${BASE}/questions`, { waitUntil: 'networkidle' })
 await page.waitForTimeout(1200)
 await page.click('button:has-text("批量导入")')
 await page.waitForTimeout(700)
-check((await page.locator('.drop-zone').count()) === 1, '题库页可打开批量导入弹窗')
+check((await page.locator('.ant-upload-drag').count()) === 1, '题库页可打开批量导入弹窗')
 const templateDownload = page.waitForEvent('download', { timeout: 15_000 })
 await page.click('button:has-text("下载模板")')
 const downloaded = await templateDownload.catch(() => null)

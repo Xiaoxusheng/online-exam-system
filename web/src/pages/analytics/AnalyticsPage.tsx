@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Alert, Card, Select, Tabs } from 'antd'
+import { Alert, Card, Descriptions, Progress, Select, Tabs } from 'antd'
 import PageHeader from '../../components/PageHeader'
-import AnimatedNumber from '../../components/AnimatedNumber'
+import MetricGrid from '../../components/MetricGrid'
 import QueryError from '../../components/QueryError'
 import EmptyState from '../../components/EmptyState'
 import ItemAnalyticsPanel from './ItemAnalyticsPanel'
@@ -51,101 +51,73 @@ export default function AnalyticsPage() {
         />
       )}
       <Card className="panel-card" variant="borderless" title={analytics.exam_title}>
-        <div className="analytics-meta">
-          <span className="analytics-meta-label">试卷</span>
-          <span className="analytics-meta-value">{analytics.paper_title}</span>
-          <span className="analytics-meta-divider" />
-          <span className="analytics-meta-label">满分 / 及格线</span>
-          <span className="analytics-meta-value">
-            {formatScore(analytics.total_score, 0)} / {formatScore(analytics.pass_score, 0)}
-          </span>
-        </div>
-        <div className="metric-grid">
-          <div className="metric-cell">
-            <div className="metric-label">编排考生</div>
-            <div className="metric-value">
-              <AnimatedNumber value={analytics.candidate_count} />
-            </div>
-          </div>
-          <div className="metric-cell">
-            <div className="metric-label">已判分答卷</div>
-            <div className="metric-value">
-              <AnimatedNumber value={analytics.graded_count} />
-            </div>
-          </div>
-          <div className="metric-cell">
-            <div className="metric-label">平均分</div>
-            <div className="metric-value">
-              <AnimatedNumber value={analytics.average} decimals={1} />
-            </div>
-          </div>
-          <div className="metric-cell">
-            <div className="metric-label">及格率</div>
-            <div className="metric-value metric-accent-success">
-              <AnimatedNumber value={analytics.pass_rate} decimals={1} suffix="%" />
-            </div>
-          </div>
-          <div className="metric-cell">
-            <div className="metric-label">最高分</div>
-            <div className="metric-value">
-              <AnimatedNumber value={analytics.highest} decimals={1} />
-            </div>
-          </div>
-          <div className="metric-cell">
-            <div className="metric-label">最低分</div>
-            <div className="metric-value">
-              <AnimatedNumber value={analytics.lowest} decimals={1} />
-            </div>
-          </div>
-        </div>
+        <Descriptions
+          className="analytics-meta"
+          size="small"
+          column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }}
+          items={[
+            { key: 'paper', label: '试卷', children: analytics.paper_title },
+            {
+              key: 'score',
+              label: '满分 / 及格线',
+              children: `${formatScore(analytics.total_score, 0)} / ${formatScore(analytics.pass_score, 0)}`,
+            },
+          ]}
+        />
+        <MetricGrid
+          items={[
+            { label: '编排考生', value: analytics.candidate_count },
+            { label: '已判分答卷', value: analytics.graded_count },
+            { label: '平均分', value: analytics.average, decimals: 1 },
+            { label: '及格率', value: analytics.pass_rate, decimals: 1, suffix: '%', tone: 'success' },
+            { label: '最高分', value: analytics.highest, decimals: 1 },
+            { label: '最低分', value: analytics.lowest, decimals: 1 },
+          ]}
+        />
       </Card>
 
       <Card className="panel-card" variant="borderless" title="判分概览">
         <div className="ring-panel">
-          <div className="donut" role="img" aria-label={`及格率 ${analytics.pass_rate}%`}>
-            <svg width="132" height="132" viewBox="0 0 132 132">
-              <circle className="donut-track" cx="66" cy="66" r="56" fill="none" strokeWidth="10" />
-              <circle
-                className="donut-value"
-                cx="66"
-                cy="66"
-                r="56"
-                fill="none"
-                strokeWidth="10"
-                strokeDasharray={2 * Math.PI * 56}
-                strokeDashoffset={2 * Math.PI * 56 * (1 - Math.min(100, Math.max(0, analytics.pass_rate)) / 100)}
-              />
-            </svg>
-            <div className="donut-center">
-              <div className="donut-number">{formatScore(analytics.pass_rate, 1)}%</div>
-              <div className="donut-caption">及格率</div>
-            </div>
-          </div>
+          <Progress
+            type="circle"
+            percent={Math.min(100, Math.max(0, analytics.pass_rate))}
+            size={132}
+            strokeWidth={10}
+            format={() => (
+              <span className="ring-center">
+                <span className="ring-center-value">{formatScore(analytics.pass_rate, 1)}%</span>
+                <span className="ring-center-caption">及格率</span>
+              </span>
+            )}
+          />
           <div className="ring-metrics">
             <div className="ring-row">
               <span className="ring-label">平均分</span>
-              <span className="ring-track">
-                <span
-                  className="ring-fill"
-                  style={{
-                    width: `${analytics.total_score > 0 ? Math.min(100, (analytics.average / analytics.total_score) * 100) : 0}%`,
-                  }}
-                />
-              </span>
+              <Progress
+                percent={
+                  analytics.total_score > 0
+                    ? Math.min(100, (analytics.average / analytics.total_score) * 100)
+                    : 0
+                }
+                showInfo={false}
+                size="small"
+              />
               <span className="ring-value">
                 {formatScore(analytics.average, 1)} / {formatScore(analytics.total_score, 0)}
               </span>
             </div>
             <div className="ring-row">
               <span className="ring-label">已判分</span>
-              <span className="ring-track">
-                <span
-                  className="ring-fill ring-fill-alt"
-                  style={{
-                    width: `${analytics.candidate_count > 0 ? Math.min(100, (analytics.graded_count / analytics.candidate_count) * 100) : 0}%`,
-                  }}
-                />
-              </span>
+              <Progress
+                percent={
+                  analytics.candidate_count > 0
+                    ? Math.min(100, (analytics.graded_count / analytics.candidate_count) * 100)
+                    : 0
+                }
+                showInfo={false}
+                size="small"
+                strokeColor="var(--app-success)"
+              />
               <span className="ring-value">
                 {analytics.graded_count} / {analytics.candidate_count} 人
               </span>
@@ -165,12 +137,11 @@ export default function AnalyticsPage() {
           {analytics.distribution.map((bucket) => (
             <div className="distribution-row" key={bucket.label}>
               <span className="cell-meta">{bucket.label}</span>
-              <span className="distribution-bar">
-                <span
-                  className="distribution-fill"
-                  style={{ width: `${Math.round((bucket.count / maxBucket) * 100)}%` }}
-                />
-              </span>
+              <Progress
+                percent={Math.round((bucket.count / maxBucket) * 100)}
+                showInfo={false}
+                size="small"
+              />
               <span className="distribution-count">{bucket.count} 人</span>
             </div>
           ))}

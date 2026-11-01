@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, Form, Input, Modal, Select, Space, Table, Tag, Tooltip } from 'antd'
+import { App, Button, Card, Flex, Form, Input, Modal, Select, Space, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { DownloadOutlined, ImportOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
@@ -198,7 +198,7 @@ export default function QuestionsPage() {
       />
 
       <Card className="panel-card" variant="borderless">
-        <div className="filter-bar">
+        <Flex className="filter-bar" gap={12} wrap align="flex-end">
           <Select
             allowClear
             placeholder="题库"
@@ -259,7 +259,7 @@ export default function QuestionsPage() {
           >
             重置
           </Button>
-        </div>
+        </Flex>
 
         <QueryError error={questionsQuery.error} onRetry={() => questionsQuery.refetch()} />
 

@@ -78,7 +78,9 @@ cd web && node scripts/verify-v1-ui.mjs  # v1.0 视觉与交互验收 + 截图�
 
 ## 前端规范
 
-- UI 遵循 Ant Design 5 + Design Token（`src/app/theme.ts`），主色飞书蓝 `#3370FF`，浅色 SaaS 风格；禁止随意引入第二套组件库。
+- UI 遵循 Ant Design 5（当前 5.29）+ Design Token（`src/app/theme.ts`），采用「卷墨」配色：主色靛墨 `#2F54EB`、成功玉青 `#0F9D76`、警告琥珀 `#D98A26`、危险批改朱 `#D64545`、靛紫 `#7A5AF8`；浅色扁平控制台风格。禁止引入第二套组件库。
+- **结构一律由 antd 组件承担**，不要手绘等价物：指标用 `Statistic`/`Card`，说明用 `Descriptions`，动态用 `Timeline`，进度与占比用 `Progress`，空态用 `Empty`，结果页用 `Result`，导航页签用 `Tabs`，题号用 `Badge`，上传用 `Upload.Dragger`，布局用 `Flex`/`Row`+`Col`。
+- 自定义样式只做组件外壳精修（间距、色调、状态色），写在 `src/styles/design-v2.css`（唯一视觉层）；`src/styles/global.css` 只保留业务组件样式。新增页面样式不要堆进 `global.css`。
 - 页面必须覆盖 Loading / Empty / Error 状态；表格、表单使用 antd 组件。
 - 全站中文文案；日期用 dayjs；金额/分数用数字格式化。
 - 新增页面必须在 `src/app/routes.tsx` 与菜单 `src/app/navigation.tsx` 同步登记。

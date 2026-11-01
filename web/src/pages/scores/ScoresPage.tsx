@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, Descriptions, Drawer, Input, InputNumber, Select, Space, Table, Tabs, Tag, Tooltip } from 'antd'
+import { App, Button, Card, Descriptions, Drawer, Flex, Input, InputNumber, Select, Space, Table, Tabs, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { HistoryOutlined, DownloadOutlined, ReloadOutlined, SearchOutlined, SendOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
@@ -207,7 +207,7 @@ export default function ScoresPage() {
 
   const listCard = (
     <Card className="panel-card" variant="borderless">
-        <div className="filter-bar">
+        <Flex className="filter-bar" gap={12} wrap align="flex-end">
           <Select
             allowClear
             showSearch
@@ -249,7 +249,7 @@ export default function ScoresPage() {
           >
             重置
           </Button>
-        </div>
+        </Flex>
 
         <QueryError error={scoresQuery.error} onRetry={() => scoresQuery.refetch()} />
 

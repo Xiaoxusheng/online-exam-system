@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Alert, Button, Card, Form, Input, Modal, Select, Switch, Table, Tabs, Tag, Tooltip } from 'antd'
+import { Alert, App, Button, Card, Flex, Form, Input, Modal, Select, Switch, Table, Tabs, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { EditOutlined, SendOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
@@ -245,7 +245,7 @@ function DispatchLogPanel() {
 
   return (
     <Card className="panel-card" variant="borderless">
-      <div className="filter-bar">
+      <Flex className="filter-bar" gap={12} wrap align="flex-end">
         <Select
           allowClear
           placeholder="发送状态"
@@ -263,7 +263,7 @@ function DispatchLogPanel() {
         <Button icon={<SendOutlined />} onClick={() => logsQuery.refetch()}>
           刷新
         </Button>
-      </div>
+      </Flex>
 
       <QueryError error={logsQuery.error} onRetry={() => logsQuery.refetch()} />
       <Table
