@@ -2,6 +2,16 @@
 
 > 唯一计划/进度文件。后续任务在本文件追加或更新，不新建任务文档。
 
+## v2.1 卡片动态补全与上线（2026-11-01 完成）
+
+- 背景：用户反馈「卡片没加上动态」。排查发现两个缺陷：
+  1. `is-interactive` 抬升类只有 CSS 定义、从未被任何页面使用，普通卡片 hover 一直无反馈；
+  2. `card-in` keyframes 带 `to` 帧 + `fill-mode: both`，动画结束后持续覆盖 transform，hover 的 `translateY(-3px)` 被顶掉。
+- 修复：指标卡 hover 补 -3px 抬升 + 主色描边 + 投影加深 + 图标放大；面板卡 hover 边框微亮 + 阴影微升（不位移，表格不晃）；`card-in` 去掉 `to` 帧（只留 `from`），动画结束回归元素样式，hover 可接管。入场幅度加大到 12px/440ms。
+- 验证：无头断言 hover 后 `.stat-card` transform `matrix(...,0)` → `matrix(...,-3)`、`.panel-card` 边框色变化、动画名 `card-in`；冒烟 47/47、typecheck/build 通过。
+- 上线：产物 `index-DputlkwD.js` / `index-kqu2_Q-m.css`，服务器端确认 hover CSS 存在后原子切换，复验 200。提交 `b01600b`。
+- 回滚：`cd /opt/online-exam && mv web web.failed && mv web.prev web`。
+
 ## v2.1 动效层与上线（2026-11-01 完成）
 
 - 背景：用户要求「加点动画」。原则：有层次、不喧闹，全部尊重既有的 `prefers-reduced-motion` 降级。
