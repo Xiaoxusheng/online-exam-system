@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Button, Card, Col, List, Row, Skeleton, Tag } from 'antd'
 import {
   ArrowRightOutlined,
@@ -7,6 +8,7 @@ import {
   FileTextOutlined,
   HistoryOutlined,
   SafetyCertificateOutlined,
+  TeamOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
@@ -16,6 +18,7 @@ import { fetchDashboardSummary } from '../api/dashboard'
 import AnimatedNumber from '../components/AnimatedNumber'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
+import StatCard, { type StatTone } from '../components/StatCard'
 import { useAuthStore } from '../stores/auth'
 import { activityLabel, dataScopeLabel, examStatusLabels, roleLabel } from '../utils/labels'
 
@@ -64,26 +67,45 @@ export default function DashboardPage() {
     queryFn: fetchDashboardSummary,
   })
 
-  const stats = [
+  const stats: {
+    label: string
+    value: number
+    unit: string
+    foot: string
+    icon: ReactNode
+    tone: StatTone
+  }[] = [
     {
       label: '在读学员',
       value: data?.stats.students ?? 0,
+      unit: '人',
       foot: '机构全部启用学员',
+      icon: <TeamOutlined />,
+      tone: 'primary',
     },
     {
       label: '进行中考试',
       value: data?.stats.exams_in_progress ?? 0,
+      unit: '场',
       foot: '处于考试时间窗内',
+      icon: <CalendarOutlined />,
+      tone: 'success',
     },
     {
       label: '待阅卷任务',
       value: data?.stats.pending_grading ?? 0,
+      unit: '份',
       foot: '主观题与音视频题',
+      icon: <ClockCircleOutlined />,
+      tone: 'warning',
     },
     {
       label: '待审核试卷',
       value: data?.stats.pending_review ?? 0,
+      unit: '份',
       foot: '待考务审核',
+      icon: <FileTextOutlined />,
+      tone: 'purple',
     },
   ]
 
@@ -112,32 +134,8 @@ export default function DashboardPage() {
         }
       />
 
-      {!isError && data && (
-        <Card className="panel-card" variant="borderless" title="基本信息">
-        <dl className="org-info-grid">
-          <dt>当前身份</dt>
-          <dd>{user ? `${user.name}（${roleLabel(user.role)}）` : '—'}</dd>
-          <dt>所属机构</dt>
-          <dd>{user?.org_id ? user.org_id.slice(0, 8) : '—'}</dd>
-          <dt>数据范围</dt>
-          <dd>{user?.data_scope ? dataScopeLabel(user.data_scope) : '—'}</dd>
-          <dt>今日</dt>
-          <dd>{dayjs().format('YYYY-MM-DD dddd')}</dd>
-          <dt>在读学员</dt>
-          <dd>{data.stats.students} 人</dd>
-          <dt>待办合计</dt>
-          <dd>{data.stats.pending_grading + data.stats.pending_review} 项（阅卷 {data.stats.pending_review} · 待判 {data.stats.pending_grading}）</dd>
-          <dt>进行中考试</dt>
-          <dd>{data.stats.exams_in_progress} 场</dd>
-          <dt>待开始考试</dt>
-          <dd>{data.upcoming_exams.length} 场</dd>
-        </dl>
-      </Card>
-      )}
-
       {isError ? (
-
-      <Card className="panel-card" variant="borderless">
+        <Card className="panel-card" variant="borderless">
           <EmptyState
             icon={<WarningOutlined />}
             title="工作台数据加载失败"
@@ -150,30 +148,57 @@ export default function DashboardPage() {
           />
         </Card>
       ) : (
-        <Card className="stat-panel" variant="borderless">
-          <div className="stat-grid">
-            {stats.map((stat) => (
-              <div className="stat-cell" key={stat.label}>
-                <div className="stat-label">{stat.label}</div>
-                <div className="stat-value">
-                  {isLoading ? (
-                    <Skeleton.Input active size="small" style={{ width: 56 }} />
-                  ) : (
-                    <AnimatedNumber value={stat.value} />
-                  )}
-                </div>
-                <div className="stat-foot">{stat.foot}</div>
-              </div>
-            ))}
+        <div className="stat-cards">
+          {stats.map((stat) => (
+            <StatCard
+              key={stat.label}
+              icon={stat.icon}
+              label={stat.label}
+              value={<AnimatedNumber value={stat.value} />}
+              unit={stat.unit}
+              foot={stat.foot}
+              tone={stat.tone}
+              loading={isLoading}
+            />
+          ))}
+        </div>
+      )}
+
+      {!isError && data && (
+        <section className="info-strip">
+          <div className="info-strip-head">
+            <h2>基本信息</h2>
+            <span className="panel-sub">当前登录身份的权限与范围</span>
           </div>
-        </Card>
+          <dl className="org-info-grid">
+            <dt>当前身份</dt>
+            <dd>{user ? `${user.name}（${roleLabel(user.role)}）` : '—'}</dd>
+            <dt>所属机构</dt>
+            <dd>{user?.org_id ? user.org_id.slice(0, 8) : '—'}</dd>
+            <dt>数据范围</dt>
+            <dd>{user?.data_scope ? dataScopeLabel(user.data_scope) : '—'}</dd>
+            <dt>今日</dt>
+            <dd>{dayjs().format('YYYY-MM-DD dddd')}</dd>
+            <dt>在读学员</dt>
+            <dd>{data.stats.students} 人</dd>
+            <dt>待办合计</dt>
+            <dd>
+              {data.stats.pending_grading + data.stats.pending_review} 项（阅卷 {data.stats.pending_review} · 待判{' '}
+              {data.stats.pending_grading}）
+            </dd>
+            <dt>进行中考试</dt>
+            <dd>{data.stats.exams_in_progress} 场</dd>
+            <dt>待开始考试</dt>
+            <dd>{data.upcoming_exams.length} 场</dd>
+          </dl>
+        </section>
       )}
 
       {!isError && (
-        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Row gutter={[16, 16]} className="dashboard-row">
           <Col xs={24} xl={15}>
             <Card
-              className="panel-card"
+              className="panel-card dashboard-card"
               variant="borderless"
               title="待开始考试"
               extra={
@@ -222,11 +247,34 @@ export default function DashboardPage() {
                 />
               )}
             </Card>
+
+            <div className="section-head">
+              <h2>快捷入口</h2>
+            </div>
+
+            <Row gutter={[12, 12]}>
+              {quickActions.map((action) => (
+                <Col key={action.path} xs={12} sm={12} xl={12}>
+                  <button type="button" className="quick-card" onClick={() => navigate(action.path)}>
+                    <span className="quick-icon">{action.icon}</span>
+                    <span>
+                      <span className="quick-title" style={{ display: 'block' }}>
+                        {action.title}
+                      </span>
+                      <span className="quick-desc" style={{ display: 'block' }}>
+                        {action.description}
+                      </span>
+                    </span>
+                    <ArrowRightOutlined className="quick-arrow" />
+                  </button>
+                </Col>
+              ))}
+            </Row>
           </Col>
 
           <Col xs={24} xl={9}>
             <Card
-              className="panel-card"
+              className="panel-card dashboard-card"
               variant="borderless"
               title="最近动态"
               extra={<span className="panel-sub">近 5 条</span>}
@@ -265,29 +313,6 @@ export default function DashboardPage() {
           </Col>
         </Row>
       )}
-
-      <div className="section-head">
-        <h2>快捷入口</h2>
-      </div>
-
-      <Row gutter={[16, 16]}>
-        {quickActions.map((action) => (
-          <Col key={action.path} xs={24} sm={12} xl={6}>
-            <button type="button" className="quick-card" onClick={() => navigate(action.path)}>
-              <span className="quick-icon">{action.icon}</span>
-              <span>
-                <span className="quick-title" style={{ display: 'block' }}>
-                  {action.title}
-                </span>
-                <span className="quick-desc" style={{ display: 'block' }}>
-                  {action.description}
-                </span>
-              </span>
-              <ArrowRightOutlined className="quick-arrow" />
-            </button>
-          </Col>
-        ))}
-      </Row>
     </div>
   )
 }

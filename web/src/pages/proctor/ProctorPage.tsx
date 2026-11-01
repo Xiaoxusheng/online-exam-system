@@ -225,11 +225,23 @@ export default function ProctorPage() {
                 </div>
                 <div className="metric-cell">
                   <div className="metric-label">未处置告警</div>
-                  <div className="metric-value">{overviewQuery.data.unhandled_events}</div>
+                  <div
+                    className={`metric-value${
+                      overviewQuery.data.unhandled_events > 0 ? ' metric-accent-warning' : ''
+                    }`}
+                  >
+                    {overviewQuery.data.unhandled_events}
+                  </div>
                 </div>
                 <div className="metric-cell">
                   <div className="metric-label">严重告警</div>
-                  <div className="metric-value">{overviewQuery.data.critical_events}</div>
+                  <div
+                    className={`metric-value${
+                      overviewQuery.data.critical_events > 0 ? ' metric-accent-danger' : ''
+                    }`}
+                  >
+                    {overviewQuery.data.critical_events}
+                  </div>
                 </div>
               </div>
             </Card>

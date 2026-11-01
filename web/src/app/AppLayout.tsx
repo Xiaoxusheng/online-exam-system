@@ -188,7 +188,7 @@ export default function AppLayout() {
   const trail = isAttemptRoute ? { group: { label: '我的考试' }, item: { label: '作答' } } : findNavTrail(location.pathname)
   const breadcrumbItems =
     allowedHere && location.pathname !== '/' && trail
-      ? [{ title: '工作台' }, { title: trail.group.label }, { title: trail.item.label }]
+      ? [{ title: trail.group.label }, { title: trail.item.label }]
       : [{ title: '工作台' }]
 
   const brand = (
@@ -339,38 +339,42 @@ export default function AppLayout() {
           </div>
         </Header>
 
-        <div className="work-tabs">
-          {visibleTabs.map((tab) => (
-            <span
-              key={tab.path}
-              className={tab.path === location.pathname ? 'work-tab work-tab-active' : 'work-tab'}
-              onClick={() => navigate(tab.path)}
-            >
-              {tab.label}
-              {tab.path !== '/' && (
-                <CloseOutlined
-                  className="work-tab-close"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    closeTab(tab.path)
-                  }}
-                />
-              )}
-            </span>
-          ))}
-        </div>
-
         <Content className="app-content">
-          <div className="content-inner" key={location.pathname}>
-            <Suspense
-              fallback={
-                <div className="route-loading">
-                  <Spin />
-                </div>
-              }
-            >
-              <Outlet />
-            </Suspense>
+          <div className="content-shell">
+            <div className="work-tabs" role="tablist" aria-label="已打开页面">
+              {visibleTabs.map((tab) => (
+                <span
+                  key={tab.path}
+                  role="tab"
+                  aria-selected={tab.path === location.pathname}
+                  className={tab.path === location.pathname ? 'work-tab work-tab-active' : 'work-tab'}
+                  onClick={() => navigate(tab.path)}
+                >
+                  {tab.label}
+                  {tab.path !== '/' && (
+                    <CloseOutlined
+                      className="work-tab-close"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        closeTab(tab.path)
+                      }}
+                    />
+                  )}
+                </span>
+              ))}
+            </div>
+
+            <div className="content-inner" key={location.pathname}>
+              <Suspense
+                fallback={
+                  <div className="route-loading">
+                    <Spin />
+                  </div>
+                }
+              >
+                <Outlet />
+              </Suspense>
+            </div>
           </div>
         </Content>
       </Layout>

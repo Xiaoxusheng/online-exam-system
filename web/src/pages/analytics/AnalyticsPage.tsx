@@ -51,6 +51,15 @@ export default function AnalyticsPage() {
         />
       )}
       <Card className="panel-card" variant="borderless" title={analytics.exam_title}>
+        <div className="analytics-meta">
+          <span className="analytics-meta-label">试卷</span>
+          <span className="analytics-meta-value">{analytics.paper_title}</span>
+          <span className="analytics-meta-divider" />
+          <span className="analytics-meta-label">满分 / 及格线</span>
+          <span className="analytics-meta-value">
+            {formatScore(analytics.total_score, 0)} / {formatScore(analytics.pass_score, 0)}
+          </span>
+        </div>
         <div className="metric-grid">
           <div className="metric-cell">
             <div className="metric-label">编排考生</div>
@@ -72,7 +81,7 @@ export default function AnalyticsPage() {
           </div>
           <div className="metric-cell">
             <div className="metric-label">及格率</div>
-            <div className="metric-value">
+            <div className="metric-value metric-accent-success">
               <AnimatedNumber value={analytics.pass_rate} decimals={1} suffix="%" />
             </div>
           </div>
@@ -87,16 +96,6 @@ export default function AnalyticsPage() {
             <div className="metric-value">
               <AnimatedNumber value={analytics.lowest} decimals={1} />
             </div>
-          </div>
-          <div className="metric-cell">
-            <div className="metric-label">满分 / 及格线</div>
-            <div className="metric-value">
-              {formatScore(analytics.total_score, 0)} / {formatScore(analytics.pass_score, 0)}
-            </div>
-          </div>
-          <div className="metric-cell">
-            <div className="metric-label">试卷</div>
-            <div className="metric-value metric-text">{analytics.paper_title}</div>
           </div>
         </div>
       </Card>
