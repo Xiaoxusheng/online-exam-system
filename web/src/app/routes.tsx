@@ -14,6 +14,7 @@ const QuestionsPage = lazy(() => import('../pages/questions/QuestionsPage'))
 const PapersPage = lazy(() => import('../pages/papers/PapersPage'))
 const ExamsPage = lazy(() => import('../pages/exams/ExamsPage'))
 const ReviewPage = lazy(() => import('../pages/review/ReviewPage'))
+const ReviewWorkbench = lazy(() => import('../pages/review/ReviewWorkbench'))
 const ScoresPage = lazy(() => import('../pages/scores/ScoresPage'))
 const AnalyticsPage = lazy(() => import('../pages/analytics/AnalyticsPage'))
 const ProctorPage = lazy(() => import('../pages/proctor/ProctorPage'))
@@ -50,6 +51,7 @@ export default function AppRoutes() {
         <Route path="exams" element={guarded('/exams', <ExamsPage />)} />
         <Route path="proctor" element={guarded('/proctor', <ProctorPage />)} />
         <Route path="review" element={guarded('/review', <ReviewPage />)} />
+        <Route path="review/workbench" element={guarded('/review/workbench', <ReviewWorkbench />)} />
         <Route path="scores" element={guarded('/scores', <ScoresPage />)} />
         <Route path="analytics" element={guarded('/analytics', <AnalyticsPage />)} />
         <Route path="system/users" element={guarded('/system/users', <UsersPage />)} />

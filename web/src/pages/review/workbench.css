@@ -1,0 +1,680 @@
+/* ==========================================================================
+   阅卷工作台 v2.2 —「三栏连续批阅」
+   左：任务队列 · 中：答卷主区 · 右：评分面板
+   复用 design-v2 令牌；本文件随页面 import，仅作用于工作台。
+   ========================================================================== */
+
+.wb-shell {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 52px - 34px - 46px);
+  min-height: 560px;
+  margin: -6px -4px -30px;
+}
+
+/* ---------------------------------------------------------------- 顶栏 */
+.wb-topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg) var(--app-radius-lg) 0 0;
+  box-shadow: var(--app-shadow-card);
+}
+
+.wb-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.wb-back.ant-btn {
+  color: var(--app-text-secondary);
+  padding-inline: 8px;
+}
+
+.wb-divider {
+  width: 1px;
+  height: 22px;
+  flex: none;
+  background: var(--app-border);
+}
+
+.wb-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.wb-title-main {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--app-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-title-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--app-text-tertiary);
+}
+
+.wb-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.wb-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wb-progress-num {
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-primary);
+}
+
+.wb-progress-label {
+  font-size: 11.5px;
+  color: var(--app-text-tertiary);
+}
+
+.wb-progress-track {
+  width: 90px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--app-border-soft);
+  overflow: hidden;
+}
+
+.wb-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4d94ff, #2175ff);
+  transition: width 320ms var(--app-ease);
+}
+
+.wb-nav {
+  flex: none;
+  gap: 8px;
+}
+
+.wb-nav-position {
+  min-width: 56px;
+  text-align: center;
+  font-weight: 650;
+  color: var(--app-primary);
+}
+
+/* ---------------------------------------------------------------- 三栏 */
+.wb-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr) 336px;
+  gap: 12px;
+  padding: 12px 0 0;
+}
+
+/* 左栏：任务队列 */
+.wb-queue {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-card);
+  overflow: hidden;
+}
+
+.wb-queue-tabs {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--app-border-soft);
+}
+
+.wb-queue-tab {
+  flex: 1;
+  padding: 5px 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--app-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: background 150ms var(--app-ease), color 150ms var(--app-ease);
+}
+
+.wb-queue-tab:hover {
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+}
+
+.wb-queue-tab-active {
+  background: var(--app-primary-soft);
+  border-color: var(--app-primary-line);
+  color: var(--app-primary-strong);
+  font-weight: 650;
+}
+
+.wb-queue-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wb-queue-empty {
+  margin-top: 32px;
+}
+
+.wb-center {
+  display: grid;
+  place-items: center;
+  padding: 32px 0;
+}
+
+.wb-center-tall {
+  height: 100%;
+}
+
+.wb-task {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 11px 9px 14px;
+  border: 1px solid var(--app-border-soft);
+  border-radius: 9px;
+  background: var(--app-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms var(--app-ease), background 150ms var(--app-ease),
+    box-shadow 150ms var(--app-ease);
+}
+
+.wb-task:hover {
+  border-color: var(--app-border);
+  background: var(--app-surface-hover);
+}
+
+.wb-task-active {
+  border-color: var(--app-primary-line);
+  background: var(--app-primary-soft);
+  box-shadow: 0 1px 2px rgba(33, 117, 255, 0.08);
+}
+
+.wb-task-active::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--app-primary);
+}
+
+.wb-task-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wb-task-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--app-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-task-user-icon {
+  font-size: 12px;
+  color: var(--app-text-tertiary);
+}
+
+.wb-task-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--app-warning);
+}
+
+.wb-task-dot-pending {
+  background: var(--app-warning);
+}
+
+.wb-task-dot-submitted {
+  background: var(--app-success);
+}
+
+.wb-task-dot-in_progress {
+  background: var(--app-primary);
+}
+
+.wb-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--app-text-tertiary);
+}
+
+.wb-task-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-task-round {
+  flex: none;
+  transform: scale(0.92);
+  margin: 0;
+}
+
+.wb-task-score {
+  margin-left: auto;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--app-text);
+}
+
+.wb-task-pending {
+  color: var(--app-text-tertiary);
+  font-weight: 400;
+}
+
+/* 中栏：答卷主区 */
+.wb-main {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 2px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wb-paper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: wb-rise 300ms var(--app-ease) both;
+}
+
+@keyframes wb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.wb-card {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-card);
+  overflow: hidden;
+}
+
+.wb-card-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--app-border-soft);
+}
+
+.wb-card-head-click {
+  cursor: pointer;
+  user-select: none;
+}
+
+.wb-card-head-click:hover {
+  background: var(--app-surface-muted);
+}
+
+.wb-card-badge {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--app-primary);
+  background: var(--app-primary-soft);
+}
+
+.wb-card-badge-answer {
+  color: var(--app-violet);
+  background: var(--app-violet-soft);
+}
+
+.wb-card-badge-ref {
+  color: var(--app-success);
+  background: var(--app-success-soft);
+}
+
+.wb-card-badge-round {
+  color: var(--app-warning);
+  background: var(--app-warning-soft);
+}
+
+.wb-card-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--app-text);
+}
+
+.wb-card-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--app-text-tertiary);
+}
+
+.wb-fold {
+  cursor: pointer;
+  color: var(--app-text-tertiary);
+}
+
+.wb-anon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--app-text-tertiary);
+}
+
+.wb-card-body {
+  padding: 14px 16px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--app-text);
+}
+
+.wb-question {
+  font-size: 14.5px;
+}
+
+.wb-card-answer {
+  border-color: var(--app-violet-soft);
+  box-shadow: 0 1px 2px rgba(122, 90, 248, 0.06);
+}
+
+.wb-answer {
+  min-height: 64px;
+  font-size: 14.5px;
+}
+
+.wb-rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wb-round {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid var(--app-border-soft);
+  border-radius: 9px;
+  font-size: 12.5px;
+}
+
+.wb-round-current {
+  border-color: var(--app-primary-line);
+  background: var(--app-primary-soft);
+}
+
+.wb-round-score {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-text);
+}
+
+.wb-round-meta {
+  color: var(--app-text-tertiary);
+}
+
+.wb-round-comment {
+  width: 100%;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+
+/* 右栏：评分面板 */
+.wb-panel {
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-card);
+}
+
+.wb-panel-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.wb-panel-alert {
+  border-radius: 10px;
+}
+
+.wb-panel-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 60px 12px;
+  color: var(--app-text-tertiary);
+  text-align: center;
+}
+
+.wb-panel-placeholder svg {
+  font-size: 30px;
+  color: var(--app-border-strong);
+}
+
+.wb-panel-placeholder p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  font-weight: 550;
+  color: var(--app-text-secondary);
+}
+
+.wb-panel-placeholder span {
+  font-size: 12px;
+}
+
+.wb-score-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--app-text-tertiary);
+}
+
+.wb-score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wb-score-input.ant-input-number {
+  flex: 1;
+  height: 46px;
+  border-radius: 10px;
+  font-size: 20px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.wb-score-input .ant-input-number-input {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-score-max {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--app-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-tiers {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.wb-tier {
+  padding: 7px 0;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-text-secondary);
+  background: var(--app-surface);
+  cursor: pointer;
+  transition: all 140ms var(--app-ease);
+}
+
+.wb-tier:hover {
+  border-color: var(--app-primary-line);
+  color: var(--app-primary-strong);
+  transform: translateY(-1px);
+}
+
+.wb-tier-active {
+  background: var(--app-primary);
+  border-color: var(--app-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px -2px rgba(33, 117, 255, 0.45);
+}
+
+.wb-comment-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--app-text-tertiary);
+}
+
+.wb-templates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.wb-template {
+  padding: 3px 9px;
+  border: 1px solid var(--app-border-soft);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--app-text-secondary);
+  background: var(--app-surface-muted);
+  cursor: pointer;
+  transition: all 140ms var(--app-ease);
+}
+
+.wb-template:hover {
+  border-color: var(--app-primary-line);
+  color: var(--app-primary-strong);
+  background: var(--app-primary-soft);
+}
+
+.wb-comment.ant-input {
+  border-radius: 10px;
+}
+
+.wb-submit.ant-btn {
+  height: 42px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wb-shortcut {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 11px;
+  color: var(--app-text-tertiary);
+}
+
+.wb-shortcut kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  margin-right: 2px;
+  border: 1px solid var(--app-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 10.5px;
+  color: var(--app-text-secondary);
+  background: var(--app-surface-muted);
+}
+
+/* ---------------------------------------------------------------- 响应式 */
+@media (max-width: 1200px) {
+  .wb-body {
+    grid-template-columns: 232px minmax(0, 1fr) 300px;
+  }
+}
+
+@media (max-width: 980px) {
+  .wb-shell {
+    height: auto;
+    margin: -6px 0 -30px;
+  }
+  .wb-body {
+    grid-template-columns: 1fr;
+  }
+  .wb-queue {
+    max-height: 260px;
+  }
+  .wb-main {
+    overflow: visible;
+  }
+  .wb-panel {
+    overflow: visible;
+  }
+}

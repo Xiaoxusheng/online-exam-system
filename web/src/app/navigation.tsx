@@ -7,6 +7,7 @@ import {
   CalendarOutlined,
   DashboardOutlined,
   TrophyOutlined,
+  FileDoneOutlined,
   FileTextOutlined,
   FormOutlined,
   HistoryOutlined,
@@ -54,6 +55,7 @@ export const navigation: NavGroup[] = [
       { key: '/exams', label: '考试管理', icon: <CalendarOutlined /> },
       { key: '/proctor', label: '监考中心', icon: <SafetyCertificateOutlined /> },
       { key: '/review', label: '阅卷中心', icon: <FormOutlined /> },
+      { key: '/review/workbench', label: '阅卷工作台', icon: <FileDoneOutlined /> },
     ],
   },
   {

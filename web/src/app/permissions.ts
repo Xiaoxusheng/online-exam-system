@@ -12,6 +12,7 @@ const pageRoles: Record<string, Role[]> = {
   '/exams': ['exam_admin'],
   '/proctor': ['proctor', 'exam_admin'],
   '/review': ['reviewer', 'exam_admin'],
+  '/review/workbench': ['reviewer', 'exam_admin'],
   '/scores': ['exam_admin', 'teacher'],
   '/analytics': ['exam_admin', 'teacher'],
   '/my/exams': ['student'],

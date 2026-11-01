@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Button, Card, Table, Tabs, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -15,7 +16,7 @@ import type { ReviewTask } from '../../types'
 
 const roundNames: Record<number, string> = { 1: '一评', 2: '二评', 3: '仲裁' }
 
-const columns = (onOpen: (task: ReviewTask) => void): ColumnsType<ReviewTask> => [
+const columns = (onOpen: (task: ReviewTask) => void, onWorkbench: (task: ReviewTask) => void): ColumnsType<ReviewTask> => [
   {
     title: '考卷',
     key: 'exam',
@@ -60,17 +61,25 @@ const columns = (onOpen: (task: ReviewTask) => void): ColumnsType<ReviewTask> =>
   {
     title: '操作',
     key: 'actions',
-    width: 96,
+    width: 150,
     fixed: 'right',
     render: (_value, record) => (
-      <Button type="link" size="small" onClick={() => onOpen(record)}>
-        {record.status === 'pending' ? '去阅卷' : '查看'}
-      </Button>
+      <>
+        {record.status === 'pending' && (
+          <Button type="link" size="small" onClick={() => onWorkbench(record)}>
+            工作台
+          </Button>
+        )}
+        <Button type="link" size="small" onClick={() => onOpen(record)}>
+          {record.status === 'pending' ? '查看' : '详情'}
+        </Button>
+      </>
     ),
   },
 ]
 
 export default function ReviewPage() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState<'pending' | 'submitted'>('pending')
   const [taskId, setTaskId] = useState<string | null>(null)
 
@@ -110,7 +119,10 @@ export default function ReviewPage() {
           rowKey="id"
           size="middle"
           loading={activeQuery.isPending}
-          columns={columns((task) => setTaskId(task.id))}
+          columns={columns(
+            (task) => setTaskId(task.id),
+            (task) => navigate(`/review/workbench?task=${task.id}&status=${tab}`),
+          )}
           dataSource={activeQuery.data?.items ?? []}
           scroll={{ x: 900 }}
           pagination={{ pageSize: 20, showSizeChanger: false, showTotal: (total) => `共 ${total} 条任务` }}
