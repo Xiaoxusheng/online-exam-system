@@ -24,7 +24,7 @@ export function submitAttempt(attemptId: string): Promise<SubmitResult> {
   return apiRequest<SubmitResult>(`/attempts/${attemptId}/submit`, { method: 'POST' })
 }
 
-export function reportEvent(attemptId: string, input: { type: string; level?: string; snapshot_url?: string }): Promise<unknown> {
+export function reportEvent(attemptId: string, input: { type: string; level?: string; snapshot_url?: string; note?: string }): Promise<unknown> {
   return apiRequest<unknown>(`/attempts/${attemptId}/events`, { method: 'POST', body: JSON.stringify(input) })
 }
 

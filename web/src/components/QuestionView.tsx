@@ -128,8 +128,22 @@ export function CandidateAnswer({ type, answer }: AnswerProps) {
   }
 
   if (type === 'media') {
+    const mediaId = typeof answer.media_id === 'string' ? answer.media_id : ''
     const url = typeof answer.url === 'string' ? answer.url : ''
-    return <div className="answer-view">{url || '（未提交音视频）'}</div>
+    const duration = typeof answer.duration_ms === 'number' ? Math.round(answer.duration_ms / 1000) : 0
+    if (!mediaId && !url) return <div className="answer-view answer-empty">考生未作答</div>
+    return (
+      <div className="answer-view">
+        {mediaId ? (
+          <>
+            <audio controls preload="metadata" src={mediaContentUrl(mediaId)} style={{ display: 'block', width: '100%', maxWidth: 480 }} />
+            {duration > 0 && <span className="cell-meta">作答时长约 {duration} 秒</span>}
+          </>
+        ) : (
+          <span>{url}</span>
+        )}
+      </div>
+    )
   }
 
   const text = typeof answer.text === 'string' ? answer.text : ''

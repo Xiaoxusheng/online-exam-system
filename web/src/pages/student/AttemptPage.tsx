@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Badge, Button, Card, Checkbox, Input, Modal, Radio, Result, Select, Space, Spin, Tag } from 'antd'
-import { FlagOutlined } from '@ant-design/icons'
+import { Alert, App, Badge, Button, Card, Checkbox, Input, Modal, Radio, Result, Select, Space, Spin, Tag, Tooltip } from 'antd'
+import { FlagOutlined, ExpandOutlined, PushpinFilled, PushpinOutlined } from '@ant-design/icons'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
-import { getAttempt, saveAnswer, submitAttempt } from '../../api/student'
+import MediaAnswer from '../../components/proctor/MediaAnswer'
+import { isMobileClient, watermarkDataUrl } from '../../components/proctor/watermark'
+import { getAttempt, reportEvent, saveAnswer, submitAttempt } from '../../api/student'
+import { uploadMediaWithProgress } from '../../api/media'
 import { queryKeys } from '../../api/queryKeys'
 import { ApiError } from '../../api/client'
 import { formatClock } from '../../utils/format'
 import { questionTypeLabel } from '../../utils/labels'
 import { errorText } from '../../utils/errors'
+import { useAuthStore } from '../../stores/auth'
 import type { AttemptQuestion } from '../../types'
 
 type AnswerContent = Record<string, unknown>
@@ -43,7 +47,7 @@ function isEmpty(question: AttemptQuestion, content: AnswerContent): boolean {
     case 'programming':
       return !content.code
     case 'media':
-      return !content.url
+      return !content.media_id && !content.url
     default:
       return !content.text
   }
@@ -75,6 +79,195 @@ export default function AttemptPage() {
 
   const state = attemptQuery.data
   const live = state?.status === 'in_progress'
+  const rules = state?.rules
+
+  // ===== 标记待检查（C-05）：按答卷持久化在 localStorage =====
+  const [flagSet, setFlagSet] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!attemptId) return
+    try {
+      const stored = window.localStorage.getItem(`attempt-flags-${attemptId}`)
+      if (stored) setFlagSet(new Set(JSON.parse(stored) as string[]))
+    } catch {
+      /* ignore malformed flags */
+    }
+  }, [attemptId])
+
+  function toggleFlag(questionId: string) {
+    setFlagSet((current) => {
+      const next = new Set(current)
+      if (next.has(questionId)) {
+        next.delete(questionId)
+      } else {
+        next.add(questionId)
+      }
+      try {
+        window.localStorage.setItem(`attempt-flags-${attemptId}`, JSON.stringify([...next]))
+      } catch {
+        /* storage full/unavailable: in-memory flags still work */
+      }
+      return next
+    })
+  }
+
+  // ===== 考生端事件上报（切屏 / 断线 / 全屏退出）=====
+  const reportEventRef = useRef(reportEvent)
+  reportEventRef.current = reportEvent
+  const switchCountRef = useRef(0)
+  const offlineSinceRef = useRef<number | null>(null)
+  const warnedScreenRef = useRef(false)
+  const userName = useAuthStore((s) => s.user?.name ?? '')
+
+  useEffect(() => {
+    if (!live || !attemptId) return
+    const onVisibility = () => {
+      if (document.visibilityState !== 'hidden') return
+      switchCountRef.current += 1
+      const count = switchCountRef.current
+      void reportEventRef.current(attemptId, {
+        type: 'screen_switch',
+        level: 'warning',
+        note: `第 ${count} 次离开作答页面`,
+      }).catch(() => undefined)
+      const limit = rules?.screen_switch_limit ?? 5
+      if (count >= limit && !warnedScreenRef.current) {
+        warnedScreenRef.current = true
+        Modal.warning({
+          title: '离开作答页面已被记录',
+          content: `监考端已收到 ${count} 次切屏告警，请立即回到作答页面。切屏达到阈值可能被标记违规。`,
+        })
+      }
+    }
+    const onOffline = () => {
+      offlineSinceRef.current = Date.now()
+    }
+    const onOnline = () => {
+      if (offlineSinceRef.current) {
+        const seconds = Math.round((Date.now() - offlineSinceRef.current) / 1000)
+        if (seconds >= 15) {
+          void reportEventRef.current(attemptId, {
+            type: 'connection_lost',
+            level: 'critical',
+            note: `网络中断约 ${seconds} 秒后恢复`,
+          }).catch(() => undefined)
+        }
+      }
+      offlineSinceRef.current = null
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('offline', onOffline)
+    window.addEventListener('online', onOnline)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('offline', onOffline)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [live, attemptId, rules?.screen_switch_limit])
+
+  // ===== 作答环境限制（M-02）：禁右键 / 复制 / 打印快捷键 =====
+  useEffect(() => {
+    if (!live) return
+    const block = (event: Event) => event.preventDefault()
+    const blockKeys = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && ['p', 'c', 'x'].includes(event.key.toLowerCase())) {
+        event.preventDefault()
+      }
+    }
+    document.addEventListener('contextmenu', block)
+    document.addEventListener('copy', block)
+    document.addEventListener('cut', block)
+    document.addEventListener('keydown', blockKeys)
+    return () => {
+      document.removeEventListener('contextmenu', block)
+      document.removeEventListener('copy', block)
+      document.removeEventListener('cut', block)
+      document.removeEventListener('keydown', blockKeys)
+    }
+  }, [live])
+
+  // ===== 全屏监控（M-02）：退出全屏上报告警 =====
+  const [fullscreenHint, setFullscreenHint] = useState(false)
+  useEffect(() => {
+    if (!live || !attemptId) return
+    const onFullscreenChange = () => {
+      if (document.fullscreenElement) {
+        setFullscreenHint(false)
+        return
+      }
+      setFullscreenHint(true)
+      void reportEventRef.current(attemptId, {
+        type: 'fullscreen_exit',
+        level: 'warning',
+        note: '退出了全屏作答环境',
+      }).catch(() => undefined)
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [live, attemptId])
+
+  // ===== 定时抓拍（M-05）：rules.snapshot_interval > 0 且有摄像头时启用 =====
+  useEffect(() => {
+    const interval = rules?.snapshot_interval ?? 0
+    if (!live || !attemptId || interval < 15) return
+    let stream: MediaStream | null = null
+    let canvas: HTMLCanvasElement | null = null
+    let stopped = false
+    let timer = 0
+
+    async function startSnapshots() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } })
+      } catch {
+        return // no camera permission: snapshots stay off, exam continues
+      }
+      if (stopped) return
+      const video = document.createElement('video')
+      video.srcObject = stream
+      video.muted = true
+      await video.play().catch(() => undefined)
+      canvas = document.createElement('canvas')
+      canvas.width = 480
+      canvas.height = 360
+
+      const shoot = async () => {
+        if (stopped || !canvas || video.readyState < 2) return
+        canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const blob = await new Promise<Blob | null>((resolve) => canvas?.toBlob(resolve, 'image/jpeg', 0.6))
+        if (!blob) return
+        try {
+          const file = new File([blob], `snapshot-${Date.now()}.jpg`, { type: 'image/jpeg' })
+          const uploaded = await uploadMediaWithProgress(file, 'proctor_snapshot', () => undefined)
+          await reportEventRef.current(attemptId, {
+            type: 'camera_snapshot',
+            level: 'info',
+            snapshot_url: `/api/v1/media/${uploaded.id}/content`,
+          })
+        } catch {
+          /* a failed snapshot never disturbs the exam */
+        }
+      }
+      timer = window.setInterval(() => void shoot(), interval * 1000)
+    }
+    void startSnapshots()
+    return () => {
+      stopped = true
+      window.clearInterval(timer)
+      stream?.getTracks().forEach((track) => track.stop())
+    }
+  }, [live, attemptId, rules?.snapshot_interval])
+
+  // ===== 水印（M-03）=====
+  const watermark = useMemo(
+    () =>
+      watermarkDataUrl([
+        userName,
+        state?.exam_title ?? '',
+        new Date().toLocaleString('zh-CN', { hour12: false }),
+      ]),
+    [userName, state?.exam_title],
+  )
+
+  const mobileBlocked = Boolean(rules?.restrict_mobile) && isMobileClient()
 
   useEffect(() => {
     if (!state) return
@@ -217,6 +410,23 @@ export default function AttemptPage() {
     )
   }
 
+  // 终端限制（C-12）：本场考试禁止移动端入场。
+  if (mobileBlocked) {
+    return (
+      <div>
+        <PageHeader title={state?.exam_title ?? '作答'} subtitle="本场考试仅允许电脑端作答。" />
+        <Card className="panel-card" variant="borderless">
+          <Result
+            status="warning"
+            title="请改用电脑浏览器入场"
+            subTitle="本场考试开启了终端限制：移动端 / 手机浏览器无法进入作答。请在电脑上使用 Chrome 或 Edge 打开本页面。"
+            extra={<Link to="/my/exams"><Button type="primary">返回我的考试</Button></Link>}
+          />
+        </Card>
+      </div>
+    )
+  }
+
   if (result) {
     return (
       <div>
@@ -247,7 +457,13 @@ export default function AttemptPage() {
   }
 
   return (
-    <div>
+    <div
+      onPaste={rules?.disable_paste ? (event) => event.preventDefault() : undefined}
+      className="attempt-page-shell"
+    >
+      {/* 考生水印（M-03） */}
+      <div className="attempt-watermark" style={{ backgroundImage: watermark }} aria-hidden="true" />
+
       <PageHeader
         title={state?.exam_title ?? '作答'}
         subtitle={`共 ${totalCount} 题 · 已作答 ${answeredCount} 题`}
@@ -256,12 +472,34 @@ export default function AttemptPage() {
             <Tag className={remaining !== null && remaining < 300 ? 'countdown countdown-danger' : 'countdown'}>
               剩余 {formatClock(remaining ?? 0)}
             </Tag>
+            {!document.fullscreenElement && (
+              <Button
+                icon={<ExpandOutlined />}
+                onClick={() => document.documentElement.requestFullscreen().catch(() => undefined)}
+              >
+                全屏作答
+              </Button>
+            )}
             <Button type="primary" icon={<FlagOutlined />} onClick={() => setConfirmOpen(true)}>
               交卷
             </Button>
           </Space>
         }
       />
+
+      {fullscreenHint && (
+        <Alert
+          className="page-alert"
+          type="warning"
+          showIcon
+          message="你已退出全屏，监考端会收到提示"
+          action={
+            <Button size="small" type="primary" onClick={() => document.documentElement.requestFullscreen().catch(() => undefined)}>
+              重新全屏
+            </Button>
+          }
+        />
+      )}
 
       <div className="attempt-layout">
         <Card className="panel-card" variant="borderless" title="题目导航" size="small">
@@ -273,30 +511,33 @@ export default function AttemptPage() {
                   {questions.map((question, index) => {
                     const answered = !isEmpty(question, answers[question.question_id] ?? {})
                     const active = question.question_id === currentId
+                    const flagged = flagSet.has(question.question_id)
                     return (
                       <Badge
                         key={question.question_id}
                         count={index + 1}
                         overflowCount={999}
                         color={
-                          active ? 'var(--app-primary)' : answered ? 'var(--app-success)' : '#E3E8EF'
+                          active ? 'var(--app-primary)' : flagged ? '#F59E0B' : answered ? 'var(--app-success)' : '#E3E8EF'
                         }
                         style={
                           active
                             ? { color: '#fff', fontWeight: 600, boxShadow: '0 0 0 2px #fff' }
-                            : answered
+                            : flagged || answered
                               ? { color: '#fff', fontWeight: 600, boxShadow: '0 0 0 2px #fff' }
                               : { color: 'var(--app-text-secondary)', fontWeight: 500, boxShadow: '0 0 0 2px #fff' }
                         }
                         offset={[0, 0]}
                       >
-                        <button
-                          type="button"
-                          className={active ? 'attempt-nav-slot attempt-nav-slot-active' : 'attempt-nav-slot'}
-                          aria-label={`第 ${index + 1} 题`}
-                          aria-current={active}
-                          onClick={() => setCurrentId(question.question_id)}
-                        />
+                        <Tooltip title={flagged ? '已标记待检查' : answered ? '已作答' : '未作答'}>
+                          <button
+                            type="button"
+                            className={active ? 'attempt-nav-slot attempt-nav-slot-active' : 'attempt-nav-slot'}
+                            aria-label={`第 ${index + 1} 题${flagged ? '，已标记待检查' : ''}`}
+                            aria-current={active}
+                            onClick={() => setCurrentId(question.question_id)}
+                          />
+                        </Tooltip>
                       </Badge>
                     )
                   })}
@@ -313,6 +554,15 @@ export default function AttemptPage() {
                 <Tag className="soft-tag">{questionTypeLabel(current.type)}</Tag>
                 <span className="cell-meta">本题 {current.score} 分</span>
                 <span className="cell-meta">{current.section}</span>
+                <Button
+                  type="text"
+                  size="small"
+                  className="attempt-flag-button"
+                  icon={flagSet.has(current.question_id) ? <PushpinFilled style={{ color: '#D98A26' }} /> : <PushpinOutlined />}
+                  onClick={() => toggleFlag(current.question_id)}
+                >
+                  {flagSet.has(current.question_id) ? '已标记待检查' : '标记待检查'}
+                </Button>
               </div>
               <p className="question-stem">{current.content?.stem}</p>
 
@@ -402,20 +652,15 @@ export default function AttemptPage() {
               )}
 
               {current.type === 'media' && (
-                <>
-                  <Alert
-                    className="page-alert"
-                    type="info"
-                    showIcon
-                    message="音视频上传通道尚未开放"
-                    description="当前阶段请将作答链接粘贴在下方，或按监考要求线下提交。"
-                  />
-                  <Input
-                    placeholder="作答链接（URL）"
-                    value={(answers[current.question_id]?.url as string) ?? ''}
-                    onChange={(event) => updateAnswer(current.question_id, { url: event.target.value })}
-                  />
-                </>
+                <MediaAnswer
+                  mode={current.content.mode === 'video' ? 'video' : 'audio'}
+                  prepareSeconds={current.content.prepare_seconds ?? 3}
+                  minSeconds={current.content.min_seconds ?? 5}
+                  maxSeconds={current.content.max_seconds ?? 180}
+                  retakeLimit={current.content.retake_limit ?? 1}
+                  value={answers[current.question_id] as { media_id?: string; duration_ms?: number }}
+                  onChange={(value) => updateAnswer(current.question_id, value)}
+                />
               )}
 
               <div className="attempt-footer">

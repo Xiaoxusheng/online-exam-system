@@ -85,6 +85,7 @@ type proctorEventRequest struct {
 	Type        string `json:"type"`
 	Level       string `json:"level"`
 	SnapshotURL string `json:"snapshot_url"`
+	Note        string `json:"note"`
 }
 
 func (a *API) handleCreateProctorEvent(w http.ResponseWriter, r *http.Request) {
@@ -102,6 +103,11 @@ func (a *API) handleCreateProctorEvent(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "事件类型不能为空且不超过 64 个字符")
 		return
 	}
+	req.Note = strings.TrimSpace(req.Note)
+	if utf8.RuneCountInString(req.Note) > 200 {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "事件备注不超过 200 字")
+		return
+	}
 	if req.Level == "" {
 		req.Level = "warning"
 	}
@@ -109,7 +115,7 @@ func (a *API) handleCreateProctorEvent(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "事件等级不正确")
 		return
 	}
-	event, err := a.store.CreateProctorEvent(r.Context(), claims.Subject, attemptID, req.Type, req.Level, strings.TrimSpace(req.SnapshotURL))
+	event, err := a.store.CreateProctorEventNote(r.Context(), claims.Subject, attemptID, req.Type, req.Level, strings.TrimSpace(req.SnapshotURL), req.Note)
 	if err != nil {
 		a.storeError(w, r, err, "答卷不存在或不在考试中")
 		return

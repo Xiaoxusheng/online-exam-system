@@ -40,6 +40,13 @@ type ProctorOverview struct {
 }
 
 func (s *Store) CreateProctorEvent(ctx context.Context, userID, attemptID, eventType, level, snapshotURL string) (ProctorEvent, error) {
+	return s.CreateProctorEventNote(ctx, userID, attemptID, eventType, level, snapshotURL, "")
+}
+
+// CreateProctorEventNote records one candidate-side event with a short note
+// (screen-switch counts, outage duration...). It re-validates ownership and
+// the in-progress state so replayed calls cannot forge history.
+func (s *Store) CreateProctorEventNote(ctx context.Context, userID, attemptID, eventType, level, snapshotURL, note string) (ProctorEvent, error) {
 	var examID string
 	err := s.pool.QueryRow(ctx, `
 		SELECT exam_id::text FROM attempts
@@ -53,9 +60,9 @@ func (s *Store) CreateProctorEvent(ctx context.Context, userID, attemptID, event
 
 	var eventID int64
 	err = s.pool.QueryRow(ctx, `
-		INSERT INTO proctor_events (exam_id, attempt_id, type, level, snapshot_url)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id`, examID, attemptID, eventType, level, snapshotURL).Scan(&eventID)
+		INSERT INTO proctor_events (exam_id, attempt_id, type, level, snapshot_url, note)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id`, examID, attemptID, eventType, level, snapshotURL, note).Scan(&eventID)
 	if err != nil {
 		return ProctorEvent{}, fmt.Errorf("create proctor event: %w", err)
 	}

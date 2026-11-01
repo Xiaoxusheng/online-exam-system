@@ -1898,3 +1898,27 @@ body {
   border: 1px solid var(--app-line, #e3e8f2);
   padding: 4px;
 }
+
+/* ===== 考生端：水印 / 标记待检查 / 音视频作答 ===== */
+.attempt-page-shell { position: relative; }
+.attempt-watermark {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  background-repeat: repeat;
+}
+.attempt-flag-button { margin-left: auto; }
+.media-answer { display: flex; flex-direction: column; gap: 12px; }
+.media-answer-status { align-items: center; }
+.media-answer-video {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border: 1px dashed var(--app-line, #e3e8f2);
+  border-radius: 8px;
+  color: var(--app-text-secondary, #55555e);
+}
+.media-answer-preview video,
+.media-answer-preview audio { display: block; width: 100%; max-width: 480px; border-radius: 8px; }

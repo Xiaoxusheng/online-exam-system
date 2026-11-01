@@ -187,6 +187,10 @@ export interface ExamRules {
   anonymous_review?: boolean
   review_mode?: 'single' | 'double'
   review_threshold?: number
+  restrict_mobile?: boolean
+  disable_paste?: boolean
+  screen_switch_limit?: number
+  snapshot_interval?: number
 }
 
 export interface Exam {
@@ -253,6 +257,13 @@ export interface AttemptQuestion {
   answer_version: number
 }
 
+export interface AttemptRules {
+  disable_paste: boolean
+  restrict_mobile: boolean
+  screen_switch_limit: number
+  snapshot_interval: number
+}
+
 export interface AttemptState {
   attempt_id: string
   exam_id: string
@@ -267,6 +278,7 @@ export interface AttemptState {
   questions: AttemptQuestion[]
   score: number | null
   pending_review: number
+  rules: AttemptRules
 }
 
 export interface SubmitResult {

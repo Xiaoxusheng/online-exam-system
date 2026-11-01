@@ -16,6 +16,7 @@ import { examStatusLabels, proctorActionLabels, proctorEventTypeLabel, proctorLe
 import { formatDateTime, formatTime } from '../../utils/format'
 import { errorText } from '../../utils/errors'
 import type { ProctorEvent, RealtimeEvent } from '../../types'
+import RoomPicker from './RoomPicker'
 
 const statusLabels: Record<SocketStatus, { label: string; status: 'success' | 'processing' | 'default' | 'error' }> = {
   open: { label: '实时连接', status: 'success' },
@@ -176,13 +177,13 @@ export default function ProctorPage() {
       />
 
       {!examId ? (
-        <Card className="panel-card" variant="borderless">
-          <EmptyState
-            icon={<SafetyCertificateOutlined />}
-            title="请选择要监考的考试"
-            description="列表包含进行中的考试，以及分配给你的考场。"
-          />
-        </Card>
+        <RoomPicker
+          rooms={rooms}
+          loading={roomsQuery.isPending}
+          error={roomsQuery.error}
+          onRetry={() => roomsQuery.refetch()}
+          onPick={setExamId}
+        />
       ) : (
         <>
           <QueryError error={roomsQuery.error} onRetry={() => roomsQuery.refetch()} />

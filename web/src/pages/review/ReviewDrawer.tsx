@@ -7,6 +7,7 @@ import type { ReviewSubmitResult } from '../../types'
 import QueryError from '../../components/QueryError'
 import { CandidateAnswer, QuestionContent, ReferenceAnswer } from '../../components/QuestionView'
 import { getReviewQueue, getReviewTask, submitReview } from '../../api/review'
+import MediaScorePanel from './MediaScorePanel'
 import { queryKeys } from '../../api/queryKeys'
 import { formatScore } from '../../utils/format'
 import { errorText } from '../../utils/errors'
@@ -201,6 +202,15 @@ export default function ReviewDrawer({ taskId, status, onClose, onNavigate }: Pr
           {detail.status !== 'submitted' && (
           <div className="review-block">
             <h4>本轮评分</h4>
+            {detail.question.type === 'media' && Array.isArray(detail.question.content?.dimensions) && detail.question.content.dimensions.length > 0 && (
+              <div className="review-block" style={{ marginBottom: 12 }}>
+                <MediaScorePanel
+                  dimensions={detail.question.content.dimensions}
+                  maxScore={maxScore}
+                  onScore={(value) => setScore(value)}
+                />
+              </div>
+            )}
             <div className="quick-scores">
               {quickScores.map((value) => (
                 <Button key={value} size="small" type={score === value ? 'primary' : 'default'} onClick={() => setScore(value)}>

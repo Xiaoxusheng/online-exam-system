@@ -30,6 +30,10 @@ interface CreateFormValues {
   review_threshold?: number
   class_ids?: string[]
   student_ids?: string[]
+  restrict_mobile?: boolean
+  disable_paste?: boolean
+  screen_switch_limit?: number
+  snapshot_interval?: number
 }
 
 export default function ExamsPage() {
@@ -106,6 +110,10 @@ export default function ExamsPage() {
         anonymous_review: values.anonymous_review,
         review_mode: values.review_mode,
         review_threshold: values.review_mode === 'double' ? values.review_threshold : undefined,
+        restrict_mobile: values.restrict_mobile ?? false,
+        disable_paste: values.disable_paste ?? false,
+        screen_switch_limit: values.screen_switch_limit ?? 5,
+        snapshot_interval: values.snapshot_interval ?? 0,
       },
       class_ids: values.class_ids ?? [],
       candidates: (values.student_ids ?? []).map((id) => ({ user_id: id })),
@@ -341,6 +349,48 @@ export default function ExamsPage() {
                           <InputNumber min={0} max={100} step={0.5} style={{ width: '100%' }} />
                         </Form.Item>
                       )}
+                    </div>
+                  </>
+                ),
+              },
+              {
+                key: 'proctor',
+                title: '监考与防作弊',
+                children: (
+                  <>
+                    <div className="form-grid">
+                      <Form.Item
+                        name="restrict_mobile"
+                        label="仅限电脑作答"
+                        valuePropName="checked"
+                        tooltip="开启后移动端 / 手机浏览器无法进入本场考试（严肃考试建议开启）"
+                      >
+                        <Switch />
+                      </Form.Item>
+                      <Form.Item
+                        name="disable_paste"
+                        label="禁止粘贴"
+                        valuePropName="checked"
+                        tooltip="开启后作答页无法粘贴内容"
+                      >
+                        <Switch />
+                      </Form.Item>
+                    </div>
+                    <div className="form-grid">
+                      <Form.Item
+                        name="screen_switch_limit"
+                        label="切屏告警阈值（次）"
+                        extra="考生离开作答页面达到该次数时弹出警告并推送监考端，0 为不限制"
+                      >
+                        <InputNumber min={0} max={50} style={{ width: '100%' }} />
+                      </Form.Item>
+                      <Form.Item
+                        name="snapshot_interval"
+                        label="摄像头抓拍间隔（秒）"
+                        extra="0 为不抓拍；开启后考生授权摄像头，每间隔自动上传一帧供监考取证"
+                      >
+                        <InputNumber min={0} max={600} step={5} style={{ width: '100%' }} />
+                      </Form.Item>
                     </div>
                   </>
                 ),

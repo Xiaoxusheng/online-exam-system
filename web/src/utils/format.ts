@@ -21,6 +21,16 @@ export function formatTime(value?: string | null): string {
   return parsed.isValid() ? parsed.format('HH:mm:ss') : '—'
 }
 
+/** 起止区间：同一天 `11-01 14:00 ~ 17:00`，跨天补全两侧日期。 */
+export function formatTimeRange(start?: string | null, end?: string | null): string {
+  const s = dayjs(start)
+  const e = dayjs(end)
+  if (!s.isValid() || !e.isValid()) return '—'
+  return s.isSame(e, 'day')
+    ? `${s.format('MM-DD HH:mm')} ~ ${e.format('HH:mm')}`
+    : `${s.format('MM-DD HH:mm')} ~ ${e.format('MM-DD HH:mm')}`
+}
+
 export function formatScore(value?: number | null, digits = 2): string {
   if (value === undefined || value === null || Number.isNaN(value)) return '—'
   return value.toFixed(digits)

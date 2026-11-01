@@ -39,6 +39,39 @@ type AttemptState struct {
 	Questions        []AttemptQuestion `json:"questions"`
 	Score            *float64          `json:"score"`
 	PendingReview    int               `json:"pending_review"`
+	// Rules is the candidate-visible subset of exam rules (anti-cheat toggles);
+	// grading or staffing fields never reach this payload.
+	Rules AttemptRules `json:"rules"`
+}
+
+// AttemptRules mirrors the exam rules a candidate client acts on.
+type AttemptRules struct {
+	DisablePaste      bool `json:"disable_paste"`
+	RestrictMobile    bool `json:"restrict_mobile"`
+	ScreenSwitchLimit int  `json:"screen_switch_limit"`
+	SnapshotInterval  int  `json:"snapshot_interval"`
+}
+
+// ParseAttemptRules extracts the candidate-visible subset; zero values keep
+// existing exams unaffected (no paste block, no mobile restriction, snapshots off).
+func ParseAttemptRules(raw json.RawMessage) AttemptRules {
+	var source struct {
+		DisablePaste      *bool `json:"disable_paste"`
+		RestrictMobile    *bool `json:"restrict_mobile"`
+		ScreenSwitchLimit *int  `json:"screen_switch_limit"`
+		SnapshotInterval  *int  `json:"snapshot_interval"`
+	}
+	_ = json.Unmarshal(raw, &source)
+	rules := AttemptRules{ScreenSwitchLimit: 5}
+	if source.ScreenSwitchLimit != nil && *source.ScreenSwitchLimit >= 0 {
+		rules.ScreenSwitchLimit = *source.ScreenSwitchLimit
+	}
+	if source.SnapshotInterval != nil && *source.SnapshotInterval >= 0 {
+		rules.SnapshotInterval = *source.SnapshotInterval
+	}
+	rules.DisablePaste = source.DisablePaste != nil && *source.DisablePaste
+	rules.RestrictMobile = source.RestrictMobile != nil && *source.RestrictMobile
+	return rules
 }
 
 type SubmitResult struct {
@@ -240,6 +273,7 @@ func (s *Store) GetAttemptState(ctx context.Context, userID, attemptID string) (
 		RemainingSeconds: remaining,
 		Questions:        []AttemptQuestion{},
 		Score:            row.Score,
+		Rules:            ParseAttemptRules(row.Rules),
 	}
 	state.TotalScore = snapshot.TotalFor(row.PaperGroup)
 	if !showScore(row.Rules) && row.Status != "published" {
