@@ -2,6 +2,31 @@
 
 > 唯一计划/进度文件。后续任务在本文件追加或更新，不新建任务文档。
 
+## v2.0 线上部署（2026-11-01 完成）
+
+- 部署内容：v2.0「墨砚」视觉重塑的前端产物（提交 `3e82e6f`），线上 `http://118.25.50.65:80`。
+- 范围：纯前端。后端二进制、数据库迁移均无变更，未重启服务、未执行迁移、未向生产库写入任何数据。
+
+### 部署流程（与 v1.3 相同）
+
+1. 本地构建：`npm run typecheck` + `npm run build`，产物 `web/dist` 33 个文件 / 1.8 MB。
+2. 上传：scp 到 `/opt/online-exam/incoming/web-v20-20261101-194513/`，服务器端校验文件数与 `index.html` 引用的 5 个资源哈希（`index-D9ON25zC.js`、`antd-vendor-DF1vQ1ZH.js`、`data-vendor-Bx1eZ4jq.js`、`react-vendor-DCmA1e8Y.js`、`index-x8WjBGni.css`）。
+3. 原子切换：旧版 v1.3 备份为 `web.prev`，`mv web web.old && mv web.new web` 换名切换后删除 `web.old`，清空 `incoming/`。切换窗口内目录始终完整。
+4. 静态服务每次读盘且 `index.html` 为 no-cache，替换即生效，未重启 systemd。
+
+### 复验结果（只读，未写生产库）
+
+- `/healthz` 200、SPA 首页 200 且已引用 v2.0 的 `index-D9ON25zC.js`、深层路由 `/questions` 回落 200、新 JS/CSS 资源 200、未登录访问导入模板 401。
+- 无头浏览器：登录页渲染 ✓、品牌区渲染 ✓、`body` 背景为纯白 `rgb(255,255,255)`、控制台零报错；截图 `_diag/ui_shots_live_v20/live_login_v20.png`。未做登录尝试（避免触发登录限流）。
+
+### 回滚
+
+旧版 v1.3 保留在 `/opt/online-exam/web.prev`。回滚命令：
+
+```bash
+cd /opt/online-exam && mv web web.failed && mv web.prev web
+```
+
 ## v2.0「墨砚」视觉重塑（2026-11-01 完成）
 
 - 背景：用户要求「做前端，要现代，高级」。当时工作区 `web/` 目录已被整体删除（未提交），从 git HEAD 恢复 v1.3 底座（API 封装、路由权限、页面逻辑均验证过），视觉层全部推倒重做。
