@@ -206,6 +206,12 @@ func (s *Store) PublishScores(ctx context.Context, orgID, examID string) (int64,
 			AND a.exam_id = $1
 			AND a.status = 'graded'
 			AND sr.status = 'pending'
+			AND sr.id = (
+				SELECT latest.id FROM score_records latest
+				WHERE latest.attempt_id = sr.attempt_id
+				ORDER BY latest.created_at DESC, latest.id DESC
+				LIMIT 1
+			)
 		RETURNING a.user_id::text, sr.total::float8`, examID)
 	if err != nil {
 		return 0, fmt.Errorf("publish score records: %w", err)
@@ -223,6 +229,18 @@ func (s *Store) PublishScores(ctx context.Context, orgID, examID string) (int64,
 		return 0, fmt.Errorf("iterate published scores: %w", err)
 	}
 	rows.Close()
+
+	// Older records of the same answer sheet were superseded by a score correction; keep
+	// them out of the pending queue so a later publish run cannot resurrect them.
+	if _, err := tx.Exec(ctx, `
+		UPDATE score_records sr SET status = 'corrected'
+		FROM attempts a
+		WHERE sr.attempt_id = a.id
+			AND a.exam_id = $1
+			AND a.status = 'graded'
+			AND sr.status = 'pending'`, examID); err != nil {
+		return 0, fmt.Errorf("supersede corrected score records: %w", err)
+	}
 
 	if len(published) == 0 {
 		var alreadyPublished int64

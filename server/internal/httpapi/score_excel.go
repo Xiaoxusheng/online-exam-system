@@ -52,6 +52,7 @@ func (a *API) handleScoreExport(w http.ResponseWriter, r *http.Request) {
 		Rows:    values,
 		Widths:  []float64{6, 14, 16, 14, 16, 18, 10, 8, 8, 8, 10, 12, 12, 18, 18, 18, 10, 26},
 	}
+	judged := judgedRows(rows)
 	summary := excel.Sheet{
 		Name:    "汇总",
 		Headers: []string{"指标", "数值"},
@@ -62,13 +63,14 @@ func (a *API) handleScoreExport(w http.ResponseWriter, r *http.Request) {
 			{"满分", meta.TotalScore},
 			{"及格线", meta.PassScore},
 			{"导出人数", len(values)},
-			{"平均分", averageScore(rows)},
-			{"最高分", extremeScore(rows, true)},
-			{"最低分", extremeScore(rows, false)},
-			{"及格人数", countPassed(rows)},
+			{"已判分人数", len(judged)},
+			{"平均分", averageScore(judged)},
+			{"最高分", extremeScore(judged, true)},
+			{"最低分", extremeScore(judged, false)},
+			{"及格人数", countPassed(judged)},
 			{"导出时间", time.Now().Format("2006-01-02 15:04:05")},
 			{"导出账号", exportActor(r.Context()).Username},
-			{"说明", "本表由系统导出，仅供教学管理使用，请勿外传"},
+			{"说明", "统计口径仅含已判分答卷；本表由系统导出，仅供教学管理使用，请勿外传"},
 		},
 	}
 	content, err := excel.Build([]excel.Sheet{sheet, summary})
@@ -123,11 +125,30 @@ func durationText(startedAt time.Time, submittedAt *time.Time) string {
 	if submittedAt == nil {
 		return ""
 	}
-	minutes := int(submittedAt.Sub(startedAt).Minutes())
-	if minutes < 0 {
+	elapsed := submittedAt.Sub(startedAt).Round(time.Second)
+	if elapsed < 0 {
 		return ""
 	}
-	return fmt.Sprintf("%d分%02d秒", minutes/60, minutes%60)
+	hours := int(elapsed.Hours())
+	minutes := int(elapsed.Minutes()) % 60
+	seconds := int(elapsed.Seconds()) % 60
+	if hours > 0 {
+		return fmt.Sprintf("%d时%02d分%02d秒", hours, minutes, seconds)
+	}
+	return fmt.Sprintf("%d分%02d秒", minutes, seconds)
+}
+
+// judgedRows keeps only answer sheets that finished grading. A sheet still waiting for
+// manual review only carries its objective score, so counting it would drag the average,
+// the extremes and the pass count below their real values.
+func judgedRows(rows []store.ScoreExportRow) []store.ScoreExportRow {
+	judged := make([]store.ScoreExportRow, 0, len(rows))
+	for _, item := range rows {
+		if item.AttemptState == "graded" || item.AttemptState == "published" {
+			judged = append(judged, item)
+		}
+	}
+	return judged
 }
 
 func averageScore(rows []store.ScoreExportRow) float64 {

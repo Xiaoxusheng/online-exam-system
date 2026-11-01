@@ -201,7 +201,9 @@ func (s *Store) AdjustScore(ctx context.Context, scope Scope, attemptID, reason 
 
 // ListScoreAdjustments returns the correction history of one attempt inside the caller's scope.
 func (s *Store) ListScoreAdjustments(ctx context.Context, scope Scope, attemptID string) ([]ScoreAdjustment, error) {
-	scopeSQL, scopeArgs := scope.peopleFilter("u", 3)
+	// The scope applies to the candidate (u2), not to the operator who filed the
+	// correction; filtering on the operator hid every record from class/self scopes.
+	scopeSQL, scopeArgs := scope.peopleFilter("u2", 3)
 	args := append([]any{attemptID, scope.OrgID}, scopeArgs...)
 	rows, err := s.pool.Query(ctx, `
 		SELECT sa.id::text, sa.attempt_id::text, sa.before_total::float8, sa.after_total::float8, sa.reason,
