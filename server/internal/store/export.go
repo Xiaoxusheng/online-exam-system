@@ -140,12 +140,13 @@ type ScoreExportRow struct {
 // ListScoresForExport returns every graded attempt of one exam inside the caller's data scope.
 func (s *Store) ListScoresForExport(ctx context.Context, scope Scope, examID string) ([]ScoreExportRow, ExamExportMeta, error) {
 	var meta ExamExportMeta
+	var paperTotal float64
 	var rulesRaw []byte
 	err := s.pool.QueryRow(ctx, `
-		SELECT e.title, p.title, e.rules
+		SELECT e.title, p.title, p.total_score::float8, e.rules
 		FROM exams e JOIN papers p ON p.id = e.paper_id
 		WHERE e.id = $1::uuid AND e.org_id = $2`, examID, scope.OrgID).
-		Scan(&meta.ExamTitle, &meta.PaperTitle, &rulesRaw)
+		Scan(&meta.ExamTitle, &meta.PaperTitle, &paperTotal, &rulesRaw)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ExamExportMeta{}, ErrNotFound
@@ -153,11 +154,16 @@ func (s *Store) ListScoresForExport(ctx context.Context, scope Scope, examID str
 		return nil, ExamExportMeta{}, fmt.Errorf("load exam for export: %w", err)
 	}
 	// The paper row sums every group, so the reachable full score comes from the snapshot.
+	// An exam that was never published has no snapshot yet and falls back to the paper total.
 	snapshot, err := s.GetSnapshot(ctx, examID)
-	if err != nil {
+	switch {
+	case err == nil:
+		meta.TotalScore = snapshot.DisplayTotal()
+	case errors.Is(err, ErrNotFound):
+		meta.TotalScore = paperTotal
+	default:
 		return nil, ExamExportMeta{}, err
 	}
-	meta.TotalScore = snapshot.DisplayTotal()
 	meta.PassScore = passScoreOf(rulesRaw, meta.TotalScore)
 
 	scopeSQL, scopeArgs := scope.peopleFilter("u", 3)
