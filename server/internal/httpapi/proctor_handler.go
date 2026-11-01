@@ -6,14 +6,14 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"online-exam-system/server/internal/auth"
 	"online-exam-system/server/internal/store"
 )
 
 // canWatchExam enforces the proctor data scope: exam administrators see every exam of
-// the organization, proctors only the rooms they were assigned to.
-func (a *API) canWatchExam(w http.ResponseWriter, r *http.Request, claims *auth.Claims, examID string) bool {
-	switch claims.Role {
+// the organization, proctors only the rooms they were assigned to. The account passed in
+// is the one reloaded for this request, never the role baked into the token.
+func (a *API) canWatchExam(w http.ResponseWriter, r *http.Request, actor store.User, examID string) bool {
+	switch actor.Role {
 	case "org_admin", "exam_admin":
 		return true
 	case "proctor":
@@ -21,7 +21,7 @@ func (a *API) canWatchExam(w http.ResponseWriter, r *http.Request, claims *auth.
 		apiError(w, http.StatusForbidden, "FORBIDDEN", "无权访问该考场")
 		return false
 	}
-	allowed, err := a.store.CanProctorExam(r.Context(), claims.OrgID, examID, claims.Subject)
+	allowed, err := a.store.CanProctorExam(r.Context(), actor.OrgID, examID, actor.ID)
 	if err != nil {
 		a.storeError(w, r, err, "考试不存在")
 		return false
@@ -34,8 +34,8 @@ func (a *API) canWatchExam(w http.ResponseWriter, r *http.Request, claims *auth.
 }
 
 func (a *API) handleProctorRooms(w http.ResponseWriter, r *http.Request) {
-	claims, _ := claimsFrom(r.Context())
-	rooms, err := a.store.ListProctorRooms(r.Context(), claims.OrgID, claims.Subject, claims.Role != "proctor")
+	actor, _ := actorFrom(r.Context())
+	rooms, err := a.store.ListProctorRooms(r.Context(), actor.OrgID, actor.ID, actor.Role != "proctor")
 	if err != nil {
 		a.storeError(w, r, err, "暂无可监考的考试")
 		return
@@ -45,11 +45,12 @@ func (a *API) handleProctorRooms(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleProctorOverview(w http.ResponseWriter, r *http.Request) {
 	claims, _ := claimsFrom(r.Context())
+	actor, _ := actorFrom(r.Context())
 	examID, ok := parseUUIDParam(w, pathParam(r, "examId"), "考试 ID")
 	if !ok {
 		return
 	}
-	if !a.canWatchExam(w, r, claims, examID) {
+	if !a.canWatchExam(w, r, actor, examID) {
 		return
 	}
 	overview, err := a.store.GetProctorOverview(r.Context(), claims.OrgID, examID)
@@ -62,11 +63,12 @@ func (a *API) handleProctorOverview(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleListProctorEvents(w http.ResponseWriter, r *http.Request) {
 	claims, _ := claimsFrom(r.Context())
+	actor, _ := actorFrom(r.Context())
 	examID, ok := parseUUIDParam(w, pathParam(r, "examId"), "考试 ID")
 	if !ok {
 		return
 	}
-	if !a.canWatchExam(w, r, claims, examID) {
+	if !a.canWatchExam(w, r, actor, examID) {
 		return
 	}
 	page, pageSize := pagination(r)
@@ -90,6 +92,7 @@ type handleProctorEventRequest struct {
 
 func (a *API) handleHandleProctorEvent(w http.ResponseWriter, r *http.Request) {
 	claims, _ := claimsFrom(r.Context())
+	actor, _ := actorFrom(r.Context())
 	eventID, err := strconv.ParseInt(pathParam(r, "eventId"), 10, 64)
 	if err != nil {
 		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "事件 ID 格式不正确")
@@ -100,7 +103,7 @@ func (a *API) handleHandleProctorEvent(w http.ResponseWriter, r *http.Request) {
 		a.storeError(w, r, err, "监考事件不存在")
 		return
 	}
-	if !a.canWatchExam(w, r, claims, examID) {
+	if !a.canWatchExam(w, r, actor, examID) {
 		return
 	}
 	var req handleProctorEventRequest

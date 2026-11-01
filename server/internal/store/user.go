@@ -11,28 +11,29 @@ import (
 )
 
 type User struct {
-	ID          string
-	OrgID       string
-	Name        string
-	Username    string
-	Phone       string
-	Email       string
-	Role        string
-	DataScope   string
-	Status      string
-	CampusID    *string
-	ClassID     *string
-	LastLoginAt *time.Time
-	CreatedAt   time.Time
+	ID            string
+	OrgID         string
+	Name          string
+	Username      string
+	Phone         string
+	Email         string
+	Role          string
+	DataScope     string
+	Status        string
+	CampusID      *string
+	ClassID       *string
+	LastLoginAt   *time.Time
+	CreatedAt     time.Time
+	SecurityStamp time.Time
 }
 
 const userColumns = `id::text, org_id::text, name, username, phone, email, role, data_scope, status,
-	campus_id::text, class_id::text, last_login_at, created_at`
+	campus_id::text, class_id::text, last_login_at, created_at, security_stamp`
 
 func userScanDest(u *User) []any {
 	return []any{
 		&u.ID, &u.OrgID, &u.Name, &u.Username, &u.Phone, &u.Email, &u.Role, &u.DataScope,
-		&u.Status, &u.CampusID, &u.ClassID, &u.LastLoginAt, &u.CreatedAt,
+		&u.Status, &u.CampusID, &u.ClassID, &u.LastLoginAt, &u.CreatedAt, &u.SecurityStamp,
 	}
 }
 
@@ -203,6 +204,7 @@ func (s *Store) UpdateUser(ctx context.Context, orgID, userID string, p UpdateUs
 	if err != nil {
 		return User{}, err
 	}
+	originalRole, originalScope, originalStatus := u.Role, u.DataScope, u.Status
 
 	if p.Name != nil {
 		u.Name = *p.Name
@@ -238,18 +240,42 @@ func (s *Store) UpdateUser(ctx context.Context, orgID, userID string, p UpdateUs
 	if p.PasswordHash != nil {
 		passwordHash = *p.PasswordHash
 	}
+	// Role, scope, status and password changes must invalidate every token issued before
+	// now; otherwise a demoted or reset account keeps its old privileges for up to 8h.
+	securityChanged := passwordHash != "" ||
+		u.Role != originalRole || u.DataScope != originalScope || u.Status != originalStatus
 	_, err = s.pool.Exec(ctx, `
 		UPDATE users
 		SET name = $1, phone = $2, email = $3, role = $4, data_scope = $5, status = $6,
 			campus_id = NULLIF($7, '')::uuid, class_id = NULLIF($8, '')::uuid,
-			password_hash = COALESCE(NULLIF($9, ''), password_hash)
+			password_hash = COALESCE(NULLIF($9, ''), password_hash),
+			security_stamp = CASE WHEN $12::boolean THEN now() ELSE security_stamp END
 		WHERE id = $10 AND org_id = $11`,
 		u.Name, u.Phone, u.Email, u.Role, u.DataScope, u.Status, campusID, classID, passwordHash, userID, orgID,
+		securityChanged,
 	)
 	if err != nil {
 		return User{}, fmt.Errorf("update user: %w", mapUniqueViolation(err))
 	}
+	if u.Status != "active" {
+		// A disabled reviewer would otherwise keep tasks that only the assigned reviewer
+		// may submit, which blocks their answer sheets from ever becoming graded.
+		if _, err := s.pool.Exec(ctx, `
+			UPDATE review_tasks SET reviewer_id = NULL, status = 'pending', updated_at = now()
+			WHERE reviewer_id = $1::uuid AND status IN ('pending', 'in_progress')`, userID); err != nil {
+			return User{}, fmt.Errorf("release review tasks of disabled user: %w", err)
+		}
+	}
 	return s.FindUserInOrg(ctx, orgID, userID)
+}
+
+// BumpSecurityStamp invalidates every access token issued before now for one account.
+// Logout uses it so the 8h access token dies with the session instead of outliving it.
+func (s *Store) BumpSecurityStamp(ctx context.Context, userID string) error {
+	if _, err := s.pool.Exec(ctx, `UPDATE users SET security_stamp = now() WHERE id = $1::uuid`, userID); err != nil {
+		return fmt.Errorf("bump security stamp: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) validateMembership(ctx context.Context, orgID, campusID, classID string) error {

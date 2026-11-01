@@ -143,6 +143,13 @@ func (a *API) resolveAuth(w http.ResponseWriter, r *http.Request) (*auth.Claims,
 		apiError(w, http.StatusForbidden, "ACCOUNT_DISABLED", "账号已停用，请联系管理员")
 		return nil, store.User{}, false
 	}
+	// A token issued before the account's security stamp is dead: role, data scope,
+	// password and status changes, plus logout, all bump the stamp. One second of
+	// tolerance absorbs the JWT timestamp's whole-second precision.
+	if claims.IssuedAt == nil || claims.IssuedAt.Time.Add(time.Second).Before(actor.SecurityStamp) {
+		apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "登录状态已失效，请重新登录")
+		return nil, store.User{}, false
+	}
 	return claims, actor, true
 }
 
@@ -165,16 +172,18 @@ func (a *API) requireRoles(roles ...string) func(http.Handler) http.Handler {
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			claims, ok := claimsFrom(r.Context())
+			// Authorize against the freshly loaded account, never the role baked into the
+			// token: a demoted user would otherwise keep their old role for up to 8h.
+			actor, ok := actorFrom(r.Context())
 			if !ok {
 				apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "请先登录")
 				return
 			}
-			if claims.Role == "org_admin" {
+			if actor.Role == "org_admin" {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if _, ok := allowed[claims.Role]; !ok {
+			if _, ok := allowed[actor.Role]; !ok {
 				apiError(w, http.StatusForbidden, "FORBIDDEN", "无权访问该资源")
 				return
 			}
@@ -186,6 +195,11 @@ func (a *API) requireRoles(roles ...string) func(http.Handler) http.Handler {
 func claimsFrom(ctx context.Context) (*auth.Claims, bool) {
 	claims, ok := ctx.Value(claimsKey).(*auth.Claims)
 	return claims, ok
+}
+
+func actorFrom(ctx context.Context) (store.User, bool) {
+	actor, ok := ctx.Value(actorKey).(store.User)
+	return actor, ok
 }
 
 // scopeFrom builds the caller's data scope from the freshly loaded account.

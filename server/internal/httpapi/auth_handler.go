@@ -269,6 +269,11 @@ func (a *API) handleLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if claims != nil {
+		// Logout must end the session, not just forget the refresh token: bumping the
+		// stamp kills the 8h access token the browser just dropped as well.
+		if err := a.store.BumpSecurityStamp(r.Context(), claims.Subject); err != nil {
+			a.log.Warn("bump security stamp on logout failed", "error", err)
+		}
 		a.audit(r, store.AuditEntry{
 			OrgID:      claims.OrgID,
 			ActorID:    claims.Subject,

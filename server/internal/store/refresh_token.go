@@ -53,6 +53,11 @@ func (s *Store) RotateRefreshToken(ctx context.Context, oldHash, newHash, userAg
 			WHERE user_id = $1::uuid AND revoked_at IS NULL`, row.UserID); err != nil {
 			return RefreshToken{}, fmt.Errorf("revoke reused token family: %w", err)
 		}
+		// Reuse means the token family is compromised, so the live access token must die
+		// too instead of staying valid until its own expiry.
+		if _, err := tx.Exec(ctx, `UPDATE users SET security_stamp = now() WHERE id = $1::uuid`, row.UserID); err != nil {
+			return RefreshToken{}, fmt.Errorf("bump security stamp on token reuse: %w", err)
+		}
 		if err := tx.Commit(ctx); err != nil {
 			return RefreshToken{}, fmt.Errorf("commit reuse revocation: %w", err)
 		}

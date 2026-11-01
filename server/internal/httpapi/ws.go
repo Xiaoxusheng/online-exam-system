@@ -187,10 +187,26 @@ func (a *API) handleProctorWebSocket(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", message)
 		return
 	}
-	if !a.canWatchExam(w, r, claims, examID) {
+	// This route sits outside the authenticate middleware, so it has to reload the
+	// account and honour the security stamp itself. Otherwise a disabled or demoted
+	// proctor keeps a live feed for as long as an old token lasts.
+	actor, err := a.store.FindUserByID(r.Context(), claims.Subject)
+	if err != nil {
+		apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "登录状态已失效，请重新登录")
 		return
 	}
-	exam, err := a.store.GetExam(r.Context(), claims.OrgID, examID)
+	if actor.Status != "active" {
+		apiError(w, http.StatusForbidden, "ACCOUNT_DISABLED", "账号已停用，请联系管理员")
+		return
+	}
+	if claims.IssuedAt == nil || claims.IssuedAt.Time.Add(time.Second).Before(actor.SecurityStamp) {
+		apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "登录状态已失效，请重新登录")
+		return
+	}
+	if !a.canWatchExam(w, r, actor, examID) {
+		return
+	}
+	exam, err := a.store.GetExam(r.Context(), actor.OrgID, examID)
 	if err != nil {
 		a.storeError(w, r, err, "考试不存在")
 		return
@@ -201,9 +217,9 @@ func (a *API) handleProctorWebSocket(w http.ResponseWriter, r *http.Request) {
 		a.log.Warn("websocket upgrade failed", "error", err, "exam_id", examID)
 		return
 	}
-	client := &proctorClient{conn: conn, examID: examID, userID: claims.Subject, send: make(chan []byte, wsSendBuffer)}
+	client := &proctorClient{conn: conn, examID: examID, userID: actor.ID, send: make(chan []byte, wsSendBuffer)}
 	if !a.hub.join(client) {
-		a.log.Warn("proctor room full", "exam_id", examID, "user_id", claims.Subject)
+		a.log.Warn("proctor room full", "exam_id", examID, "user_id", actor.ID)
 		_ = conn.WriteControl(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseTryAgainLater, "监考房间连接数已达上限"),
 			time.Now().Add(wsWriteWait))
@@ -211,7 +227,7 @@ func (a *API) handleProctorWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.log.Info("proctor websocket connected",
-		"exam_id", examID, "exam_title", exam.Title, "user_id", claims.Subject, "role", claims.Role)
+		"exam_id", examID, "exam_title", exam.Title, "user_id", actor.ID, "role", actor.Role)
 
 	hello, err := json.Marshal(map[string]any{
 		"type": "connected",

@@ -5,26 +5,26 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"online-exam-system/server/internal/auth"
 	"online-exam-system/server/internal/store"
 )
 
 // reviewScope returns the reviewer id to filter by. Plain reviewers only see their own
-// (plus unassigned) tasks; exam administrators and org admins see the whole pool.
-func reviewScope(claims *auth.Claims) string {
-	if claims.Role == "reviewer" {
-		return claims.Subject
+// (plus unassigned) tasks; exam administrators and org admins see the whole pool. The
+// account is the one reloaded for this request, so a role change applies immediately.
+func reviewScope(actor store.User) string {
+	if actor.Role == "reviewer" {
+		return actor.ID
 	}
 	return ""
 }
 
 func (a *API) handleListReviewTasks(w http.ResponseWriter, r *http.Request) {
-	claims, _ := claimsFrom(r.Context())
+	actor, _ := actorFrom(r.Context())
 	page, pageSize := pagination(r)
 	filter := store.ReviewFilter{
 		Status:     strings.TrimSpace(r.URL.Query().Get("status")),
 		ExamID:     strings.TrimSpace(r.URL.Query().Get("exam_id")),
-		ReviewerID: reviewScope(claims),
+		ReviewerID: reviewScope(actor),
 		Page:       page,
 		PageSize:   pageSize,
 	}
@@ -33,7 +33,7 @@ func (a *API) handleListReviewTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	tasks, total, err := a.store.ListReviewTasks(r.Context(), claims.OrgID, filter)
+	tasks, total, err := a.store.ListReviewTasks(r.Context(), actor.OrgID, filter)
 	if err != nil {
 		a.storeError(w, r, err, "阅卷任务不存在")
 		return
@@ -42,12 +42,12 @@ func (a *API) handleListReviewTasks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) handleGetReviewTask(w http.ResponseWriter, r *http.Request) {
-	claims, _ := claimsFrom(r.Context())
+	actor, _ := actorFrom(r.Context())
 	taskID, ok := parseUUIDParam(w, pathParam(r, "id"), "阅卷任务 ID")
 	if !ok {
 		return
 	}
-	task, err := a.store.GetReviewTaskDetail(r.Context(), claims.OrgID, taskID, reviewScope(claims))
+	task, err := a.store.GetReviewTaskDetail(r.Context(), actor.OrgID, taskID, reviewScope(actor))
 	if err != nil {
 		a.storeError(w, r, err, "阅卷任务不存在")
 		return
@@ -58,7 +58,7 @@ func (a *API) handleGetReviewTask(w http.ResponseWriter, r *http.Request) {
 // handleReviewTaskNeighbors returns the previous/next task of the queue the reviewer is browsing,
 // which is what powers 上一份/下一份 in the grading drawer.
 func (a *API) handleReviewTaskNeighbors(w http.ResponseWriter, r *http.Request) {
-	claims, _ := claimsFrom(r.Context())
+	actor, _ := actorFrom(r.Context())
 	taskID, ok := parseUUIDParam(w, pathParam(r, "id"), "阅卷任务 ID")
 	if !ok {
 		return
@@ -66,14 +66,14 @@ func (a *API) handleReviewTaskNeighbors(w http.ResponseWriter, r *http.Request) 
 	filter := store.ReviewFilter{
 		Status:     strings.TrimSpace(r.URL.Query().Get("status")),
 		ExamID:     strings.TrimSpace(r.URL.Query().Get("exam_id")),
-		ReviewerID: reviewScope(claims),
+		ReviewerID: reviewScope(actor),
 	}
 	if filter.ExamID != "" {
 		if _, ok := parseUUIDParam(w, filter.ExamID, "exam_id"); !ok {
 			return
 		}
 	}
-	queue, err := a.store.ReviewTaskNeighbors(r.Context(), claims.OrgID, filter, taskID)
+	queue, err := a.store.ReviewTaskNeighbors(r.Context(), actor.OrgID, filter, taskID)
 	if err != nil {
 		a.storeError(w, r, err, "阅卷任务不存在")
 		return
