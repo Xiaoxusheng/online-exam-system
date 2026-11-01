@@ -75,7 +75,16 @@ export default function AttemptPage() {
   const versionsRef = useRef(versions)
   versionsRef.current = versions
   const timersRef = useRef<Record<string, number>>({})
-  const savingRef = useRef<Record<string, boolean>>({})
+  // Saves are chained per question instead of dropped while a request is in flight: a
+  // second edit used to be discarded silently and never reached the server.
+  const chainsRef = useRef<Record<string, Promise<void>>>({})
+  const saveQuestionRef = useRef<(questionId: string) => Promise<void>>(async () => undefined)
+  // Questions whose local value has not reached the server yet. Refreshing the attempt
+  // must not overwrite them, or typing in progress disappears on a version conflict.
+  const dirtyRef = useRef<Set<string>>(new Set())
+  const editSeqRef = useRef<Record<string, number>>({})
+  const conflictRetryRef = useRef<Record<string, number>>({})
+  const submittedRef = useRef(false)
 
   const state = attemptQuery.data
   const live = state?.status === 'in_progress'
@@ -271,89 +280,165 @@ export default function AttemptPage() {
 
   useEffect(() => {
     if (!state) return
-    const next: Record<string, AnswerContent> = {}
+    setAnswers((current) => {
+      const next: Record<string, AnswerContent> = {}
+      for (const question of state.questions) {
+        next[question.question_id] = dirtyRef.current.has(question.question_id)
+          ? current[question.question_id] ?? toContent(question, question.saved_answer ?? {})
+          : toContent(question, question.saved_answer ?? {})
+      }
+      return next
+    })
+    // Server versions always win, including for unsaved questions: the local value is
+    // then re-sent against the current version instead of conflicting forever.
     const nextVersions: Record<string, number> = {}
     for (const question of state.questions) {
-      next[question.question_id] = toContent(question, question.saved_answer ?? {})
       nextVersions[question.question_id] = question.answer_version
     }
-    setAnswers(next)
     setVersions(nextVersions)
     setCurrentId((current) => current || state.questions[0]?.question_id || '')
     setRemaining(state.remaining_seconds)
   }, [state])
 
   const saveQuestion = useCallback(
-    async (questionId: string) => {
-      if (savingRef.current[questionId]) return
-      savingRef.current[questionId] = true
-      try {
+    (questionId: string): Promise<void> => {
+      const previous = chainsRef.current[questionId] ?? Promise.resolve()
+      const next = previous.then(async () => {
         const content = answersRef.current[questionId]
         const version = versionsRef.current[questionId] ?? 0
-        const saved = await saveAnswer(attemptId, questionId, content, version)
-        setVersions((current) => ({ ...current, [questionId]: saved.version }))
-      } catch (error) {
-        if (error instanceof ApiError && error.code === 'CONFLICT') {
-          message.warning('答案版本冲突，已为你载入最新保存的内容')
-          await queryClient.invalidateQueries({ queryKey: queryKeys.attempt(attemptId) })
-        } else if (error instanceof ApiError && (error.code === 'EXAM_EXPIRED' || error.code === 'INVALID_STATE')) {
-          message.error(errorText(error))
-        } else {
-          message.error(`保存失败：${errorText(error)}`)
+        const seq = editSeqRef.current[questionId] ?? 0
+        try {
+          const saved = await saveAnswer(attemptId, questionId, content, version)
+          setVersions((current) => ({ ...current, [questionId]: saved.version }))
+          if (seq === (editSeqRef.current[questionId] ?? 0)) {
+            dirtyRef.current.delete(questionId)
+          }
+        } catch (error) {
+          if (error instanceof ApiError && error.code === 'CONFLICT') {
+            message.warning('答案版本冲突，已载入最新保存的内容')
+            try {
+              const fresh = await getAttempt(attemptId)
+              const freshVersion = fresh.questions.find((item) => item.question_id === questionId)?.answer_version ?? 0
+              versionsRef.current = { ...versionsRef.current, [questionId]: freshVersion }
+              setVersions((current) => ({ ...current, [questionId]: freshVersion }))
+              if (!conflictRetryRef.current[questionId]) {
+                conflictRetryRef.current[questionId] = 1
+                void saveQuestionRef.current(questionId)
+              }
+            } catch {
+              message.error('载入最新答案失败，请刷新页面后重试')
+            }
+          } else if (error instanceof ApiError && (error.code === 'EXAM_EXPIRED' || error.code === 'INVALID_STATE')) {
+            message.error(errorText(error))
+            dirtyRef.current.delete(questionId)
+          } else {
+            message.error(`保存失败：${errorText(error)}`)
+          }
         }
-      } finally {
-        savingRef.current[questionId] = false
-      }
+      })
+      chainsRef.current[questionId] = next
+      return next
     },
-    [attemptId, message, queryClient],
+    [attemptId, message],
   )
+  saveQuestionRef.current = saveQuestion
 
   function scheduleSave(questionId: string) {
     const existing = timersRef.current[questionId]
     if (existing) window.clearTimeout(existing)
     timersRef.current[questionId] = window.setTimeout(() => {
-      void saveQuestion(questionId)
+      delete timersRef.current[questionId]
+      void saveQuestionRef.current(questionId)
     }, 900)
   }
 
   function updateAnswer(questionId: string, patch: AnswerContent) {
+    editSeqRef.current[questionId] = (editSeqRef.current[questionId] ?? 0) + 1
+    dirtyRef.current.add(questionId)
     setAnswers((current) => ({ ...current, [questionId]: { ...current[questionId], ...patch } }))
     scheduleSave(questionId)
   }
 
-  // Flush pending saves when leaving the page.
-  useEffect(
-    () => () => {
-      Object.values(timersRef.current).forEach((timer) => window.clearTimeout(timer))
-    },
-    [],
-  )
+  // Waits until every debounced and in-flight save has settled. Submission must not race
+  // the last keystroke, which is exactly how answers used to be lost.
+  const flushSaves = useCallback(async () => {
+    const queued = new Set<string>(Object.keys(chainsRef.current))
+    for (const [questionId, timer] of Object.entries(timersRef.current)) {
+      window.clearTimeout(timer)
+      queued.add(questionId)
+    }
+    timersRef.current = {}
+    for (const questionId of queued) {
+      if (dirtyRef.current.has(questionId)) {
+        await saveQuestionRef.current(questionId)
+      }
+    }
+  }, [])
+
+  // Leaving the page (navigation, refresh, tab close) must not swallow unsent answers.
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (dirtyRef.current.size === 0) return
+      event.preventDefault()
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      for (const [questionId, timer] of Object.entries(timersRef.current)) {
+        window.clearTimeout(timer)
+        // Last-resort save: the SPA keeps running after navigation, so this still lands.
+        void saveAnswer(attemptId, questionId, answersRef.current[questionId], versionsRef.current[questionId] ?? 0).catch(() => undefined)
+      }
+      timersRef.current = {}
+    }
+  }, [attemptId])
 
   const submitMutation = useMutation({
     mutationFn: () => submitAttempt(attemptId),
     onSuccess: (data) => {
+      submittedRef.current = true
       setResult({ total: data.total_score, visible: data.score_visible, pending: data.pending_review, at: data.submitted_at })
       setConfirmOpen(false)
       queryClient.invalidateQueries({ queryKey: queryKeys.myExams })
       queryClient.invalidateQueries({ queryKey: queryKeys.myScores })
+      // Refresh the attempt too, so `live` flips to false and the countdown stops
+      // instead of firing a second automatic submission at zero.
+      queryClient.invalidateQueries({ queryKey: queryKeys.attempt(attemptId) })
     },
     onError: (error) => {
+      submittedRef.current = false
       setConfirmOpen(false)
       message.error(errorText(error))
     },
   })
 
+  // Flush every pending answer before submitting: the debounce window must not decide
+  // whether the last keystroke counts. The mutate ref keeps this callback stable so the
+  // countdown effect is not re-armed on every render.
+  const submitRef = useRef(submitMutation.mutate)
+  submitRef.current = submitMutation.mutate
+  const submitNow = useCallback(async () => {
+    if (submittedRef.current) return
+    submittedRef.current = true
+    try {
+      await flushSaves()
+    } finally {
+      submitRef.current()
+    }
+  }, [flushSaves])
+
   // Countdown; hitting zero submits automatically, exactly like the server sweep would.
   useEffect(() => {
     if (!live || remaining === null) return
     if (remaining <= 0) {
+      if (submittedRef.current) return
       message.warning('答题时间到，系统已自动交卷')
-      submitMutation.mutate()
+      void submitNow()
       return
     }
     const timer = window.setTimeout(() => setRemaining((value) => (value === null ? null : value - 1)), 1000)
     return () => window.clearTimeout(timer)
-  }, [remaining, live])
+  }, [remaining, live, submitNow])
 
   const sections = useMemo(() => {
     const groups = new Map<string, AttemptQuestion[]>()
@@ -689,7 +774,7 @@ export default function AttemptPage() {
         okText="确认交卷"
         cancelText="继续作答"
         confirmLoading={submitMutation.isPending}
-        onOk={() => submitMutation.mutate()}
+        onOk={() => void submitNow()}
         onCancel={() => setConfirmOpen(false)}
       >
         <p>
