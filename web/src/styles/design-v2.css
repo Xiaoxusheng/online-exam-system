@@ -614,6 +614,16 @@ body {
   padding: 14px 16px;
 }
 
+/* 卡片 hover 反馈：所有面板卡边框微亮 + 阴影微升，不动位移以免表格晃眼 */
+.panel-card.ant-card {
+  transition: border-color 200ms var(--app-ease), box-shadow 200ms var(--app-ease);
+}
+
+.panel-card.ant-card:hover {
+  border-color: #d4ddee !important;
+  box-shadow: 0 4px 16px -8px rgba(15, 23, 42, 0.14) !important;
+}
+
 /* 可交互卡片才有抬升，避免表格类卡片抖动 */
 .panel-card.is-interactive:hover {
   border-color: var(--app-primary-line) !important;
@@ -636,6 +646,26 @@ body {
 
 .stat-card.ant-card .ant-card-body {
   padding: 13px 15px;
+}
+
+/* 指标卡 hover：明显抬升 + 主色描边 + 数字加深 */
+.stat-card.ant-card {
+  transition: border-color 200ms var(--app-ease), box-shadow 220ms var(--app-ease),
+    transform 220ms var(--app-ease);
+}
+
+.stat-card.ant-card:hover {
+  border-color: var(--app-primary-line) !important;
+  box-shadow: var(--app-shadow-lift) !important;
+  transform: translateY(-3px);
+}
+
+.stat-card.ant-card:hover .stat-card-icon {
+  transform: scale(1.08);
+}
+
+.stat-card-icon {
+  transition: transform 220ms var(--app-ease-spring);
 }
 
 .stat-card .ant-statistic-title {
@@ -1276,16 +1306,13 @@ body {
 @keyframes card-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.988);
+    transform: translateY(12px) scale(0.982);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  /* 不写 to 帧：动画结束回归元素自身样式，hover 抬升等 transform 才能接管 */
 }
 
 .content-inner .stat-card.ant-card {
-  animation: card-in 380ms var(--app-ease) both;
+  animation: card-in 440ms var(--app-ease) both;
 }
 
 .content-inner .stat-card.ant-card:nth-child(1) { animation-delay: 30ms; }
