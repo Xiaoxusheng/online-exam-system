@@ -14,6 +14,7 @@ import {
   LineChartOutlined,
   NotificationOutlined,
   SafetyCertificateOutlined,
+  SkinOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
 
@@ -74,6 +75,7 @@ export const navigation: NavGroup[] = [
       { key: '/system/orgs', label: '组织架构', icon: <ApartmentOutlined /> },
       { key: '/system/audit-logs', label: '审计日志', icon: <HistoryOutlined /> },
       { key: '/system/notifications', label: '通知配置', icon: <NotificationOutlined /> },
+      { key: '/system/branding', label: '品牌设置', icon: <SkinOutlined /> },
     ],
   },
 ]

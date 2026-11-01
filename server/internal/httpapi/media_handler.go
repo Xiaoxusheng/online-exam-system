@@ -201,28 +201,35 @@ func newMediaKey() string {
 func mediaPublicURL(id string) string { return "/api/v1/media/" + id + "/content" }
 
 func (a *API) handleMediaContent(w http.ResponseWriter, r *http.Request) {
-	claims, _, ok := a.resolveAuth(w, r)
-	if !ok {
-		return
-	}
 	mediaID, ok := parseUUIDParam(w, pathParam(r, "id"), "媒体 ID")
 	if !ok {
 		return
 	}
-	item, err := a.store.GetMediaFile(r.Context(), claims.OrgID, mediaID)
+	item, err := a.store.GetMediaFileByID(r.Context(), mediaID)
 	if err != nil {
 		a.storeError(w, r, err, "媒体不存在")
 		return
 	}
-	// Sensitive purposes stay visible only to their owner plus staff roles; the
-	// <audio>/<video> tags reach this route through ?token= instead of a header.
-	if item.Purpose == "answer_media" || item.Purpose == "proctor_snapshot" {
-		owner := item.UploaderID == claims.Subject
-		staff := claims.Role == "org_admin" || claims.Role == "exam_admin" ||
-			claims.Role == "reviewer" || claims.Role == "proctor"
-		if !owner && !staff {
+	// Brand logos render on the pre-login page, so they are public. Everything
+	// else requires a session: the <audio>/<video>/<img> tags reach this route
+	// through ?token= instead of a header, org tenancy included.
+	if item.Purpose != "branding" {
+		claims, _, authOK := a.resolveAuth(w, r)
+		if !authOK {
+			return
+		}
+		if claims.OrgID != item.OrgID {
 			apiError(w, http.StatusForbidden, "FORBIDDEN", "无权访问该媒体")
 			return
+		}
+		if item.Purpose == "answer_media" || item.Purpose == "proctor_snapshot" {
+			owner := item.UploaderID == claims.Subject
+			staff := claims.Role == "org_admin" || claims.Role == "exam_admin" ||
+				claims.Role == "reviewer" || claims.Role == "proctor"
+			if !owner && !staff {
+				apiError(w, http.StatusForbidden, "FORBIDDEN", "无权访问该媒体")
+				return
+			}
 		}
 	}
 

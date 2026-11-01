@@ -4,6 +4,7 @@ import type {
   ListResult,
   NotificationLog,
   NotificationTemplate,
+  OrgBranding,
   SystemOverview,
 } from '../types'
 
@@ -76,5 +77,23 @@ export function testNotificationChannel(input: {
   return apiRequest<TestChannelResult>('/notification-channels/test', {
     method: 'POST',
     body: JSON.stringify(input),
+  })
+}
+
+/** Public branding profile — reachable without a session (login page). */
+export function getBranding(): Promise<OrgBranding> {
+  return apiRequest<OrgBranding>('/branding')
+}
+
+export interface BrandingPatch {
+  name?: string
+  slogan?: string
+  logo_media_id?: string
+}
+
+export function updateBranding(patch: BrandingPatch): Promise<OrgBranding> {
+  return apiRequest<OrgBranding>('/system/branding', {
+    method: 'PUT',
+    body: JSON.stringify(patch),
   })
 }

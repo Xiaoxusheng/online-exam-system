@@ -1,11 +1,13 @@
 import { useEffect } from 'react'
 import { Alert, App, Button, Form, Input } from 'antd'
 import { CheckCircleFilled, LockOutlined, UserOutlined } from '@ant-design/icons'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { login } from '../api/auth'
 import { ApiError } from '../api/client'
+import { getBranding } from '../api/system'
 import { hasValidSession, useAuthStore } from '../stores/auth'
+import { queryKeys } from '../api/queryKeys'
 import './login.css'
 
 interface LoginForm {
@@ -24,6 +26,22 @@ const capabilities = [
   '逐题诊断、知识点掌握度与成绩更正申诉',
 ]
 
+/** Brand block shared by both panels; falls back to the built-in identity. */
+function useBranding() {
+  const query = useQuery({
+    queryKey: queryKeys.branding,
+    queryFn: getBranding,
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+  const data = query.data
+  return {
+    name: data?.name || '在线考试系统',
+    slogan: data?.slogan || '稳定 · 可信 · 可追溯',
+    logoUrl: data?.logo_url ?? null,
+  }
+}
+
 export default function LoginPage() {
   const { message } = App.useApp()
   const navigate = useNavigate()
@@ -31,6 +49,7 @@ export default function LoginPage() {
   const token = useAuthStore((state) => state.token)
   const expiresAt = useAuthStore((state) => state.expiresAt)
   const setSession = useAuthStore((state) => state.setSession)
+  const branding = useBranding()
 
   const state = location.state as LoginLocationState | null
   const redirectTarget =
@@ -64,15 +83,19 @@ export default function LoginPage() {
     <div className="login-page">
       <aside className="login-brand">
         <div className="login-brand-top">
-          <span className="login-brand-mark">考</span>
+          {branding.logoUrl ? (
+            <img className="login-brand-logo" src={branding.logoUrl} alt={branding.name} />
+          ) : (
+            <span className="login-brand-mark">考</span>
+          )}
           <div>
-            <div className="login-brand-name">在线考试系统</div>
+            <div className="login-brand-name">{branding.name}</div>
             <div className="login-brand-en">ONLINE EXAM PLATFORM</div>
           </div>
         </div>
 
         <div className="login-brand-copy">
-          <span className="login-eyebrow">稳定 · 可信 · 可追溯</span>
+          <span className="login-eyebrow">{branding.slogan}</span>
           <h2 className="login-headline">
             从组卷到成绩
             <br />
@@ -126,14 +149,18 @@ export default function LoginPage() {
           <div className="login-trust">数据加密存储 · 全链路审计 · 按角色与数据范围授权</div>
         </div>
 
-        <div className="login-brand-footer">© 2026 在线考试系统</div>
+        <div className="login-brand-footer">© 2026 {branding.name}</div>
       </aside>
 
       <main className="login-panel">
         <div className="login-form-card">
           <div className="login-panel-brand">
-            <span className="login-panel-mark">考</span>
-            <span>在线考试系统</span>
+            {branding.logoUrl ? (
+              <img className="login-brand-logo" src={branding.logoUrl} alt={branding.name} />
+            ) : (
+              <span className="login-panel-mark">考</span>
+            )}
+            <span>{branding.name}</span>
           </div>
 
           <h1 className="login-title">欢迎回来</h1>

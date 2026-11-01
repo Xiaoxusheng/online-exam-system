@@ -25,6 +25,7 @@ const UsersPage = lazy(() => import('../pages/system/UsersPage'))
 const OrgsPage = lazy(() => import('../pages/system/OrgsPage'))
 const AuditLogsPage = lazy(() => import('../pages/system/AuditLogsPage'))
 const NotificationSettingsPage = lazy(() => import('../pages/system/NotificationSettingsPage'))
+const BrandingSettingsPage = lazy(() => import('../pages/system/BrandingSettingsPage'))
 
 function guarded(path: string, element: ReactNode) {
   return <RequireRole path={path}>{element}</RequireRole>
@@ -61,6 +62,7 @@ export default function AppRoutes() {
           path="system/notifications"
           element={guarded('/system/notifications', <NotificationSettingsPage />)}
         />
+        <Route path="system/branding" element={guarded('/system/branding', <BrandingSettingsPage />)} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

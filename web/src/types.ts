@@ -88,6 +88,14 @@ export interface MediaScoringDimension {
   weight: number
 }
 
+export interface OrgBranding {
+  org_id: string
+  name: string
+  slogan: string
+  logo_media_id: string
+  logo_url: string | null
+}
+
 export interface QuestionContent {
   stem?: string
   options?: QuestionOption[]

@@ -28,6 +28,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { fetchMe, logout } from '../api/auth'
+import { getBranding } from '../api/system'
 import { listNotifications, markNotificationRead } from '../api/notification'
 import { queryKeys } from '../api/queryKeys'
 import EmptyState from '../components/EmptyState'
@@ -144,6 +145,17 @@ export default function AppLayout() {
   const notices = notificationsQuery.data?.items ?? []
   const hasUnread = notices.some((item) => item.status !== 'read')
 
+  const brandingQuery = useQuery({
+    queryKey: queryKeys.branding,
+    queryFn: getBranding,
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+  const branding = {
+    name: brandingQuery.data?.name || '在线考试系统',
+    logoUrl: brandingQuery.data?.logo_url ?? null,
+  }
+
   async function handleReadNotice(id: string) {
     try {
       await markNotificationRead(id)
@@ -195,10 +207,14 @@ export default function AppLayout() {
 
   const brand = (
     <div className={collapsed ? 'app-brand app-brand-collapsed' : 'app-brand'}>
-      <span className="app-brand-mark">考</span>
+      {branding.logoUrl ? (
+        <img className="app-brand-logo" src={branding.logoUrl} alt={branding.name} />
+      ) : (
+        <span className="app-brand-mark">考</span>
+      )}
       {!collapsed && (
         <div className="app-brand-text">
-          <div className="app-brand-name">在线考试系统</div>
+          <div className="app-brand-name">{branding.name}</div>
           <div className="app-brand-sub">Online Exam Platform</div>
         </div>
       )}

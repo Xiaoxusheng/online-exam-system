@@ -206,6 +206,21 @@ body {
   color: var(--app-text-tertiary) !important;
 }
 
+/* 分组分隔：非首个分组标题上方一条缩进细线，增强扫读节奏 */
+.app-menu .ant-menu-item-group:not(:first-child) .ant-menu-item-group-title {
+  position: relative;
+}
+
+.app-menu .ant-menu-item-group:not(:first-child) .ant-menu-item-group-title::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 18px;
+  right: 18px;
+  height: 1px;
+  background: var(--app-border-soft);
+}
+
 .app-menu .ant-menu-item {
   position: relative;
   height: 34px;
@@ -216,10 +231,17 @@ body {
   transition: background 150ms var(--app-ease), color 150ms var(--app-ease);
 }
 
+/* 图标统一 22px 圆角容器：选中时浮出主色软底，选中切换不跳动 */
 .app-menu .ant-menu-item .ant-menu-item-icon {
-  font-size: 14.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 13.5px;
   color: var(--app-text-tertiary);
-  transition: color 150ms var(--app-ease);
+  transition: color 150ms var(--app-ease), background 150ms var(--app-ease);
 }
 
 .app-menu .ant-menu-item:hover {
@@ -238,17 +260,23 @@ body {
 }
 
 .app-menu .ant-menu-item-selected .ant-menu-item-icon {
+  background: rgba(255, 255, 255, 0.72);
   color: var(--app-primary) !important;
+  box-shadow: inset 0 0 0 1px var(--app-primary-line);
 }
 
-/* 活动项左侧胶囊高亮条 */
+[data-theme='dark'] .app-menu .ant-menu-item-selected .ant-menu-item-icon {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* 活动项左侧胶囊高亮条：贴项内缘，看得见的选中标记 */
 .app-menu .ant-menu-item-selected::before {
   content: '';
   position: absolute;
-  left: -10px;
+  left: 0;
   top: 50%;
   width: 3px;
-  height: 16px;
+  height: 14px;
   border-radius: 999px;
   transform: translateY(-50%);
   background: var(--app-primary);
@@ -280,7 +308,7 @@ body {
 }
 
 .app-sider.ant-layout-sider-collapsed .app-menu .ant-menu-item-selected::before {
-  left: -8px;
+  left: 0;
 }
 
 .app-sider-footer {
@@ -295,9 +323,13 @@ body {
 }
 
 .sider-version {
-  font-size: 11px;
-  color: var(--app-text-tertiary);
+  padding: 1px 8px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: var(--app-surface-muted);
+  font-size: 10.5px;
   letter-spacing: 0.02em;
+  color: var(--app-text-tertiary);
 }
 
 .sider-status {
@@ -305,8 +337,12 @@ body {
   align-items: center;
   gap: 5px;
   margin-left: auto;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--app-success-soft);
   font-size: 11px;
-  color: var(--app-text-tertiary);
+  font-weight: 600;
+  color: var(--app-success);
 }
 
 .sider-status::before {
@@ -315,7 +351,7 @@ body {
   height: 5px;
   border-radius: 50%;
   background: var(--app-success);
-  box-shadow: 0 0 0 3px rgba(15, 157, 118, 0.14);
+  animation: room-pulse 2s ease-out infinite;
 }
 
 /* 顶栏：白色毛玻璃 */
@@ -1840,4 +1876,25 @@ body {
 .channel-card p {
   margin: 0;
   line-height: 1.6;
+}
+
+/* ===== 品牌设置与动态 Logo ===== */
+.login-brand-logo,
+.app-brand-logo,
+.branding-logo-preview img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.branding-logo-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.branding-logo-preview img {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--app-line, #e3e8f2);
+  padding: 4px;
 }

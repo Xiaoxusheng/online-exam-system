@@ -48,6 +48,9 @@ func (a *API) Router() http.Handler {
 		r.Post("/auth/login", a.handleLogin)
 		r.Post("/auth/refresh", a.handleRefresh)
 
+		// Public branding profile: the login page needs it before any session.
+		r.Get("/branding", a.handleGetBranding)
+
 		// Proctor realtime room. Browsers cannot attach an Authorization header to a
 		// websocket, so this route authenticates its ?token= parameter itself.
 		r.Get("/proctor/exams/{examId}/ws", a.handleProctorWebSocket)
@@ -85,6 +88,8 @@ func (a *API) Router() http.Handler {
 			r.Get("/notification-channels", a.handleNotificationChannels)
 			r.Post("/notification-channels/test", a.handleTestNotificationChannel)
 			r.Get("/system/overview", a.handleSystemOverview)
+			r.Get("/system/branding", a.handleGetBranding)
+			r.Put("/system/branding", a.handleUpdateBranding)
 			})
 
 			r.Group(func(r chi.Router) {

@@ -67,6 +67,20 @@ func (s *Store) GetMediaFile(ctx context.Context, orgID, id string) (MediaFile, 
 	return item, nil
 }
 
+// GetMediaFileByID loads one active file without the org filter. Only the
+// branding handler uses it (public logos must resolve before login); every
+// other purpose re-checks tenancy against the caller's claims.
+func (s *Store) GetMediaFileByID(ctx context.Context, id string) (MediaFile, error) {
+	item, err := scanMediaFile(s.pool.QueryRow(ctx, `
+		SELECT `+mediaColumns+`
+		FROM media_files
+		WHERE id = $1::uuid AND status = 'active'`, id))
+	if err != nil {
+		return MediaFile{}, fmt.Errorf("get media file by id: %w", err)
+	}
+	return item, nil
+}
+
 // MarkMediaDeleted soft-deletes one file. The uploader or an org admin may call it;
 // the handler resolves that rule before reaching here.
 func (s *Store) MarkMediaDeleted(ctx context.Context, orgID, id, actorID string, actorAdmin bool) error {
