@@ -2,6 +2,41 @@
 
 > 唯一计划/进度文件。后续任务在本文件追加或更新，不新建任务文档。
 
+## v1.3 线上部署（2026-11-01 完成）
+
+- 部署内容：v1.3「卷墨」视觉重整的前端产物（提交 `ed12d51`），线上 `http://118.25.50.65:80`。
+- 范围：纯前端。后端二进制、数据库迁移均无变更（`git diff c80758b..HEAD -- server/` 为空），因此只替换静态资源，未重启服务、未执行迁移、未向生产库写入任何数据。
+
+### 部署流程
+
+1. 本地构建：`npm run typecheck` + `npm run build`（无 CSS 语法告警），产物 `web/dist` 33 个文件 / 1.8 MB。
+2. 上传：scp 到 `/opt/online-exam/incoming/web-<时间戳>/`，服务器端校验文件数与 `index.html` 引用的哈希。
+3. 原子切换：先 `cp -a web web.prev` 备份旧版，再把新版本移到 `web.new`，`mv web web.old && mv web.new web` 换名切换，最后删除 `web.old` —— 切换窗口内目录始终完整，不会出现半新半旧的资源。
+4. 清理：清空 `incoming/`。
+
+### 为什么没有重启服务
+
+`server/internal/httpapi/static.go` 的静态服务用 `http.Dir(root)` 每次请求从磁盘读取，`index.html` 走 `Cache-Control: no-cache`、`/assets/*` 走 immutable 长缓存（文件名带内容哈希）。因此替换目录后立即生效，无需重启 systemd，也就没有服务中断。
+
+### 复验结果（只读，未写生产库）
+
+- 基础：`/healthz` 200、SPA 首页 200、深层路由 `/questions` 回落 200、`index.html` 已指向新版 `index-WWj6sbKa.js`、JS/CSS 资源 200、未登录访问导入模板 401。
+- 无头浏览器（`web/scripts/verify-live.mjs`）：**27/27 通过**。逐路由断言标题渲染且控制台零报错（题库/考试/成绩/分析/阅卷/监考/账号/通知 8 个路由），并断言 v1.3 组件库化确实生效——工作台 4 张 `ant-statistic` 指标卡、`ant-descriptions` 基本信息、`ant-timeline` 最近动态、`ant-tabs` 工作页签、4 张 `ant-card` 快捷入口，分析页 2 个 `ant-progress` 环形图 + 7 条进度线，且旧的自绘 `svg.donut-value` 数量为 0。
+- 截图：`_diag/ui_shots_live_v13/live_*.png`（含移动端与暗色）。
+
+### 回滚
+
+旧版保留在 `/opt/online-exam/web.prev`（`index-TdHBKFr3.js`）。回滚命令：
+
+```bash
+cd /opt/online-exam && mv web web.failed && mv web.prev web
+```
+
+### 注意事项
+
+- 生产管理员密码是 `/opt/online-exam/.env` 里的 `SEED_ADMIN_PASSWORD`，**不是** `Admin@123456`（后者只是本地开发种子）。用错密码会撞上登录限流：账号 5 次失败即封 15 分钟（进程内内存计数，重启服务才清）。
+- SSH 口令登录已失效，使用本机 `~/.ssh/id_ed25519` 公钥认证；用户名含中文时必须用绝对路径传 `IdentityFile` 与 `UserKnownHostsFile`，否则 ssh 会把路径按 ANSI 码页转义成 `/c/Users/\300\327\301\372` 导致读写 `known_hosts` 失败。
+
 ## v1.3 视觉重整：「卷墨」风格 + 全量组件库化（2026-11-01 完成）
 
 - 背景：用户在 v1.2 之后要求「重新设计前端页面，只用组件库的组件，还是要有自己的风格，并且要精致现代，符合这考试系统」。
