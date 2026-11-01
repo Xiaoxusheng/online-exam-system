@@ -273,7 +273,7 @@ func (s *Store) PublishExam(ctx context.Context, orgID, examID string) (Exam, er
 	}
 	notice := fmt.Sprintf("考试时间 %s 至 %s，限时 %d 分钟，请按时参加。",
 		startAt.Format("2006-01-02 15:04"), endAt.Format("2006-01-02 15:04"), duration)
-	if err := notifyMany(ctx, tx, orgID, candidates,
+	if err := s.notifyMany(ctx, tx, orgID, candidates,
 		fmt.Sprintf("考试发布：%s", examTitle), notice, "exam_publish", examID, map[string]string{
 			"exam":     examTitle,
 			"start_at": startAt.Format("2006-01-02 15:04"),
@@ -344,6 +344,7 @@ func (s *Store) buildSnapshot(ctx context.Context, tx pgx.Tx, orgID, paperID, pa
 			return snapshot, fmt.Errorf("load paper questions for snapshot: %w", err)
 		}
 		defer rows.Close()
+		groupTotals := make(map[string]float64, 2)
 		for rows.Next() {
 			var q SnapshotQuestion
 			if err := rows.Scan(&q.QuestionID, &q.Type, &q.Section, &q.PaperGroup, &q.Difficulty, &q.KnowledgePoint,
@@ -352,6 +353,7 @@ func (s *Store) buildSnapshot(ctx context.Context, tx pgx.Tx, orgID, paperID, pa
 			}
 			snapshot.Questions = append(snapshot.Questions, q)
 			snapshot.TotalScore += q.Score
+			groupTotals[q.PaperGroup] += q.Score
 		}
 		if err := rows.Err(); err != nil {
 			return snapshot, fmt.Errorf("iterate snapshot questions: %w", err)
@@ -359,6 +361,15 @@ func (s *Store) buildSnapshot(ctx context.Context, tx pgx.Tx, orgID, paperID, pa
 		if len(snapshot.Questions) == 0 {
 			return snapshot, fmt.Errorf("paper has no questions: %w", ErrInvalidState)
 		}
+		// An AB paper hands one group to each half of the candidates. Publishing a paper
+		// whose B group is empty would leave that half unable to submit at all, which in
+		// turn keeps the exam open and blocks every candidate's score from being published.
+		if paperType == "ab" {
+			if groupTotals["A"] <= 0 || groupTotals["B"] <= 0 {
+				return snapshot, fmt.Errorf("ab paper requires questions in both group A and group B: %w", ErrInvalidState)
+			}
+		}
+		snapshot.GroupTotals = groupTotals
 		return snapshot, nil
 	}
 

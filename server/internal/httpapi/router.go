@@ -21,17 +21,20 @@ type chiRouter interface {
 }
 
 type API struct {
-	cfg     config.Config
-	log     *slog.Logger
-	store   *store.Store
-	tokens  *auth.TokenManager
-	hub     *proctorHub
-	limiter *loginLimiter
+	cfg      config.Config
+	log      *slog.Logger
+	store    *store.Store
+	tokens   *auth.TokenManager
+	hub      *proctorHub
+	limiter  *loginLimiter
+	notifier store.ExternalNotifier
 }
 
 func New(cfg config.Config, log *slog.Logger, st *store.Store, tokens *auth.TokenManager) *API {
 	return &API{cfg: cfg, log: log, store: st, tokens: tokens, hub: newProctorHub(log),
-		limiter: newLoginLimiter(cfg.LoginAccountLimit, cfg.LoginIPLimit, cfg.LoginBlock)}
+		limiter:  newLoginLimiter(cfg.LoginAccountLimit, cfg.LoginIPLimit, cfg.LoginBlock),
+		notifier: st.Notifier(),
+	}
 }
 
 func (a *API) Router() http.Handler {
@@ -78,8 +81,10 @@ func (a *API) Router() http.Handler {
 				r.Get("/audit-logs", a.handleListAuditLogs)
 				r.Get("/notification-templates", a.handleListNotificationTemplates)
 				r.Put("/notification-templates/{id}", a.handleUpdateNotificationTemplate)
-				r.Get("/notification-logs", a.handleListNotificationLogs)
-				r.Get("/system/overview", a.handleSystemOverview)
+			r.Get("/notification-logs", a.handleListNotificationLogs)
+			r.Get("/notification-channels", a.handleNotificationChannels)
+			r.Post("/notification-channels/test", a.handleTestNotificationChannel)
+			r.Get("/system/overview", a.handleSystemOverview)
 			})
 
 			r.Group(func(r chi.Router) {

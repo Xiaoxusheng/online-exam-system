@@ -153,12 +153,20 @@ func (s *Store) StartAttempt(ctx context.Context, orgID, userID, examID string) 
 		return "", ErrInvalidState
 	}
 
-	var snapshotExists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM paper_snapshots WHERE exam_id = $1)`, examID).Scan(&snapshotExists); err != nil {
-		return "", fmt.Errorf("check exam snapshot: %w", err)
-	}
-	if !snapshotExists {
+	var snapshotPayload []byte
+	err = tx.QueryRow(ctx, `SELECT payload FROM paper_snapshots WHERE exam_id = $1`, examID).Scan(&snapshotPayload)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrInvalidState
+	}
+	if err != nil {
+		return "", fmt.Errorf("load exam snapshot: %w", err)
+	}
+	var snapshot PaperSnapshot
+	if err := json.Unmarshal(snapshotPayload, &snapshot); err != nil {
+		return "", fmt.Errorf("parse exam snapshot: %w", err)
+	}
+	if snapshot.TotalFor(paperGroup) <= 0 {
+		return "", fmt.Errorf("exam paper has no questions for group %s: %w", paperGroup, ErrInvalidState)
 	}
 
 	insertedID := ""
@@ -233,11 +241,7 @@ func (s *Store) GetAttemptState(ctx context.Context, userID, attemptID string) (
 		Questions:        []AttemptQuestion{},
 		Score:            row.Score,
 	}
-	for _, question := range snapshot.Questions {
-		if question.PaperGroup == row.PaperGroup {
-			state.TotalScore += question.Score
-		}
-	}
+	state.TotalScore = snapshot.TotalFor(row.PaperGroup)
 	if !showScore(row.Rules) && row.Status != "published" {
 		state.Score = nil
 	}

@@ -235,7 +235,7 @@ func (s *Store) PublishScores(ctx context.Context, orgID, examID string) (int64,
 	}
 	for _, item := range published {
 		content := fmt.Sprintf("《%s》成绩已公布，得分 %.2f 分。", examTitle, item.total)
-		if _, err := notifyUser(ctx, tx, orgID, item.userID, "成绩发布", content, "score_publish", examID, map[string]string{
+		if _, err := s.notifyUser(ctx, tx, orgID, item.userID, "成绩发布", content, "score_publish", examID, map[string]string{
 			"exam": examTitle, "total": fmt.Sprintf("%.2f", item.total),
 		}); err != nil {
 			return 0, err
@@ -329,23 +329,25 @@ func (s *Store) GetExamAnalytics(ctx context.Context, scope Scope, examID string
 	if err != nil {
 		return ExamAnalytics{}, err
 	}
-	analytics.TotalScore = snapshot.TotalScore
+	// A candidate only ever sees one paper group, so the reachable full score is the
+	// largest group total, never the A+B sum stored on the paper.
+	analytics.TotalScore = snapshot.DisplayTotal()
 
-	var rules struct {
-		PassScore float64 `json:"pass_score"`
-	}
-	_ = json.Unmarshal(rulesRaw, &rules)
-	analytics.PassScore = rules.PassScore
-	if analytics.PassScore <= 0 && analytics.TotalScore > 0 {
-		analytics.PassScore = math.Round(analytics.TotalScore*0.6*100) / 100
-	}
+	analytics.PassScore = passScoreOf(rulesRaw, analytics.TotalScore)
 
 	scoreScope, scoreArgs := scope.peopleFilter("u", 2)
+	type attemptScore struct {
+		score float64
+		group string
+	}
 	rows, err := s.pool.Query(ctx, `
-		SELECT sr.total::float8
-		FROM score_records sr
-		JOIN attempts a ON a.id = sr.attempt_id
+		SELECT latest.total::float8, a.paper_group
+		FROM attempts a
 		JOIN users u ON u.id = a.user_id
+		JOIN LATERAL (
+			SELECT total FROM score_records
+			WHERE attempt_id = a.id ORDER BY created_at DESC, id DESC LIMIT 1
+		) latest ON true
 		WHERE a.exam_id = $1 AND a.status IN ('graded', 'published')`+scoreScope,
 		append([]any{examID}, scoreArgs...)...)
 	if err != nil {
@@ -353,13 +355,13 @@ func (s *Store) GetExamAnalytics(ctx context.Context, scope Scope, examID string
 	}
 	defer rows.Close()
 
-	scores := make([]float64, 0)
+	scores := make([]attemptScore, 0)
 	for rows.Next() {
-		var score float64
-		if err := rows.Scan(&score); err != nil {
+		var item attemptScore
+		if err := rows.Scan(&item.score, &item.group); err != nil {
 			return ExamAnalytics{}, fmt.Errorf("scan analytics score: %w", err)
 		}
-		scores = append(scores, score)
+		scores = append(scores, item)
 	}
 	if err := rows.Err(); err != nil {
 		return ExamAnalytics{}, fmt.Errorf("iterate analytics scores: %w", err)
@@ -374,20 +376,22 @@ func (s *Store) GetExamAnalytics(ctx context.Context, scope Scope, examID string
 	}
 	sum := 0.0
 	passCount := 0
-	for _, score := range scores {
-		sum += score
-		if score > analytics.Highest || analytics.Highest == 0 {
-			analytics.Highest = score
+	for index, item := range scores {
+		sum += item.score
+		if index == 0 || item.score > analytics.Highest {
+			analytics.Highest = item.score
 		}
-		if score < analytics.Lowest || analytics.Lowest == 0 {
-			analytics.Lowest = score
+		if index == 0 || item.score < analytics.Lowest {
+			analytics.Lowest = item.score
 		}
-		if score >= analytics.PassScore {
+		// Each answer sheet is measured against its own group's full score.
+		groupTotal := groupTotalOf(snapshot, analytics.TotalScore, item.group)
+		if item.score >= passScoreOf(rulesRaw, groupTotal) {
 			passCount++
 		}
 		percent := 0.0
-		if analytics.TotalScore > 0 {
-			percent = score / analytics.TotalScore * 100
+		if groupTotal > 0 {
+			percent = item.score / groupTotal * 100
 		}
 		switch {
 		case percent < 60:
@@ -402,6 +406,8 @@ func (s *Store) GetExamAnalytics(ctx context.Context, scope Scope, examID string
 			analytics.Distribution[4].Count++
 		}
 	}
+	analytics.Highest = round2(analytics.Highest)
+	analytics.Lowest = round2(analytics.Lowest)
 	analytics.Average = round2(sum / float64(len(scores)))
 	analytics.PassRate = round2(float64(passCount) / float64(len(scores)) * 100)
 	return analytics, nil

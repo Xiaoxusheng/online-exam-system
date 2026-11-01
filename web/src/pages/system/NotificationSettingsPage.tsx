@@ -2,13 +2,16 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, Flex, Form, Input, Modal, Select, Switch, Table, Tabs, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { EditOutlined, SendOutlined } from '@ant-design/icons'
+import { EditOutlined, MailOutlined, MobileOutlined, SendOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
 import {
+  getNotificationChannels,
   listNotificationLogs,
   listNotificationTemplates,
+  testNotificationChannel,
   updateNotificationTemplate,
+  type NotificationChannelStatus,
   type NotificationLogParams,
 } from '../../api/system'
 import { queryKeys } from '../../api/queryKeys'
@@ -292,22 +295,130 @@ function DispatchLogPanel() {
   )
 }
 
+function ChannelPanel() {
+  const { message } = App.useApp()
+  const [form] = Form.useForm<{ channel: 'email' | 'sms'; code?: string; recipient?: string }>()
+
+  const channelsQuery = useQuery({
+    queryKey: queryKeys.notificationChannels,
+    queryFn: getNotificationChannels,
+  })
+  const status: NotificationChannelStatus | undefined = channelsQuery.data
+
+  const testMutation = useMutation({
+    mutationFn: (values: { channel: 'email' | 'sms'; code?: string; recipient?: string }) =>
+      testNotificationChannel(values),
+    onSuccess: (result) => {
+      if (result.status === 'sent') {
+        message.success(`测试通知已发送至 ${result.recipient}`)
+      } else if (result.status === 'simulated') {
+        message.info(`短信网关未接入，已按模拟投递记录（${result.recipient}）`)
+      } else {
+        message.error(`发送失败：${result.detail ?? '未知原因'}`)
+      }
+    },
+    onError: (error) => message.error(errorText(error)),
+  })
+
+  const channelCards = [
+    {
+      key: 'email',
+      icon: <MailOutlined />,
+      title: '邮件（SMTP）',
+      desc: status?.email.configured
+        ? 'SMTP 已配置，启用邮件模板后即随通知投递'
+        : '未配置：设置 SMTP_HOST / SMTP_FROM 等环境变量后生效',
+      ok: Boolean(status?.email.configured),
+    },
+    {
+      key: 'sms',
+      icon: <MobileOutlined />,
+      title: '短信',
+      desc:
+        status?.sms.mode === 'gateway'
+          ? '短信网关已接入，启用短信模板后即随通知投递'
+          : status?.sms.mode === 'simulated'
+            ? '网关未接入：投递按「模拟发送」记录，接入 SMS_API_URL 后自动转为真实下发'
+            : '通知服务未启用外发通道',
+      ok: status?.sms.mode === 'gateway',
+      simulated: status?.sms.mode === 'simulated',
+    },
+  ]
+
+  return (
+    <Card className="panel-card" variant="borderless">
+      <QueryError error={channelsQuery.error} onRetry={() => channelsQuery.refetch()} />
+      <div className="channel-cards">
+        {channelCards.map((item) => (
+          <div className="channel-card" key={item.key}>
+            <div className="channel-card-head">
+              {item.icon}
+              <strong>{item.title}</strong>
+              {item.ok ? (
+                <Tag color="green">已就绪</Tag>
+              ) : item.simulated ? (
+                <Tag color="gold">模拟投递</Tag>
+              ) : (
+                <Tag className="soft-tag">未配置</Tag>
+              )}
+            </div>
+            <p className="cell-meta">{item.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{ channel: 'email', code: 'exam_publish' }}
+        onFinish={(values) => testMutation.mutate(values)}
+        style={{ maxWidth: 480, marginTop: 16 }}
+      >
+        <Form.Item name="channel" label="测试通道" rules={[{ required: true }]}>
+          <Select
+            options={[
+              { value: 'email', label: '邮件' },
+              { value: 'sms', label: '短信' },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item name="code" label="使用模板">
+          <Select
+            options={Object.entries(codeLabels).map(([value, label]) => ({ value, label }))}
+          />
+        </Form.Item>
+        <Form.Item
+          name="recipient"
+          label="接收邮箱 / 手机号"
+          tooltip="留空则发给自己（取账号资料中的邮箱或手机号）"
+        >
+          <Input placeholder="选填" />
+        </Form.Item>
+        <Button type="primary" htmlType="submit" icon={<SendOutlined />} loading={testMutation.isPending}>
+          发送测试通知
+        </Button>
+      </Form>
+    </Card>
+  )
+}
+
 export default function NotificationSettingsPage() {
   return (
     <div>
-      <PageHeader title="通知配置" subtitle="维护站内通知文案并查看全部发送记录；短信与邮件通道需要接入服务商。" />
+      <PageHeader title="通知配置" subtitle="维护站内通知文案、查看外发通道状态与全部发送记录。" />
 
       <Alert
         className="page-alert"
         type="info"
         showIcon
         message="模板如何生效"
-        description="考试发布、成绩发布、成绩更正与申诉处理都会按场景编码取用启用的模板；模板留空或停用时回退到系统默认文案。同一场景对同一人不会重复发送。"
+        description="考试发布、成绩发布、成绩更正与申诉处理都会按场景编码取用启用的模板；模板留空或停用时回退到系统默认文案。同一场景对同一人不会重复发送；邮件与短信需先启用对应通道的模板才会外发。"
       />
 
       <Tabs
         items={[
           { key: 'templates', label: '模板管理', children: <TemplatePanel /> },
+          { key: 'channels', label: '通道与测试', children: <ChannelPanel /> },
           { key: 'logs', label: '发送记录', children: <DispatchLogPanel /> },
         ]}
       />

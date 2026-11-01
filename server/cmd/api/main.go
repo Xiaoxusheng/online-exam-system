@@ -14,6 +14,7 @@ import (
 	"online-exam-system/server/internal/config"
 	"online-exam-system/server/internal/database"
 	"online-exam-system/server/internal/httpapi"
+	"online-exam-system/server/internal/notify"
 	"online-exam-system/server/internal/store"
 )
 
@@ -44,7 +45,8 @@ func run() error {
 	}
 	defer pool.Close()
 
-	st := store.New(pool)
+	st := store.New(pool, store.WithNotifier(notify.NewDispatcher(cfg, log)))
+	defer st.Close()
 	api := httpapi.New(cfg, log, st, auth.NewTokenManager(cfg.JWTSecret, cfg.JWTTTL))
 	// Wired before any request or background job can emit an event.
 	st.UseRealtime(api)

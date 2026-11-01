@@ -1268,6 +1268,11 @@ body {
 }
 
 /* ---------------------------------------------------------------- 监考考场选择 */
+.room-stats b {
+  font-weight: 600;
+  color: var(--app-text-secondary);
+}
+
 .room-card.ant-card {
   position: relative;
   height: 100%;
@@ -1811,4 +1816,28 @@ body {
   width: 100%;
   max-width: 520px;
   margin: 8px 0;
+}
+
+/* ===== 通知通道状态卡 ===== */
+.channel-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.channel-card {
+  border: 1px solid var(--app-line, #e3e8f2);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.channel-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.channel-card p {
+  margin: 0;
+  line-height: 1.6;
 }

@@ -19,11 +19,52 @@ type SnapshotQuestion struct {
 }
 
 type PaperSnapshot struct {
-	PaperID    string             `json:"paper_id"`
-	PaperTitle string             `json:"paper_title"`
-	PaperType  string             `json:"paper_type"`
-	TotalScore float64            `json:"total_score"`
-	Questions  []SnapshotQuestion `json:"questions"`
+	PaperID     string             `json:"paper_id"`
+	PaperTitle  string             `json:"paper_title"`
+	PaperType   string             `json:"paper_type"`
+	TotalScore  float64            `json:"total_score"`
+	GroupTotals map[string]float64 `json:"group_totals,omitempty"`
+	Questions   []SnapshotQuestion `json:"questions"`
+}
+
+// groupTotals returns the full score of every paper group. Snapshots written before
+// group_totals existed derive it from the questions so historical AB exams report the
+// score a candidate can actually reach instead of the A+B sum stored in TotalScore.
+func (p PaperSnapshot) groupTotals() map[string]float64 {
+	if len(p.GroupTotals) > 0 {
+		return p.GroupTotals
+	}
+	totals := make(map[string]float64, 2)
+	for _, question := range p.Questions {
+		totals[question.PaperGroup] += question.Score
+	}
+	return totals
+}
+
+// TotalFor is the full score for one candidate group. A group missing from the paper
+// yields 0, which callers treat as "this candidate has no questions".
+func (p PaperSnapshot) TotalFor(group string) float64 {
+	totals := p.groupTotals()
+	if len(totals) == 0 {
+		return p.TotalScore
+	}
+	return totals[group]
+}
+
+// DisplayTotal is the paper full score to show a person: the largest group total, since
+// no candidate ever sees more than one group.
+func (p PaperSnapshot) DisplayTotal() float64 {
+	totals := p.groupTotals()
+	if len(totals) == 0 {
+		return p.TotalScore
+	}
+	highest := 0.0
+	for _, total := range totals {
+		if total > highest {
+			highest = total
+		}
+	}
+	return highest
 }
 
 type RandomSection struct {

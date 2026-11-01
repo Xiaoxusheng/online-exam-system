@@ -30,6 +30,16 @@ type Config struct {
 	MediaDir          string
 	SeedAdminPassword string
 	WebDir            string
+
+	// Outbound notification channels. SMTP unset = email disabled; SMS gateway
+	// unset = sms deliveries are recorded as simulated.
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUsername string
+	SMTPPassword string
+	SMTPFrom     string
+	SMSAPIURL    string
+	SMSAPIToken  string
 }
 
 func Load() (Config, error) {
@@ -50,6 +60,14 @@ func Load() (Config, error) {
 		MediaDir:          getEnv("MEDIA_DIR", "data/media"),
 		SeedAdminPassword: getEnv("SEED_ADMIN_PASSWORD", "Admin@123456"),
 		WebDir:            os.Getenv("WEB_DIR"),
+
+		SMTPHost:     os.Getenv("SMTP_HOST"),
+		SMTPPort:     getEnv("SMTP_PORT", "587"),
+		SMTPUsername: os.Getenv("SMTP_USERNAME"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:     os.Getenv("SMTP_FROM"),
+		SMSAPIURL:    os.Getenv("SMS_API_URL"),
+		SMSAPIToken:  os.Getenv("SMS_API_TOKEN"),
 	}
 
 	switch cfg.Env {

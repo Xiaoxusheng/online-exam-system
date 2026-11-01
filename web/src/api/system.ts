@@ -52,3 +52,29 @@ export interface NotificationLogParams {
 export function listNotificationLogs(params: NotificationLogParams = {}): Promise<ListResult<NotificationLog>> {
   return apiListRequest<NotificationLog>(`/notification-logs${toQuery(params)}`)
 }
+
+export interface NotificationChannelStatus {
+  email: { configured: boolean }
+  sms: { configured: boolean; mode: 'gateway' | 'simulated' | 'none' }
+}
+
+export function getNotificationChannels(): Promise<NotificationChannelStatus> {
+  return apiRequest<NotificationChannelStatus>('/notification-channels')
+}
+
+export interface TestChannelResult {
+  status: string
+  detail?: string
+  recipient: string
+}
+
+export function testNotificationChannel(input: {
+  channel: 'email' | 'sms'
+  code?: string
+  recipient?: string
+}): Promise<TestChannelResult> {
+  return apiRequest<TestChannelResult>('/notification-channels/test', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}

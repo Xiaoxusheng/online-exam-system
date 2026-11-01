@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"online-exam-system/server/internal/store"
@@ -120,6 +121,86 @@ func (a *API) handleListNotificationLogs(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	listData(w, items, page, pageSize, total)
+}
+
+// handleNotificationChannels reports which outbound channels are wired so the
+// settings page can show real status instead of hopeful labels.
+func (a *API) handleNotificationChannels(w http.ResponseWriter, _ *http.Request) {
+	email := map[string]any{"configured": false}
+	sms := map[string]any{"configured": false, "mode": "none"}
+	if a.notifier != nil {
+		email["configured"] = a.notifier.EmailConfigured()
+		sms["configured"] = true
+		if a.notifier.SMSConfigured() {
+			sms["mode"] = "gateway"
+		} else {
+			sms["mode"] = "simulated"
+		}
+	}
+	data(w, http.StatusOK, map[string]any{"email": email, "sms": sms})
+}
+
+type testChannelRequest struct {
+	Channel   string `json:"channel"`
+	Code      string `json:"code"`
+	Recipient string `json:"recipient"`
+}
+
+// handleTestNotificationChannel renders one template with sample vars and
+// delivers it to the given mailbox/phone. Audit-logged like every send.
+func (a *API) handleTestNotificationChannel(w http.ResponseWriter, r *http.Request) {
+	claims, actor, ok := a.resolveAuth(w, r)
+	if !ok {
+		return
+	}
+	var req testChannelRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if !validOneOf(req.Channel, "email", "sms") {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "channel 仅支持 email 或 sms")
+		return
+	}
+	recipient := strings.TrimSpace(req.Recipient)
+	if recipient == "" {
+		if req.Channel == "email" {
+			recipient = actor.Email
+		} else {
+			recipient = actor.Phone
+		}
+	}
+	if recipient == "" {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "请填写测试接收邮箱或手机号")
+		return
+	}
+
+	code := strings.TrimSpace(req.Code)
+	if code == "" {
+		code = "exam_publish"
+	}
+	vars := map[string]string{
+		"exam": "测试考试", "start_at": "2026-01-01 09:00", "end_at": "2026-01-01 11:00",
+		"duration": "120", "total": "88.5", "before": "80", "verdict": "已通过", "note": "测试",
+		"count": "1",
+	}
+	title, content, sendable := a.store.RenderChannelTemplate(r.Context(), claims.OrgID, req.Channel, code,
+		"测试通知", "这是一条测试通知。", vars)
+	if !sendable {
+		apiError(w, http.StatusBadRequest, "TEMPLATE_DISABLED", "该通道的模板未启用或不存在，请先在模板列表中启用")
+		return
+	}
+
+	status, err := a.notifier.Send(r.Context(), req.Channel, recipient, title, content)
+	if err != nil {
+		data(w, http.StatusOK, map[string]any{"status": "failed", "detail": err.Error(), "recipient": recipient})
+		return
+	}
+	a.audit(r, store.AuditEntry{
+		OrgID: claims.OrgID, ActorID: actor.ID, Action: "notification.test_sent",
+		TargetType: "notification_template", TargetID: code,
+		Detail: map[string]any{"channel": req.Channel, "recipient": recipient, "status": status, "at": time.Now().Format(time.RFC3339)},
+	})
+	data(w, http.StatusOK, map[string]any{"status": status, "recipient": recipient})
 }
 
 func (a *API) handleListAuditLogs(w http.ResponseWriter, r *http.Request) {

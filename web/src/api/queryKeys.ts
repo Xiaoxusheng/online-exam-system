@@ -44,6 +44,7 @@ export const queryKeys = {
 
   notifications: (params: KeyParams) => ['notification', 'list', params] as const,
   notificationTemplates: ['notification', 'templates'] as const,
+  notificationChannels: ['notification', 'channels'] as const,
   notificationLogs: (params: KeyParams) => ['notification', 'logs', params] as const,
 
   auditLogs: (params: KeyParams) => ['system', 'audit-logs', params] as const,

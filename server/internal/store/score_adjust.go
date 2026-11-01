@@ -187,7 +187,7 @@ func (s *Store) AdjustScore(ctx context.Context, scope Scope, attemptID, reason 
 
 	if nextStatus == "published" {
 		content := fmt.Sprintf("成绩已更正：当前 %.2f 分（原 %.2f 分）。如有疑问可在“我的成绩”提交申诉。", total, before)
-		if _, err := notifyUser(ctx, tx, orgID, userID, "成绩更正", content, "score_adjust", newRecordID, map[string]string{
+		if _, err := s.notifyUser(ctx, tx, orgID, userID, "成绩更正", content, "score_adjust", newRecordID, map[string]string{
 			"total": fmt.Sprintf("%.2f", total), "before": fmt.Sprintf("%.2f", before),
 		}); err != nil {
 			return ScoreAdjustment{}, err
@@ -419,7 +419,7 @@ func (s *Store) HandleAppeal(ctx context.Context, scope Scope, appealID, action,
 		verdict = "已通过"
 	}
 	content := fmt.Sprintf("成绩申诉%s：%s。当前得分 %.2f 分。", verdict, note, total)
-	if _, err := notifyUser(ctx, tx, orgID, userID, "成绩申诉结果", content, "score_appeal", appealID, map[string]string{
+	if _, err := s.notifyUser(ctx, tx, orgID, userID, "成绩申诉结果", content, "score_appeal", appealID, map[string]string{
 		"verdict": verdict, "note": note, "total": fmt.Sprintf("%.2f", total),
 	}); err != nil {
 		return ScoreAppeal{}, err
