@@ -101,16 +101,24 @@ type attemptRow struct {
 }
 
 func loadAttempt(ctx context.Context, db DBTX, attemptID string, forUpdate bool) (attemptRow, error) {
+	clause := ""
+	if forUpdate {
+		clause = ` FOR UPDATE OF a`
+	}
+	return loadAttemptWithLock(ctx, db, attemptID, clause)
+}
+
+// loadAttemptWithLock takes an explicit row lock clause ("FOR UPDATE OF a" or
+// "FOR SHARE OF a"). Answer saves use a share lock: it serialises against SubmitAttempt
+// (which holds FOR UPDATE) without letting two saves block each other.
+func loadAttemptWithLock(ctx context.Context, db DBTX, attemptID, clause string) (attemptRow, error) {
 	query := `
 		SELECT a.id::text, a.exam_id::text, e.title, a.user_id::text, u.name, a.status, a.paper_group,
 			a.started_at, a.submitted_at, a.score::float8, e.start_at, e.end_at, e.duration_minutes, e.rules
 		FROM attempts a
 		JOIN exams e ON e.id = a.exam_id
 		JOIN users u ON u.id = a.user_id
-		WHERE a.id = $1`
-	if forUpdate {
-		query += ` FOR UPDATE OF a`
-	}
+		WHERE a.id = $1` + clause
 	var row attemptRow
 	err := db.QueryRow(ctx, query, attemptID).Scan(
 		&row.ID, &row.ExamID, &row.ExamTitle, &row.UserID, &row.UserName, &row.Status, &row.PaperGroup,
@@ -139,6 +147,12 @@ func (s *Store) StartAttempt(ctx context.Context, orgID, userID, examID string) 
 		return "", fmt.Errorf("begin start attempt: %w", err)
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
+
+	// Same order as the expiry sweep (exams before exam_candidates) so starting an exam
+	// at the exact end_at cannot deadlock against the sweep marking candidates absent.
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM exams WHERE id = $1::uuid AND org_id = $2::uuid FOR UPDATE`, examID, orgID); err != nil {
+		return "", fmt.Errorf("lock exam for start: %w", err)
+	}
 
 	var (
 		examStatus      string
@@ -342,7 +356,15 @@ func (s *Store) GetAttemptState(ctx context.Context, userID, attemptID string) (
 }
 
 func (s *Store) SaveAnswer(ctx context.Context, userID, attemptID, questionID string, content json.RawMessage, version int) (int, error) {
-	row, err := loadAttempt(ctx, s.pool, attemptID, false)
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("begin save answer: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	// FOR SHARE conflicts with the FOR UPDATE taken by SubmitAttempt. Without it a save
+	// racing the submission could return 200 and still be ignored by the graded score.
+	row, err := loadAttemptWithLock(ctx, tx, attemptID, ` FOR SHARE OF a`)
 	if err != nil {
 		return 0, err
 	}
@@ -371,8 +393,9 @@ func (s *Store) SaveAnswer(ctx context.Context, userID, attemptID, questionID st
 		return 0, ErrNotFound
 	}
 
+	savedVersion := version + 1
 	if version <= 0 {
-		tag, err := s.pool.Exec(ctx, `
+		tag, err := tx.Exec(ctx, `
 			INSERT INTO answers (attempt_id, question_id, content, version, updated_at)
 			VALUES ($1, $2, $3::jsonb, 1, now())
 			ON CONFLICT (attempt_id, question_id) DO NOTHING`, attemptID, questionID, string(content))
@@ -382,21 +405,23 @@ func (s *Store) SaveAnswer(ctx context.Context, userID, attemptID, questionID st
 		if tag.RowsAffected() == 0 {
 			return 0, ErrConflict
 		}
-		return 1, nil
+	} else {
+		tag, err := tx.Exec(ctx, `
+			UPDATE answers
+			SET content = $1::jsonb, version = version + 1, updated_at = now()
+			WHERE attempt_id = $2 AND question_id = $3 AND version = $4`,
+			string(content), attemptID, questionID, version)
+		if err != nil {
+			return 0, fmt.Errorf("update answer: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return 0, ErrConflict
+		}
 	}
-
-	tag, err := s.pool.Exec(ctx, `
-		UPDATE answers
-		SET content = $1::jsonb, version = version + 1, updated_at = now()
-		WHERE attempt_id = $2 AND question_id = $3 AND version = $4`,
-		string(content), attemptID, questionID, version)
-	if err != nil {
-		return 0, fmt.Errorf("update answer: %w", err)
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("commit save answer: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
-		return 0, ErrConflict
-	}
-	return version + 1, nil
+	return savedVersion, nil
 }
 
 func (s *Store) SubmitAttempt(ctx context.Context, userID, attemptID string) (SubmitResult, error) {
@@ -419,6 +444,14 @@ func (s *Store) SubmitAttempt(ctx context.Context, userID, attemptID string) (Su
 	}
 	if row.Status != "in_progress" {
 		return SubmitResult{}, ErrInvalidState
+	}
+	// Lock the exam before the candidate rows below. The expiry sweep takes exams first
+	// and then exam_candidates; submitting in the opposite order deadlocked whenever the
+	// last candidate submitted right at end_at.
+	var lockedExamStatus string
+	if err := tx.QueryRow(ctx, `SELECT status FROM exams WHERE id = $1::uuid FOR UPDATE`, row.ExamID).
+		Scan(&lockedExamStatus); err != nil {
+		return SubmitResult{}, fmt.Errorf("lock exam for submit: %w", err)
 	}
 
 	var payload []byte
