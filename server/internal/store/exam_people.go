@@ -112,6 +112,22 @@ func (s *Store) setExamStaff(ctx context.Context, orgID, examID, kind string, us
 			return nil, fmt.Errorf("insert exam %s: %w", kind, err)
 		}
 	}
+	if kind == staffKindReviewer {
+		// A reviewer dropped from the list keeps their pending tasks otherwise, and
+		// SubmitReview only accepts the assigned reviewer — nobody, including an
+		// administrator, could finish them, so the answer sheet never turns graded and
+		// the whole exam can no longer publish scores. Release them back to the pool.
+		if _, err := tx.Exec(ctx, `
+			UPDATE review_tasks rt
+			SET reviewer_id = NULL, status = 'pending', updated_at = now()
+			FROM attempts a
+			WHERE rt.attempt_id = a.id AND a.exam_id = $1::uuid
+				AND rt.status IN ('pending', 'in_progress')
+				AND rt.reviewer_id IS NOT NULL
+				AND NOT (rt.reviewer_id::text = ANY($2::text[]))`, examID, unique); err != nil {
+			return nil, fmt.Errorf("release orphan review tasks: %w", err)
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit exam %s: %w", kind, err)
 	}

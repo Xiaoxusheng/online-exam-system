@@ -180,6 +180,19 @@ func (s *Store) PublishScores(ctx context.Context, orgID, examID string) (int64,
 		return 0, ErrInvalidState
 	}
 
+	// Self-heal sheets that were fully reviewed before the SubmitReview lock fix: two
+	// reviewers finishing together used to leave them stuck on submitted forever, which
+	// silently kept their scores out of every publish run.
+	if _, err := tx.Exec(ctx, `
+		UPDATE attempts a SET status = 'graded'
+		WHERE a.exam_id = $1 AND a.status = 'submitted'
+			AND NOT EXISTS (
+				SELECT 1 FROM review_tasks rt
+				WHERE rt.attempt_id = a.id AND rt.status IN ('pending', 'in_progress')
+			)`, examID); err != nil {
+		return 0, fmt.Errorf("repair graded attempts: %w", err)
+	}
+
 	type publishedScore struct {
 		userID string
 		total  float64

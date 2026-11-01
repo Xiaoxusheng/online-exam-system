@@ -253,10 +253,11 @@ func (s *Store) GetReviewTaskDetail(ctx context.Context, orgID, taskID, reviewer
 	var detail ReviewTaskDetail
 	var rulesRaw []byte
 	var assignedTo *string
+	var paperGroup string
 	err := s.pool.QueryRow(ctx, `
 		SELECT rt.id::text, rt.attempt_id::text, e.id::text, e.title, u.id::text, u.name,
 			rt.question_id::text, q.type, rt.round::int, rt.status, rt.score::float8, rt.comment,
-			rt.created_at, rt.updated_at, e.rules, a.status, rt.reviewer_id::text, COALESCE(ru.name, '')
+			rt.created_at, rt.updated_at, e.rules, a.status, rt.reviewer_id::text, COALESCE(ru.name, ''), a.paper_group
 		FROM review_tasks rt
 		JOIN attempts a ON a.id = rt.attempt_id
 		JOIN exams e ON e.id = a.exam_id
@@ -266,7 +267,7 @@ func (s *Store) GetReviewTaskDetail(ctx context.Context, orgID, taskID, reviewer
 		WHERE rt.id = $1::uuid AND e.org_id = $2`, taskID, orgID,
 	).Scan(&detail.ID, &detail.AttemptID, &detail.ExamID, &detail.ExamTitle, &detail.UserID, &detail.UserName,
 		&detail.QuestionID, &detail.QuestionType, &detail.Round, &detail.Status, &detail.Score, &detail.Comment,
-		&detail.CreatedAt, &detail.UpdatedAt, &rulesRaw, &detail.AttemptStatus, &assignedTo, &detail.ReviewerName)
+		&detail.CreatedAt, &detail.UpdatedAt, &rulesRaw, &detail.AttemptStatus, &assignedTo, &detail.ReviewerName, &paperGroup)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ReviewTaskDetail{}, ErrNotFound
@@ -292,7 +293,9 @@ func (s *Store) GetReviewTaskDetail(ctx context.Context, orgID, taskID, reviewer
 	}
 	found := false
 	for _, question := range snapshot.Questions {
-		if question.QuestionID == detail.QuestionID {
+		// The same question may sit in both AB groups with different scores; take the one
+		// the candidate was actually handed.
+		if question.QuestionID == detail.QuestionID && question.PaperGroup == paperGroup {
 			detail.Question = question
 			found = true
 			break
@@ -373,16 +376,21 @@ func (s *Store) SubmitReview(ctx context.Context, orgID, reviewerID, taskID stri
 		taskStatus string
 		assigned   *string
 		rulesRaw   []byte
+		paperGroup string
 	)
+	// Locking the attempt alongside the task serialises every review of the same answer
+	// sheet. Without it two reviewers finishing the last two tasks at the same instant
+	// each still see the other's task as pending, so the submitted -> graded transition
+	// below never runs and the candidate's score can never be published.
 	err = tx.QueryRow(ctx, `
 		SELECT rt.attempt_id::text, e.id::text, rt.question_id::text, rt.round::int, rt.status,
-			rt.reviewer_id::text, e.rules
+			rt.reviewer_id::text, e.rules, a.paper_group
 		FROM review_tasks rt
 		JOIN attempts a ON a.id = rt.attempt_id
 		JOIN exams e ON e.id = a.exam_id
 		WHERE rt.id = $1::uuid AND e.org_id = $2
-		FOR UPDATE OF rt`, taskID, orgID,
-	).Scan(&attemptID, &examID, &questionID, &round, &taskStatus, &assigned, &rulesRaw)
+		FOR UPDATE OF rt, a`, taskID, orgID,
+	).Scan(&attemptID, &examID, &questionID, &round, &taskStatus, &assigned, &rulesRaw, &paperGroup)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ReviewSubmitResult{}, ErrNotFound
@@ -407,7 +415,7 @@ func (s *Store) SubmitReview(ctx context.Context, orgID, reviewerID, taskID stri
 	var maxScore float64
 	found := false
 	for _, question := range snapshot.Questions {
-		if question.QuestionID == questionID {
+		if question.QuestionID == questionID && question.PaperGroup == paperGroup {
 			maxScore = question.Score
 			found = true
 			break
