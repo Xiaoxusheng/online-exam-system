@@ -204,7 +204,7 @@ export default function PapersPage() {
         <Table
           rowKey="id"
           size="middle"
-          loading={papersQuery.isPending}
+          loading={papersQuery.isFetching}
           columns={columns}
           dataSource={papersQuery.data?.items ?? []}
           scroll={{ x: 900 }}

@@ -118,7 +118,7 @@ export default function ReviewPage() {
         <Table
           rowKey="id"
           size="middle"
-          loading={activeQuery.isPending}
+          loading={activeQuery.isFetching}
           columns={columns(
             (task) => setTaskId(task.id),
             (task) => navigate(`/review/workbench?task=${task.id}&status=${tab}`),

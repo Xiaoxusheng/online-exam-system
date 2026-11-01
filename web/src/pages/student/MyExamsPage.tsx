@@ -113,7 +113,7 @@ export default function MyExamsPage() {
         <Table
           rowKey="id"
           size="middle"
-          loading={examsQuery.isPending}
+          loading={examsQuery.isFetching}
           columns={columns}
           dataSource={examsQuery.data ?? []}
           scroll={{ x: 860 }}

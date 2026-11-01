@@ -144,7 +144,7 @@ function TemplatePanel() {
       <Table
         rowKey="id"
         size="middle"
-        loading={templatesQuery.isPending}
+        loading={templatesQuery.isFetching}
         columns={columns}
         dataSource={templatesQuery.data ?? []}
         pagination={false}
@@ -277,7 +277,7 @@ function DispatchLogPanel() {
       <Table
         rowKey="id"
         size="middle"
-        loading={logsQuery.isPending}
+        loading={logsQuery.isFetching}
         columns={columns}
         dataSource={logsQuery.data?.items ?? []}
         scroll={{ x: 1160 }}

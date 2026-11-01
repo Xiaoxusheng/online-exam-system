@@ -256,7 +256,7 @@ export default function ScoresPage() {
         <Table
           rowKey="attempt_id"
           size="middle"
-          loading={scoresQuery.isPending}
+          loading={scoresQuery.isFetching}
           columns={scoreColumns(openDetail)}
           dataSource={scoresQuery.data?.items ?? []}
           scroll={{ x: 980 }}
@@ -440,7 +440,7 @@ export default function ScoresPage() {
                 <Table
                   rowKey="id"
                   size="small"
-                  loading={historyQuery.isPending}
+                  loading={historyQuery.isFetching}
                   dataSource={historyQuery.data ?? []}
                   pagination={false}
                   columns={[

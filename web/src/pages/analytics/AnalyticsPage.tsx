@@ -163,7 +163,7 @@ export default function AnalyticsPage() {
             style={{ width: 280 }}
             value={chosen}
             options={examOptions}
-            loading={examsQuery.isPending}
+            loading={examsQuery.isFetching}
             onChange={(value) => setChosen(value)}
           />
         }

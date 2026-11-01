@@ -266,7 +266,7 @@ export default function QuestionsPage() {
         <Table
           rowKey="id"
           size="middle"
-          loading={questionsQuery.isPending}
+          loading={questionsQuery.isFetching}
           columns={columns}
           dataSource={questionsQuery.data?.items ?? []}
           scroll={{ x: 1020 }}

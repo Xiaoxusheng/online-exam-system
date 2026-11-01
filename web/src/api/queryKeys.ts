@@ -24,6 +24,9 @@ export const queryKeys = {
   myExams: ['student', 'my-exams'] as const,
   attempt: (attemptId: string) => ['student', 'attempt', attemptId] as const,
   myScores: ['student', 'my-scores'] as const,
+  // Deliberately separate from scoreRecord: the two endpoints return different shapes,
+  // and sharing one key let the candidate page render the admin payload (and vice versa).
+  myScoreRecord: (attemptId: string) => ['student', 'score-record', attemptId] as const,
 
   scores: (params: KeyParams) => ['score', 'list', params] as const,
   scoreRecord: (attemptId: string) => ['score', 'record', attemptId] as const,

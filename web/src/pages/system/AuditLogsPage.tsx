@@ -177,7 +177,7 @@ export default function AuditLogsPage() {
         <Table
           rowKey="id"
           size="middle"
-          loading={logsQuery.isPending}
+          loading={logsQuery.isFetching}
           columns={columns}
           dataSource={logsQuery.data?.items ?? []}
           scroll={{ x: 900 }}

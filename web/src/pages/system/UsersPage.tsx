@@ -365,7 +365,7 @@ export default function UsersPage() {
                   <Table
                     rowKey="id"
                     size="middle"
-                    loading={usersQuery.isPending}
+                    loading={usersQuery.isFetching}
                     columns={columns}
                     dataSource={usersQuery.data?.items ?? []}
                     scroll={{ x: 1080 }}
@@ -389,7 +389,7 @@ export default function UsersPage() {
                 <Table
                   rowKey="code"
                   size="middle"
-                  loading={rolesQuery.isPending}
+                  loading={rolesQuery.isFetching}
                   columns={[
                     { title: '角色', dataIndex: 'name', width: 140 },
                     { title: '标识', dataIndex: 'code', width: 140, render: (value: string) => <code>{value}</code> },

@@ -233,7 +233,7 @@ export default function ExamDetail({ examId, onClose }: { examId: string | null;
                     <Table
                       rowKey="id"
                       size="small"
-                      loading={candidatesQuery.isPending}
+                      loading={candidatesQuery.isFetching}
                       columns={candidateColumns}
                       dataSource={candidatesQuery.data?.items ?? []}
                       pagination={{
@@ -280,7 +280,7 @@ export default function ExamDetail({ examId, onClose }: { examId: string | null;
                     <Table
                       rowKey="user_id"
                       size="small"
-                      loading={proctorsQuery.isPending}
+                      loading={proctorsQuery.isFetching}
                       columns={[
                         { title: '姓名', dataIndex: 'name' },
                         { title: '用户名', dataIndex: 'username' },
@@ -329,7 +329,7 @@ export default function ExamDetail({ examId, onClose }: { examId: string | null;
                     <Table
                       rowKey="user_id"
                       size="small"
-                      loading={reviewersQuery.isPending}
+                      loading={reviewersQuery.isFetching}
                       columns={[
                         { title: '姓名', dataIndex: 'name' },
                         { title: '用户名', dataIndex: 'username' },

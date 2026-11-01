@@ -248,7 +248,7 @@ export default function ExamsPage() {
         <Table
           rowKey="id"
           size="middle"
-          loading={examsQuery.isPending}
+          loading={examsQuery.isFetching}
           columns={columns}
           dataSource={examsQuery.data?.items ?? []}
           scroll={{ x: 1000 }}
@@ -299,7 +299,7 @@ export default function ExamsPage() {
               optionFilterProp="label"
               placeholder="选择已通过审核的试卷"
               options={paperOptions}
-              loading={papersQuery.isPending}
+              loading={papersQuery.isFetching}
             />
           </Form.Item>
 
@@ -417,7 +417,7 @@ export default function ExamsPage() {
                 children: (
                   <>
                     <Form.Item name="class_ids" label="按班级编排" tooltip="班级内启用状态的学员会被全部加入">
-                      <Select mode="multiple" allowClear placeholder="选择班级" options={classOptions} loading={classesQuery.isPending} />
+                      <Select mode="multiple" allowClear placeholder="选择班级" options={classOptions} loading={classesQuery.isFetching} />
                     </Form.Item>
 
                     <Form.Item
@@ -436,7 +436,7 @@ export default function ExamsPage() {
                         optionFilterProp="label"
                         placeholder="选择学员"
                         options={studentOptions}
-                        loading={studentsQuery.isPending}
+                        loading={studentsQuery.isFetching}
                       />
                     </Form.Item>
                   </>

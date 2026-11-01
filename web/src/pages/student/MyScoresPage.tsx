@@ -30,7 +30,7 @@ export default function MyScoresPage() {
   const scoresQuery = useQuery({ queryKey: queryKeys.myScores, queryFn: listMyScores })
   const appealsQuery = useQuery({ queryKey: queryKeys.myAppeals, queryFn: listMyAppeals })
   const recordQuery = useQuery({
-    queryKey: queryKeys.scoreRecord(activeAttempt ?? ''),
+    queryKey: queryKeys.myScoreRecord(activeAttempt ?? ''),
     queryFn: () => getMyScoreRecord(activeAttempt ?? ''),
     enabled: Boolean(activeAttempt),
   })
@@ -149,7 +149,7 @@ export default function MyScoresPage() {
                 <Table
                   rowKey="attempt_id"
                   size="middle"
-                  loading={scoresQuery.isPending}
+                  loading={scoresQuery.isFetching}
                   columns={columns}
                   dataSource={scoresQuery.data ?? []}
                   pagination={false}
@@ -177,7 +177,7 @@ export default function MyScoresPage() {
                 <Table
                   rowKey="id"
                   size="middle"
-                  loading={appealsQuery.isPending}
+                  loading={appealsQuery.isFetching}
                   columns={appealColumns}
                   dataSource={appealsQuery.data ?? []}
                   pagination={false}

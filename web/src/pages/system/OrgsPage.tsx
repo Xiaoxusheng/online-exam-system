@@ -93,7 +93,7 @@ export default function OrgsPage() {
             <Table
               rowKey="id"
               size="small"
-              loading={campusesQuery.isPending}
+              loading={campusesQuery.isFetching}
               columns={campusColumns}
               dataSource={campusesQuery.data ?? []}
               pagination={false}
@@ -126,7 +126,7 @@ export default function OrgsPage() {
             <Table
               rowKey="id"
               size="small"
-              loading={classesQuery.isPending}
+              loading={classesQuery.isFetching}
               columns={classColumns}
               dataSource={classesQuery.data ?? []}
               pagination={{ pageSize: 10, showSizeChanger: false, showTotal: (total) => `共 ${total} 个班级` }}

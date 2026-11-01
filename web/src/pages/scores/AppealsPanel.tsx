@@ -148,7 +148,7 @@ export default function AppealsPanel() {
       <Table
         rowKey="id"
         size="middle"
-        loading={appealsQuery.isPending}
+        loading={appealsQuery.isFetching}
         columns={columns}
         dataSource={appealsQuery.data?.items ?? []}
         scroll={{ x: 1020 }}
