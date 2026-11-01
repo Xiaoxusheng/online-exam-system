@@ -20,19 +20,19 @@ import (
 // mediaMimeExts maps every accepted upload MIME type to a file extension. The
 // extension comes from this table, never from the client-supplied filename.
 var mediaMimeExts = map[string]string{
-	"image/png":      "png",
-	"image/jpeg":     "jpg",
-	"image/webp":     "webp",
-	"image/gif":      "gif",
-	"audio/mpeg":     "mp3",
-	"audio/mp4":      "m4a",
-	"audio/x-m4a":    "m4a",
-	"audio/wav":      "wav",
-	"audio/x-wav":    "wav",
-	"audio/ogg":      "ogg",
-	"audio/webm":     "weba",
-	"video/mp4":      "mp4",
-	"video/webm":     "webm",
+	"image/png":       "png",
+	"image/jpeg":      "jpg",
+	"image/webp":      "webp",
+	"image/gif":       "gif",
+	"audio/mpeg":      "mp3",
+	"audio/mp4":       "m4a",
+	"audio/x-m4a":     "m4a",
+	"audio/wav":       "wav",
+	"audio/x-wav":     "wav",
+	"audio/ogg":       "ogg",
+	"audio/webm":      "weba",
+	"video/mp4":       "mp4",
+	"video/webm":      "webm",
 	"video/quicktime": "mov",
 }
 
@@ -72,7 +72,7 @@ func (a *API) handleUploadMedia(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "purpose 取值不正确")
 		return
 	}
-	if claims.Role == "student" {
+	if actor.Role == "student" {
 		if _, allowed := studentMediaPurposes[purpose]; !allowed {
 			apiError(w, http.StatusForbidden, "FORBIDDEN", "考生仅可上传作答音视频与抓拍")
 			return
@@ -214,7 +214,7 @@ func (a *API) handleMediaContent(w http.ResponseWriter, r *http.Request) {
 	// else requires a session: the <audio>/<video>/<img> tags reach this route
 	// through ?token= instead of a header, org tenancy included.
 	if item.Purpose != "branding" {
-		claims, _, authOK := a.resolveAuth(w, r)
+		claims, actor, authOK := a.resolveAuth(w, r)
 		if !authOK {
 			return
 		}
@@ -223,9 +223,9 @@ func (a *API) handleMediaContent(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if item.Purpose == "answer_media" || item.Purpose == "proctor_snapshot" {
-			owner := item.UploaderID == claims.Subject
-			staff := claims.Role == "org_admin" || claims.Role == "exam_admin" ||
-				claims.Role == "reviewer" || claims.Role == "proctor"
+			owner := item.UploaderID == actor.ID
+			staff := actor.Role == "org_admin" || actor.Role == "exam_admin" ||
+				actor.Role == "reviewer" || actor.Role == "proctor"
 			if !owner && !staff {
 				apiError(w, http.StatusForbidden, "FORBIDDEN", "无权访问该媒体")
 				return
@@ -258,7 +258,7 @@ func (a *API) handleDeleteMedia(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	admin := claims.Role == "org_admin"
+	admin := actor.Role == "org_admin"
 	if err := a.store.MarkMediaDeleted(r.Context(), claims.OrgID, mediaID, actor.ID, admin); err != nil {
 		a.storeError(w, r, err, "媒体不存在或无权删除")
 		return
