@@ -2,6 +2,15 @@
 
 > 唯一计划/进度文件。后续任务在本文件追加或更新，不新建任务文档。
 
+## v2.1 动效层与上线（2026-11-01 完成）
+
+- 背景：用户要求「加点动画」。原则：有层次、不喧闹，全部尊重既有的 `prefers-reduced-motion` 降级。
+- 入场：卡片统一 `card-in`（淡入 + 8px 上移 + 0.988 缩放，380ms）；指标卡按 30/80/130/180/230ms stagger；面板、筛选栏、快捷入口、指标栅格统一 90ms 延迟跟进，与内容区 `content-rise` 形成两层节奏。
+- 微交互：通知铃铛 hover 摇摆（四段回摆）、主题/折叠按钮 hover 弹性旋转、侧栏菜单图标 hover 轻移 1.5px、空态插画 3.4s 缓浮。
+- 验证：无头浏览器断言工作台 `.stat-card/.panel-card/.quick-card` 的 computed animationName 均为 `card-in`；typecheck/build 通过、冒烟 47/47、控制台零报错。
+- 上线：产物 `index-KKoSo5z2.js` / `index-BvoutHS_.css`，服务器端校验含 `card-in` 后原子切换，复验 200。提交 `db031ff`。
+- 回滚：`cd /opt/online-exam && mv web web.failed && mv web.prev web`。
+
 ## v2.1 全站覆盖确认与重新上线（2026-11-01 完成）
 
 - 背景：用户强调参考稿风格要覆盖整个系统而非仅工作台。经逐屏核查，v2.1 改在全局令牌层（theme.ts）与唯一视觉层（design-v2.css），本就全站生效；补充截图验证了此前未覆盖的界面。
