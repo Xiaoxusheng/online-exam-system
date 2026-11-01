@@ -19,6 +19,11 @@ type ScoreDetailItem struct {
 	MaxScore    float64 `json:"max_score"`
 	NeedsReview bool    `json:"needs_review"`
 	Auto        bool    `json:"auto"`
+	// Analysis fields are only attached when the exam releases analysis (C-13)
+	// or a staff member reads the record.
+	Correct   []string `json:"correct,omitempty"`
+	Reference string   `json:"reference,omitempty"`
+	Rubric    []string `json:"rubric,omitempty"`
 }
 
 type ScoreDetail struct {
@@ -124,9 +129,13 @@ func (s *Store) ListScores(ctx context.Context, scope Scope, f ScoreFilter) ([]S
 
 // GetScoreRecord loads the latest score record of an attempt within the caller's scope.
 // publishedOnly is used by the candidate route so unpublished scores stay invisible.
-func (s *Store) GetScoreRecord(ctx context.Context, scope Scope, attemptID string, publishedOnly bool) (ScoreRecordDetail, error) {
+// GetScoreRecord loads one score row. When withAnalysis is true the per-question
+// analysis (correct answer / reference / rubric) rides along from the paper
+// snapshot; candidates only receive it when the exam enabled show_analysis.
+func (s *Store) GetScoreRecord(ctx context.Context, scope Scope, attemptID string, publishedOnly, withAnalysis bool) (ScoreRecordDetail, error) {
 	var item ScoreRecordDetail
 	var detailRaw []byte
+	var rulesRaw []byte
 	scopeSQL, scopeArgs := scope.peopleFilter("u", 3)
 	if publishedOnly {
 		scopeSQL += " AND sr.status = 'published'"
@@ -134,7 +143,7 @@ func (s *Store) GetScoreRecord(ctx context.Context, scope Scope, attemptID strin
 	args := append([]any{attemptID, scope.OrgID}, scopeArgs...)
 	err := s.pool.QueryRow(ctx, `
 		SELECT a.id::text, u.id::text, u.name, u.username, e.id::text, e.title,
-			sr.total::float8, sr.status, a.status, a.submitted_at, sr.published_at, sr.detail
+			sr.total::float8, sr.status, a.status, a.submitted_at, sr.published_at, sr.detail, e.rules
 		FROM score_records sr
 		JOIN attempts a ON a.id = sr.attempt_id
 		JOIN users u ON u.id = a.user_id
@@ -142,7 +151,7 @@ func (s *Store) GetScoreRecord(ctx context.Context, scope Scope, attemptID strin
 		WHERE sr.attempt_id = $1::uuid AND e.org_id = $2`+scopeSQL+`
 		ORDER BY sr.created_at DESC
 		LIMIT 1`, args...).Scan(&item.AttemptID, &item.UserID, &item.UserName, &item.Username, &item.ExamID, &item.ExamTitle,
-		&item.Total, &item.ScoreStatus, &item.AttemptStatus, &item.SubmittedAt, &item.PublishedAt, &detailRaw)
+		&item.Total, &item.ScoreStatus, &item.AttemptStatus, &item.SubmittedAt, &item.PublishedAt, &detailRaw, &rulesRaw)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ScoreRecordDetail{}, ErrNotFound
@@ -154,10 +163,56 @@ func (s *Store) GetScoreRecord(ctx context.Context, scope Scope, attemptID strin
 			return ScoreRecordDetail{}, fmt.Errorf("parse score detail: %w", err)
 		}
 	}
+	if withAnalysis && showAnalysisEnabled(rulesRaw) {
+		item.Detail.Questions = s.attachAnalysis(ctx, item.ExamID, item.Detail.Questions)
+	}
 	if item.Detail.Questions == nil {
 		item.Detail.Questions = []ScoreDetailItem{}
 	}
 	return item, nil
+}
+
+func showAnalysisEnabled(rulesRaw []byte) bool {
+	var rules struct {
+		ShowAnalysis *bool `json:"show_analysis"`
+	}
+	_ = json.Unmarshal(rulesRaw, &rules)
+	return rules.ShowAnalysis != nil && *rules.ShowAnalysis
+}
+
+// attachAnalysis merges the snapshot answers into the score detail rows.
+func (s *Store) attachAnalysis(ctx context.Context, examID string, questions []ScoreDetailItem) []ScoreDetailItem {
+	snapshot, err := s.GetSnapshot(ctx, examID)
+	if err != nil {
+		return questions // analysis is best-effort: never fail the score read
+	}
+	byID := make(map[string]SnapshotQuestion, len(snapshot.Questions))
+	for _, question := range snapshot.Questions {
+		byID[question.QuestionID] = question
+	}
+	var answer struct {
+		Correct   []string `json:"correct"`
+		Reference string   `json:"reference"`
+		Rubric    []string `json:"rubric"`
+	}
+	for index := range questions {
+		source, ok := byID[questions[index].QuestionID]
+		if !ok {
+			continue
+		}
+		answer = struct {
+			Correct   []string `json:"correct"`
+			Reference string   `json:"reference"`
+			Rubric    []string `json:"rubric"`
+		}{}
+		if err := json.Unmarshal(source.Answer, &answer); err != nil {
+			continue
+		}
+		questions[index].Correct = answer.Correct
+		questions[index].Reference = answer.Reference
+		questions[index].Rubric = answer.Rubric
+	}
+	return questions
 }
 
 func (s *Store) PublishScores(ctx context.Context, orgID, examID string) (int64, error) {

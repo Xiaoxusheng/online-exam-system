@@ -258,6 +258,34 @@ export default function MyScoresPage() {
                 },
               ]}
             />
+            {questions.some((item) => item.correct?.length || item.reference || item.rubric?.length) && (
+              <div className="score-analysis">
+                <h4 className="score-analysis-title">答案与解析</h4>
+                {questions.map((item, index) => {
+                  const hasAnalysis = Boolean(item.correct?.length || item.reference || item.rubric?.length)
+                  if (!hasAnalysis) return null
+                  return (
+                    <div className="score-analysis-item" key={item.question_id}>
+                      <div className="score-analysis-head">
+                        <Tag className="soft-tag">第 {index + 1} 题 · {questionTypeLabel(item.type)}</Tag>
+                        <span className="cell-meta">{formatScore(item.score, 1)} / {formatScore(item.max_score, 1)} 分</span>
+                      </div>
+                      {item.correct && item.correct.length > 0 && (
+                        <p className="score-analysis-line">正确答案：{item.correct.map((value) => String(value)).join('、')}</p>
+                      )}
+                      {item.reference && <p className="score-analysis-line">解析：{item.reference}</p>}
+                      {item.rubric && item.rubric.length > 0 && (
+                        <ul className="score-analysis-line">
+                          {item.rubric.map((point, pointIndex) => (
+                            <li key={pointIndex}>{point}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </>
         )}
       </Drawer>

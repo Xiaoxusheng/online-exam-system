@@ -1945,3 +1945,10 @@ body {
   font-weight: 600;
   border-bottom-color: var(--app-primary, #2175ff);
 }
+
+/* ===== 成绩解析（C-13）===== */
+.score-analysis { margin-top: 16px; border-top: 1px solid var(--app-line, #e3e8f2); padding-top: 12px; }
+.score-analysis-title { margin: 0 0 10px; font-size: 13px; }
+.score-analysis-item { padding: 10px 0; border-bottom: 1px dashed var(--app-line, #e3e8f2); }
+.score-analysis-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.score-analysis-line { margin: 4px 0; font-size: 13px; line-height: 1.7; }

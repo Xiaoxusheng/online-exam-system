@@ -34,6 +34,7 @@ interface CreateFormValues {
   disable_paste?: boolean
   screen_switch_limit?: number
   snapshot_interval?: number
+  show_analysis?: boolean
 }
 
 export default function ExamsPage() {
@@ -114,6 +115,7 @@ export default function ExamsPage() {
         disable_paste: values.disable_paste ?? false,
         screen_switch_limit: values.screen_switch_limit ?? 5,
         snapshot_interval: values.snapshot_interval ?? 0,
+        show_analysis: values.show_analysis ?? false,
       },
       class_ids: values.class_ids ?? [],
       candidates: (values.student_ids ?? []).map((id) => ({ user_id: id })),
@@ -393,6 +395,20 @@ export default function ExamsPage() {
                       </Form.Item>
                     </div>
                   </>
+                ),
+              },
+              {
+                key: 'analysis',
+                title: '答案与解析',
+                children: (
+                  <Form.Item
+                    name="show_analysis"
+                    label="成绩发布后展示解析"
+                    valuePropName="checked"
+                    tooltip="开启后考生在成绩明细中可查看正确答案、参考答案与评分要点"
+                  >
+                    <Switch />
+                  </Form.Item>
                 ),
               },
               {

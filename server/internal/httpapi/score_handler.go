@@ -34,7 +34,7 @@ func (a *API) handleGetScore(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	score, err := a.store.GetScoreRecord(r.Context(), scopeFrom(r.Context()), attemptID, false)
+	score, err := a.store.GetScoreRecord(r.Context(), scopeFrom(r.Context()), attemptID, false, true)
 	if err != nil {
 		a.storeError(w, r, err, "成绩不存在")
 		return
@@ -48,7 +48,9 @@ func (a *API) handleMyScoreRecord(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	score, err := a.store.GetScoreRecord(r.Context(), scopeFrom(r.Context()), attemptID, true)
+	// Analysis rides along only when the exam enabled show_analysis (C-13);
+	// the store decides, so the candidate payload stays clean otherwise.
+	score, err := a.store.GetScoreRecord(r.Context(), scopeFrom(r.Context()), attemptID, true, true)
 	if err != nil {
 		a.storeError(w, r, err, "成绩不存在或未发布")
 		return

@@ -191,6 +191,7 @@ export interface ExamRules {
   disable_paste?: boolean
   screen_switch_limit?: number
   snapshot_interval?: number
+  show_analysis?: boolean
 }
 
 export interface Exam {
@@ -364,6 +365,10 @@ export interface ScoreDetailItem {
   max_score: number
   needs_review: boolean
   auto: boolean
+  /** Analysis fields ride along only when the exam released them (C-13). */
+  correct?: (string | string[])[]
+  reference?: string
+  rubric?: string[]
 }
 
 export interface ScoreListItem {
