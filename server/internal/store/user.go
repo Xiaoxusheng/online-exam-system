@@ -66,6 +66,26 @@ func (s *Store) FindUserByID(ctx context.Context, id string) (User, error) {
 	return u, nil
 }
 
+// FindUserByPhone loads the active account bound to a phone number (C-01).
+// Ambiguity resolves to the earliest account, matching FindUserByAccount.
+func (s *Store) FindUserByPhone(ctx context.Context, phone string) (User, error) {
+	var u User
+	err := s.pool.QueryRow(ctx, `
+		SELECT `+userColumns+`
+		FROM users
+		WHERE phone = $1 AND status = 'active'
+		ORDER BY created_at
+		LIMIT 1`, phone,
+	).Scan(userScanDest(&u)...)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return User{}, ErrNotFound
+		}
+		return User{}, fmt.Errorf("find user by phone: %w", err)
+	}
+	return u, nil
+}
+
 func (s *Store) FindUserInOrg(ctx context.Context, orgID, id string) (User, error) {
 	var u User
 	err := s.pool.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE id = $1 AND org_id = $2`, id, orgID).

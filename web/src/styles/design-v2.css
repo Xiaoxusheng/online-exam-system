@@ -1922,3 +1922,26 @@ body {
 }
 .media-answer-preview video,
 .media-answer-preview audio { display: block; width: 100%; max-width: 480px; border-radius: 8px; }
+
+/* ===== 登录方式切换 ===== */
+.login-mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--app-line, #e3e8f2);
+}
+.login-mode-tab {
+  border: none;
+  background: none;
+  padding: 8px 2px;
+  margin-right: 20px;
+  font-size: 14px;
+  color: var(--app-text-secondary, #55555e);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.login-mode-tab-active {
+  color: var(--app-primary, #2175ff);
+  font-weight: 600;
+  border-bottom-color: var(--app-primary, #2175ff);
+}

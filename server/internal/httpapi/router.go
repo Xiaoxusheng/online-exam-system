@@ -27,12 +27,14 @@ type API struct {
 	tokens   *auth.TokenManager
 	hub      *proctorHub
 	limiter  *loginLimiter
+	sms      *smsVerification
 	notifier store.ExternalNotifier
 }
 
 func New(cfg config.Config, log *slog.Logger, st *store.Store, tokens *auth.TokenManager) *API {
 	return &API{cfg: cfg, log: log, store: st, tokens: tokens, hub: newProctorHub(log),
 		limiter:  newLoginLimiter(cfg.LoginAccountLimit, cfg.LoginIPLimit, cfg.LoginBlock),
+		sms:      newSMSVerification(),
 		notifier: st.Notifier(),
 	}
 }
@@ -47,6 +49,9 @@ func (a *API) Router() http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", a.handleLogin)
 		r.Post("/auth/refresh", a.handleRefresh)
+		// C-01 phone verification-code login (throttled, memory-backed codes).
+		r.Post("/auth/sms-code", a.handleSendSmsCode)
+		r.Post("/auth/login-sms", a.handleLoginBySmsCode)
 
 		// Public branding profile: the login page needs it before any session.
 		r.Get("/branding", a.handleGetBranding)
