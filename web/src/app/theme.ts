@@ -4,21 +4,21 @@ const fontFamily =
   'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif'
 
 /**
- * 「墨砚」设计基座 v2.0 —— 现代高级感的考试工作台。
+ * 「墨砚」设计基座 v2.1 —— 对齐参考风格的亮蓝配色与高信息密度。
  *
  * 三条主线：
  * 1. 纯白画布：全站铺白，层次只靠 1px 细边框与极轻投影，干净通透；
- * 2. 墨色语言：靛墨主色 + 批改朱语义色，稳重中带一点锋利；
- * 3. 柔和几何：8/12px 圆角、药丸页签、胶囊高亮，紧凑但不局促。
+ * 2. 亮蓝语言：#2175FF 主色 + 鲜亮语义色，数字层级突出；
+ * 3. 紧凑密度：小圆角、窄行距、密排卡片，信息密度高但保持呼吸感。
  */
 const baseToken: ThemeConfig['token'] = {
   // 品牌与语义
-  colorPrimary: '#2F54EB',
-  colorInfo: '#2F54EB',
-  colorLink: '#2F54EB',
-  colorSuccess: '#0F9D76',
-  colorWarning: '#D98A26',
-  colorError: '#D64545',
+  colorPrimary: '#2175FF',
+  colorInfo: '#2175FF',
+  colorLink: '#2175FF',
+  colorSuccess: '#16A34A',
+  colorWarning: '#F59E0B',
+  colorError: '#EF4444',
   colorTextBase: '#111A2E',
   colorTextSecondary: '#55607A',
   colorTextTertiary: '#8B94AB',
@@ -33,11 +33,11 @@ const baseToken: ThemeConfig['token'] = {
   colorBgContainer: '#FFFFFF',
   colorBgElevated: '#FFFFFF',
 
-  // 形状：柔和现代
-  borderRadius: 8,
-  borderRadiusLG: 12,
-  borderRadiusSM: 6,
-  borderRadiusXS: 4,
+  // 形状：小圆角，接近参考稿的紧凑卡片
+  borderRadius: 7,
+  borderRadiusLG: 10,
+  borderRadiusSM: 5,
+  borderRadiusXS: 3,
 
   // 尺度：紧凑，适配高频录入
   controlHeight: 32,
@@ -59,16 +59,16 @@ const baseComponents: ThemeConfig['components'] = {
     siderBg: '#FFFFFF',
     headerBg: '#FFFFFF',
     bodyBg: '#FFFFFF',
-    headerHeight: 56,
-    headerPadding: '0 20px',
+    headerHeight: 52,
+    headerPadding: '0 18px',
   },
   Menu: {
-    itemBorderRadius: 8,
-    itemHeight: 36,
-    itemMarginInline: 10,
+    itemBorderRadius: 7,
+    itemHeight: 34,
+    itemMarginInline: 8,
     itemMarginBlock: 2,
-    itemSelectedBg: '#EEF2FE',
-    itemSelectedColor: '#2F54EB',
+    itemSelectedBg: '#EAF2FF',
+    itemSelectedColor: '#2175FF',
     itemColor: '#55607A',
     itemHoverBg: '#F5F7FB',
     itemHoverColor: '#111A2E',
@@ -78,65 +78,65 @@ const baseComponents: ThemeConfig['components'] = {
     collapsedIconSize: 17,
   },
   Card: {
-    borderRadiusLG: 12,
-    paddingLG: 18,
+    borderRadiusLG: 10,
+    paddingLG: 16,
     colorBorderSecondary: '#EFF2F7',
-    headerHeight: 46,
-    headerFontSize: 14,
+    headerHeight: 44,
+    headerFontSize: 13.5,
   },
   Statistic: {
     titleFontSize: 12,
-    contentFontSize: 28,
+    contentFontSize: 30,
     fontFamily,
   },
   Button: {
     fontWeight: 500,
-    borderRadius: 8,
+    borderRadius: 7,
     controlHeight: 32,
-    primaryShadow: '0 1px 2px rgba(47, 84, 235, 0.24)',
+    primaryShadow: '0 1px 2px rgba(33, 117, 255, 0.24)',
     defaultShadow: 'none',
     dangerShadow: 'none',
-    paddingInline: 14,
+    paddingInline: 12,
     fontSize: 13,
   },
   Input: {
-    borderRadius: 8,
+    borderRadius: 7,
     controlHeight: 32,
-    activeShadow: '0 0 0 3px rgba(47, 84, 235, 0.10)',
-    hoverBorderColor: '#A9BEF5',
-    activeBorderColor: '#2F54EB',
+    activeShadow: '0 0 0 3px rgba(33, 117, 255, 0.10)',
+    hoverBorderColor: '#8FB8FF',
+    activeBorderColor: '#2175FF',
   },
   InputNumber: {
-    borderRadius: 8,
+    borderRadius: 7,
     controlHeight: 32,
-    activeShadow: '0 0 0 3px rgba(47, 84, 235, 0.10)',
+    activeShadow: '0 0 0 3px rgba(33, 117, 255, 0.10)',
   },
   Select: {
-    borderRadius: 8,
+    borderRadius: 7,
     controlHeight: 32,
-    optionSelectedBg: '#EEF2FE',
-    optionSelectedColor: '#2F54EB',
+    optionSelectedBg: '#EAF2FF',
+    optionSelectedColor: '#2175FF',
   },
   DatePicker: {
-    borderRadius: 8,
+    borderRadius: 7,
     controlHeight: 32,
-    activeShadow: '0 0 0 3px rgba(47, 84, 235, 0.10)',
+    activeShadow: '0 0 0 3px rgba(33, 117, 255, 0.10)',
   },
   Table: {
     headerBg: '#F9FAFC',
     headerColor: '#55607A',
     headerSplitColor: 'transparent',
-    rowHoverBg: '#F6F9FE',
+    rowHoverBg: '#F5F9FF',
     borderColor: '#EFF2F7',
-    cellPaddingBlock: 11,
-    cellPaddingInline: 14,
+    cellPaddingBlock: 9,
+    cellPaddingInline: 12,
     footerBg: '#FAFBFD',
     stickyScrollBarBg: '#D6DDE8',
-    headerSortActiveBg: '#EEF2FE',
+    headerSortActiveBg: '#EAF2FF',
     headerSortHoverBg: '#F2F5FA',
   },
   Tabs: {
-    inkBarColor: '#2F54EB',
+    inkBarColor: '#2175FF',
     itemSelectedColor: '#111A2E',
     itemColor: '#8B94AB',
     itemHoverColor: '#111A2E',
@@ -153,7 +153,7 @@ const baseComponents: ThemeConfig['components'] = {
     defaultColor: '#55607A',
   },
   Modal: {
-    borderRadiusLG: 14,
+    borderRadiusLG: 12,
     titleFontSize: 15,
     contentBg: '#FFFFFF',
     headerBg: '#FFFFFF',
@@ -177,7 +177,7 @@ const baseComponents: ThemeConfig['components'] = {
   },
   Pagination: {
     borderRadius: 6,
-    itemActiveBg: '#EEF2FE',
+    itemActiveBg: '#EAF2FF',
   },
   Breadcrumb: {
     fontSize: 12,
@@ -186,7 +186,7 @@ const baseComponents: ThemeConfig['components'] = {
     separatorColor: '#C7CEDB',
   },
   Segmented: {
-    borderRadius: 8,
+    borderRadius: 7,
     itemSelectedBg: '#FFFFFF',
     trackBg: '#EFF2F7',
     itemSelectedColor: '#111A2E',
@@ -197,7 +197,7 @@ const baseComponents: ThemeConfig['components'] = {
     itemPaddingBottom: 10,
   },
   Progress: {
-    defaultColor: '#2F54EB',
+    defaultColor: '#2175FF',
     remainingColor: '#EFF2F7',
     lineBorderRadius: 3,
   },
@@ -239,12 +239,12 @@ export const darkTheme: ThemeConfig = {
   algorithm: antdTheme.darkAlgorithm,
   token: {
     ...baseToken,
-    colorPrimary: '#5C7CFA',
-    colorInfo: '#5C7CFA',
-    colorLink: '#5C7CFA',
-    colorSuccess: '#35C79A',
-    colorWarning: '#E5A54B',
-    colorError: '#E86A6A',
+    colorPrimary: '#6D9AFF',
+    colorInfo: '#6D9AFF',
+    colorLink: '#6D9AFF',
+    colorSuccess: '#3DDB9E',
+    colorWarning: '#F5B04C',
+    colorError: '#F87A7A',
     colorTextBase: '#E6EAF2',
     colorTextSecondary: '#9AA5B8',
     colorTextTertiary: '#6F7A8D',
@@ -270,8 +270,8 @@ export const darkTheme: ThemeConfig = {
     },
     Menu: {
       ...baseComponents?.Menu,
-      itemSelectedBg: 'rgba(92, 124, 250, 0.15)',
-      itemSelectedColor: '#9DB3FB',
+      itemSelectedBg: 'rgba(109, 154, 255, 0.16)',
+      itemSelectedColor: '#A9C4FF',
       itemColor: '#9AA5B8',
       itemHoverBg: '#1A2230',
       itemHoverColor: '#E6EAF2',
@@ -287,7 +287,7 @@ export const darkTheme: ThemeConfig = {
       rowHoverBg: '#1B2333',
       borderColor: '#1D2431',
       footerBg: '#141A25',
-      headerSortActiveBg: 'rgba(92, 124, 250, 0.16)',
+      headerSortActiveBg: 'rgba(109, 154, 255, 0.16)',
       headerSortHoverBg: '#1A2230',
     },
     Tabs: {
@@ -295,7 +295,7 @@ export const darkTheme: ThemeConfig = {
       itemColor: '#8A93A3',
       itemHoverColor: '#E6EAF2',
       itemSelectedColor: '#E6EAF2',
-      inkBarColor: '#5C7CFA',
+      inkBarColor: '#6D9AFF',
     },
     Descriptions: {
       ...baseComponents?.Descriptions,

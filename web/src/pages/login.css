@@ -22,7 +22,7 @@
   overflow: hidden;
   color: var(--app-text, #111a2e);
   background:
-    radial-gradient(900px 520px at 10% -10%, rgba(47, 84, 235, 0.14), transparent 60%),
+    radial-gradient(900px 520px at 10% -10%, rgba(33, 117, 255, 0.14), transparent 60%),
     radial-gradient(720px 480px at 92% 108%, rgba(122, 90, 248, 0.1), transparent 58%),
     linear-gradient(168deg, #f9fbff 0%, #eef3ff 58%, #e9efff 100%);
   border-right: 1px solid var(--app-border, #e6eaf1);
@@ -34,8 +34,8 @@
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(47, 84, 235, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(47, 84, 235, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(33, 117, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(33, 117, 255, 0.05) 1px, transparent 1px);
   background-size: 36px 36px;
   -webkit-mask-image: radial-gradient(720px 480px at 30% 24%, #000 0%, transparent 78%);
   mask-image: radial-gradient(720px 480px at 30% 24%, #000 0%, transparent 78%);
@@ -64,9 +64,9 @@
   font-size: 17px;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #3d66f5 0%, #2444c9 100%);
+  background: linear-gradient(135deg, #3d8bff 0%, #1b5fe0 100%);
   box-shadow:
-    0 6px 16px -4px rgba(47, 84, 235, 0.5),
+    0 6px 16px -4px rgba(33, 117, 255, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.28);
   transition: transform 240ms var(--app-ease-spring);
 }
@@ -102,9 +102,9 @@
   font-size: 12px;
   font-weight: 550;
   letter-spacing: 0.02em;
-  color: #2444c9;
+  color: #1b5fe0;
   background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(47, 84, 235, 0.16);
+  border: 1px solid rgba(33, 117, 255, 0.16);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
   animation: login-rise 560ms 60ms var(--app-ease) both;
 }
@@ -114,7 +114,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--app-success, #0f9d76);
+  background: var(--app-success, #16a34a);
   box-shadow: 0 0 0 3px rgba(15, 157, 118, 0.16);
 }
 
@@ -129,7 +129,7 @@
 
 .login-headline em {
   font-style: normal;
-  background: linear-gradient(120deg, #2f54eb 10%, #7a5af8 90%);
+  background: linear-gradient(120deg, #2175ff 10%, #1b5fe0 90%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -164,7 +164,7 @@
 
 .login-feature-list li svg {
   font-size: 15px;
-  color: var(--app-success, #0f9d76);
+  color: var(--app-success, #16a34a);
   flex: none;
 }
 
@@ -175,7 +175,7 @@
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.74);
   border: 1px solid rgba(255, 255, 255, 0.9);
-  outline: 1px solid rgba(47, 84, 235, 0.08);
+  outline: 1px solid rgba(33, 117, 255, 0.08);
   box-shadow:
     0 18px 44px -20px rgba(15, 23, 42, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
@@ -256,7 +256,7 @@
 .login-preview-chart i {
   flex: 1;
   border-radius: 4px 4px 2px 2px;
-  background: linear-gradient(180deg, #5c7cfa 0%, #2f54eb 100%);
+  background: linear-gradient(180deg, #4d94ff 0%, #2175ff 100%);
   transform-origin: bottom;
   animation: preview-grow 900ms 420ms var(--app-ease-spring) both;
 }
@@ -265,7 +265,7 @@
 .login-preview-chart i:nth-child(2) { height: 62%; animation-delay: 480ms; }
 .login-preview-chart i:nth-child(3) { height: 48%; animation-delay: 540ms; }
 .login-preview-chart i:nth-child(4) { height: 82%; animation-delay: 600ms; }
-.login-preview-chart i:nth-child(5) { height: 66%; animation-delay: 660ms; background: linear-gradient(180deg, #a394fb 0%, #7a5af8 100%); }
+.login-preview-chart i:nth-child(5) { height: 66%; animation-delay: 660ms; background: linear-gradient(180deg, #1e6ae8 0%, #1554c8 100%); }
 
 @keyframes preview-grow {
   from {
@@ -336,8 +336,8 @@
   font-size: 13px;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #3d66f5 0%, #2444c9 100%);
-  box-shadow: 0 4px 12px -3px rgba(47, 84, 235, 0.45);
+  background: linear-gradient(135deg, #3d8bff 0%, #1b5fe0 100%);
+  box-shadow: 0 4px 12px -3px rgba(33, 117, 255, 0.45);
 }
 
 .login-title {
@@ -381,17 +381,17 @@
   border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
-  background: linear-gradient(135deg, #3d66f5 0%, #2f54eb 55%, #2444c9 100%);
+  background: linear-gradient(135deg, #3d8bff 0%, #2175ff 55%, #1b5fe0 100%);
   border: none;
   box-shadow:
-    0 8px 20px -6px rgba(47, 84, 235, 0.5),
+    0 8px 20px -6px rgba(33, 117, 255, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .login-submit.ant-btn:hover {
-  background: linear-gradient(135deg, #4a71f7 0%, #3a5df0 55%, #2b4bd6 100%) !important;
+  background: linear-gradient(135deg, #4d94ff 0%, #3583ff 55%, #1e6ae8 100%) !important;
   box-shadow:
-    0 12px 26px -8px rgba(47, 84, 235, 0.55),
+    0 12px 26px -8px rgba(33, 117, 255, 0.55),
     inset 0 1px 0 rgba(255, 255, 255, 0.22);
   transform: translateY(-1px);
 }
