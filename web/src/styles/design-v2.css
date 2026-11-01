@@ -1,31 +1,31 @@
 /* ==========================================================================
-   Design System v1.3 —「卷墨」
-   在线考试系统的精致现代风格：细边框、方朗圆角、墨色主色、批改朱语义色。
+   Design System v2.0 —「墨砚」
+   纯白画布 + 细边框分层 + 柔和几何 + 克制动效。
    结构一律由 antd 组件承担，本文件只做组件外壳的精修与排版微调，
    加载顺序在 global.css 之后。
    ========================================================================== */
 
 :root {
-  /* 画布与表面 */
-  --app-bg: #f4f6fa;
+  /* 画布与表面：全站纯白，层次靠边框 */
+  --app-bg: #ffffff;
   --app-surface: #ffffff;
   --app-surface-muted: #f8fafc;
-  --app-surface-hover: #f5f8fe;
+  --app-surface-hover: #f6f8fc;
 
   /* 描边 */
-  --app-border: #e3e8ef;
-  --app-border-soft: #edf0f5;
-  --app-border-strong: #cfd6e2;
+  --app-border: #e6eaf1;
+  --app-border-soft: #eff2f7;
+  --app-border-strong: #cdd5e3;
 
   /* 文本 */
-  --app-text: #101828;
-  --app-text-secondary: #4b5565;
-  --app-text-tertiary: #8a93a3;
+  --app-text: #111a2e;
+  --app-text-secondary: #55607a;
+  --app-text-tertiary: #8b94ab;
 
-  /* 品牌与语义：卷墨 / 批改朱 / 玉青 / 琥珀 / 靛紫 */
+  /* 品牌与语义：靛墨 / 批改朱 / 玉青 / 琥珀 / 靛紫 */
   --app-primary: #2f54eb;
   --app-primary-strong: #2444c9;
-  --app-primary-soft: #edf1fe;
+  --app-primary-soft: #eef2fe;
   --app-primary-line: #c3d0f8;
   --app-success: #0f9d76;
   --app-success-soft: #e6f6f1;
@@ -37,16 +37,16 @@
   --app-violet-soft: #f0edfe;
 
   /* 形状与阴影 */
-  --app-radius: 6px;
-  --app-radius-lg: 10px;
-  --app-radius-sm: 4px;
-  --app-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-  --app-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
-  --app-shadow-lift: 0 10px 26px -18px rgba(16, 24, 40, 0.32);
-  --app-shadow-pop: 0 16px 44px -20px rgba(16, 24, 40, 0.3);
+  --app-radius: 8px;
+  --app-radius-lg: 12px;
+  --app-radius-sm: 6px;
+  --app-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --app-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.03);
+  --app-shadow-lift: 0 10px 28px -14px rgba(15, 23, 42, 0.18);
+  --app-shadow-pop: 0 18px 52px -20px rgba(15, 23, 42, 0.24);
 
   /* 动效 */
-  --app-transition: 170ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  --app-transition: 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
   --app-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --app-ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
 }
@@ -96,7 +96,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d3dae5;
+  background: #d4dbe7;
 }
 
 [data-theme='dark'] ::-webkit-scrollbar-thumb {
@@ -129,14 +129,14 @@ body {
   height: 100%;
 }
 
+/* 品牌区 */
 .app-brand {
-  height: 52px;
+  height: 56px;
   flex: none;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--app-border-soft);
+  gap: 10px;
+  padding: 0 16px;
   overflow: hidden;
   white-space: nowrap;
 }
@@ -151,33 +151,36 @@ body {
 }
 
 .app-brand-mark {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 7px;
-  font-size: 13px;
+  border-radius: 9px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #fff;
-  background: var(--app-primary);
+  background: linear-gradient(135deg, #3d66f5 0%, #2444c9 100%);
+  box-shadow:
+    0 2px 6px -1px rgba(47, 84, 235, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
   transition: transform 240ms var(--app-ease-spring);
 }
 
 .app-brand:hover .app-brand-mark {
-  transform: translateY(-1px) rotate(-3deg);
+  transform: translateY(-1px) rotate(-4deg);
 }
 
 .app-brand-name {
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 650;
   letter-spacing: -0.01em;
   color: var(--app-text);
 }
 
 .app-brand-sub {
   font-size: 9.5px;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--app-text-tertiary);
 }
@@ -188,7 +191,7 @@ body {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 10px 0 14px;
+  padding: 8px 0 14px;
   border-inline-end: none !important;
   background: transparent;
   font-size: 13px;
@@ -196,19 +199,19 @@ body {
 }
 
 .app-menu .ant-menu-item-group-title {
-  padding: 12px 16px 5px !important;
+  padding: 14px 18px 6px !important;
   font-size: 10.5px !important;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--app-text-tertiary) !important;
 }
 
 .app-menu .ant-menu-item {
   position: relative;
-  height: 34px;
-  margin: 2px 8px !important;
-  padding-left: 10px !important;
-  border-radius: 6px;
+  height: 36px;
+  margin: 2px 10px !important;
+  padding-left: 12px !important;
+  border-radius: 8px;
   color: var(--app-text-secondary);
   transition: background 150ms var(--app-ease), color 150ms var(--app-ease);
 }
@@ -238,32 +241,33 @@ body {
   color: var(--app-primary) !important;
 }
 
-/* 活动项左侧高亮条 */
+/* 活动项左侧胶囊高亮条 */
 .app-menu .ant-menu-item-selected::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 2px;
-  border-radius: 0 2px 2px 0;
+  left: -10px;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  border-radius: 999px;
+  transform: translateY(-50%);
   background: var(--app-primary);
-  animation: nav-bar-in 240ms var(--app-ease-spring);
+  animation: nav-pill-in 260ms var(--app-ease-spring);
 }
 
-@keyframes nav-bar-in {
+@keyframes nav-pill-in {
   from {
-    transform: scaleY(0.2);
+    transform: translateY(-50%) scaleY(0.2);
     opacity: 0;
   }
   to {
-    transform: scaleY(1);
+    transform: translateY(-50%) scaleY(1);
     opacity: 1;
   }
 }
 
 .app-sider.ant-layout-sider-collapsed .app-menu {
-  padding-top: 10px;
+  padding-top: 8px;
 }
 
 .app-sider.ant-layout-sider-collapsed .app-menu .ant-menu-item {
@@ -275,10 +279,14 @@ body {
   display: none;
 }
 
+.app-sider.ant-layout-sider-collapsed .app-menu .ant-menu-item-selected::before {
+  left: -8px;
+}
+
 .app-sider-footer {
   flex: none;
   margin-top: auto;
-  padding: 9px 14px 12px;
+  padding: 10px 16px 13px;
   border-top: 1px solid var(--app-border-soft);
   display: flex;
   align-items: center;
@@ -310,25 +318,31 @@ body {
   box-shadow: 0 0 0 3px rgba(15, 157, 118, 0.14);
 }
 
-/* 顶栏 */
+/* 顶栏：白色毛玻璃 */
 .app-main {
   min-width: 0;
   background: var(--app-bg);
 }
 
 .app-header.ant-layout-header {
-  height: 52px !important;
-  line-height: 52px !important;
-  padding: 0 18px !important;
+  height: 56px !important;
+  line-height: 56px !important;
+  padding: 0 20px !important;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: var(--app-surface) !important;
+  background: rgba(255, 255, 255, 0.86) !important;
+  backdrop-filter: saturate(1.6) blur(14px);
+  -webkit-backdrop-filter: saturate(1.6) blur(14px);
   border-bottom: 1px solid var(--app-border) !important;
   position: sticky;
   top: 0;
   z-index: 20;
+}
+
+[data-theme='dark'] .app-header.ant-layout-header {
+  background: rgba(20, 26, 37, 0.82) !important;
 }
 
 .header-left {
@@ -346,24 +360,24 @@ body {
 }
 
 .header-icon-btn.ant-btn {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--app-text-secondary);
   transition: background 150ms var(--app-ease), color 150ms var(--app-ease);
 }
 
 .header-icon-btn.ant-btn:hover {
-  background: var(--app-surface-hover) !important;
+  background: var(--app-surface-muted) !important;
   color: var(--app-primary) !important;
 }
 
 .app-header .ant-breadcrumb {
   font-size: 12px;
-  line-height: 52px;
+  line-height: 56px;
 }
 
 .app-header .ant-breadcrumb a,
@@ -387,20 +401,21 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
-  padding: 0 8px 0 4px;
-  border-radius: 7px;
+  height: 36px;
+  padding: 0 9px 0 5px;
+  border-radius: 9px;
   cursor: pointer;
   transition: background 150ms var(--app-ease);
 }
 
 .user-chip:hover {
-  background: var(--app-surface-hover);
+  background: var(--app-surface-muted);
 }
 
 .user-avatar.ant-avatar {
-  background: var(--app-primary-soft) !important;
-  color: var(--app-primary) !important;
+  background: linear-gradient(135deg, #3d66f5 0%, #2444c9 100%) !important;
+  color: #fff !important;
+  font-size: 13px;
 }
 
 .user-chip-meta {
@@ -428,53 +443,66 @@ body {
   color: var(--app-text-tertiary);
 }
 
+.user-chip-caret {
+  font-size: 10px;
+  color: var(--app-text-tertiary);
+}
+
 /* ---------------------------------------------------------------- 工作页签 */
-/* 页签条由 antd Tabs 承担，这里只做外壳精修：与内容左边缘对齐、留出间距 */
+/* 药丸式页签：浮在纯白画布上，与内容左边缘对齐、与卡片保持呼吸 */
 .work-tabs.ant-tabs {
-  margin-bottom: 12px;
+  margin-bottom: 4px;
 }
 
 .work-tabs.ant-tabs > .ant-tabs-nav {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
 }
 
 .work-tabs.ant-tabs .ant-tabs-nav::before {
-  border-bottom: 1px solid var(--app-border-soft);
+  display: none;
 }
 
 .work-tabs.ant-tabs .ant-tabs-tab {
-  margin-bottom: -1px;
-  padding: 4px 10px;
-  border-radius: 6px 6px 0 0;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  border-radius: 999px !important;
+  padding: 4px 12px !important;
   font-size: 12.5px;
-  transition: background 150ms var(--app-ease), color 150ms var(--app-ease);
+  transition: background 160ms var(--app-ease), color 160ms var(--app-ease),
+    border-color 160ms var(--app-ease), box-shadow 160ms var(--app-ease) !important;
 }
 
 .work-tabs.ant-tabs .ant-tabs-tab:hover {
-  color: var(--app-primary);
+  background: var(--app-surface-muted) !important;
+  color: var(--app-text) !important;
+}
+
+.work-tabs.ant-tabs .ant-tabs-tab-active {
+  background: var(--app-primary-soft) !important;
+  border-color: var(--app-primary-line) !important;
+  box-shadow: 0 1px 2px rgba(47, 84, 235, 0.08);
 }
 
 .work-tabs.ant-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
-  color: var(--app-primary);
+  color: var(--app-primary-strong) !important;
   font-weight: 600;
 }
 
 .work-tabs.ant-tabs .ant-tabs-tab-remove {
   color: var(--app-text-tertiary);
   font-size: 10px;
+  margin-left: 2px;
 }
 
 .work-tabs.ant-tabs .ant-tabs-tab-remove:hover {
   color: var(--app-danger);
-}
-
-.work-tabs.ant-tabs .ant-tabs-tab + .ant-tabs-tab {
-  margin-left: 4px;
+  background: rgba(214, 69, 69, 0.1);
+  border-radius: 50%;
 }
 
 /* ---------------------------------------------------------------- 内容区 */
 .app-content {
-  padding: 16px 20px 32px;
+  padding: 18px 24px 36px;
 }
 
 .content-shell {
@@ -483,13 +511,13 @@ body {
 }
 
 .content-inner {
-  animation: content-rise 260ms var(--app-ease) both;
+  animation: content-rise 280ms var(--app-ease) both;
 }
 
 @keyframes content-rise {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(5px);
   }
   to {
     opacity: 1;
@@ -503,7 +531,7 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .page-head-main {
@@ -512,16 +540,16 @@ body {
 
 .page-title {
   margin: 0;
-  font-size: 19px;
-  line-height: 26px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-size: 21px;
+  line-height: 29px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
   color: var(--app-text);
 }
 
 .page-subtitle {
   max-width: 760px;
-  margin: 4px 0 0;
+  margin: 5px 0 0;
   font-size: 12.5px;
   line-height: 18px;
   color: var(--app-text-tertiary);
@@ -539,12 +567,12 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 20px 0 10px;
+  margin: 22px 0 12px;
 }
 
 .section-head h2 {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 20px;
   color: var(--app-text);
@@ -571,19 +599,19 @@ body {
 }
 
 .panel-card.ant-card > .ant-card-head {
-  min-height: 42px;
-  padding: 0 16px;
+  min-height: 46px;
+  padding: 0 18px;
   border-bottom: 1px solid var(--app-border-soft);
 }
 
 .panel-card.ant-card > .ant-card-head .ant-card-head-title {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--app-text);
 }
 
 .panel-card.ant-card > .ant-card-body {
-  padding: 14px 16px;
+  padding: 16px 18px;
 }
 
 /* 可交互卡片才有抬升，避免表格类卡片抖动 */
@@ -603,15 +631,15 @@ body {
 .stat-cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 .stat-card.ant-card .ant-card-body {
-  padding: 14px 16px;
+  padding: 15px 18px;
 }
 
 .stat-card .ant-statistic-title {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   overflow: hidden;
 }
 
@@ -622,11 +650,11 @@ body {
 .stat-card-icon {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   flex: none;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: 8px;
+  font-size: 13.5px;
   color: var(--stat-accent, var(--app-primary));
   background: var(--stat-tint, var(--app-primary-soft));
 }
@@ -657,7 +685,7 @@ body {
 }
 
 .stat-card-foot {
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 11.5px;
   line-height: 16px;
   color: var(--app-text-tertiary);
@@ -700,7 +728,7 @@ body {
 }
 
 .metric-cell {
-  padding: 12px 14px;
+  padding: 13px 15px;
   background: var(--app-surface);
 }
 
@@ -729,13 +757,14 @@ body {
 }
 
 /* ---------------------------------------------------------------- 筛选栏 */
-/* 结构由 antd Flex 承担，这里只给外层容器一个底与边框 */
+/* 纯白画布上用白底 + 细边框围合，与卡片语言一致 */
 .filter-bar {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   padding: 11px 13px;
-  background: var(--app-surface-muted);
-  border: 1px solid var(--app-border-soft);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-card);
 }
 
 .filter-bar .ant-form-item {
@@ -750,6 +779,7 @@ body {
 .ant-table-wrapper .ant-table-thead > tr > th {
   font-size: 12px !important;
   font-weight: 600 !important;
+  letter-spacing: 0.02em;
   color: var(--app-text-secondary) !important;
   background: var(--app-surface-muted) !important;
   border-bottom: 1px solid var(--app-border) !important;
@@ -769,7 +799,7 @@ body {
 }
 
 .ant-table-wrapper .ant-table-pagination.ant-pagination {
-  margin: 12px 4px 0;
+  margin: 14px 4px 0;
 }
 
 .table-actions .ant-btn-link {
@@ -804,11 +834,20 @@ body {
 /* ---------------------------------------------------------------- 控件 */
 .ant-btn {
   transition: background 150ms var(--app-ease), border-color 150ms var(--app-ease),
-    color 150ms var(--app-ease);
+    color 150ms var(--app-ease), box-shadow 150ms var(--app-ease);
 }
 
 .ant-btn:not(:disabled):active {
   transform: scale(0.985);
+}
+
+.ant-btn-primary:not(:disabled) {
+  box-shadow: 0 1px 2px rgba(47, 84, 235, 0.24);
+}
+
+.ant-btn-primary:not(:disabled):hover {
+  box-shadow: 0 4px 12px -2px rgba(47, 84, 235, 0.4);
+  transform: translateY(-1px);
 }
 
 .ant-btn-default:not(:disabled) {
@@ -823,7 +862,7 @@ body {
 
 .ant-btn-link:not(:disabled):hover {
   background: var(--app-primary-soft);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .ant-input,
@@ -845,10 +884,10 @@ body {
 
 /* 状态标签：细边框 + 柔和底 */
 .ant-tag {
-  border-radius: 4px;
+  border-radius: 5px;
   font-size: 11.5px;
-  line-height: 19px;
-  padding-inline: 6px;
+  line-height: 20px;
+  padding-inline: 7px;
   border: 1px solid transparent;
 }
 
@@ -938,17 +977,17 @@ body {
 .ant-picker-dropdown .ant-picker-panel-container {
   border: 1px solid var(--app-border);
   box-shadow: var(--app-shadow-pop);
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .ant-dropdown-menu-item {
-  border-radius: 4px;
+  border-radius: 6px;
   transition: background 130ms var(--app-ease);
 }
 
 .ant-modal .ant-modal-content {
   border: 1px solid var(--app-border);
-  border-radius: 12px;
+  border-radius: 14px;
   box-shadow: var(--app-shadow-pop);
 }
 
@@ -1023,21 +1062,6 @@ body {
   height: 40px;
 }
 
-/* ---------------------------------------------------------------- 登录页 */
-.login-page {
-  background:
-    radial-gradient(880px 500px at 14% -8%, rgba(47, 84, 235, 0.12), transparent 62%),
-    radial-gradient(700px 440px at 88% 6%, rgba(15, 157, 118, 0.08), transparent 58%),
-    var(--app-bg);
-}
-
-.login-card {
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  box-shadow: var(--app-shadow-pop);
-  animation: content-rise 380ms var(--app-ease) both;
-}
-
 /* ---------------------------------------------------------------- 页面细节 */
 .exam-item-title,
 .activity-main strong {
@@ -1058,7 +1082,7 @@ body {
 .dashboard-list .ant-list-item {
   padding-block: 10px;
   transition: background 150ms var(--app-ease);
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .dashboard-list .ant-list-item:hover {
@@ -1076,7 +1100,42 @@ body {
 .quick-card.ant-card:hover {
   border-color: var(--app-primary-line) !important;
   box-shadow: var(--app-shadow-lift) !important;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+}
+
+/* 快捷入口图标：柔和主色底，hover 时轻缩放 */
+.quick-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 16px;
+  color: var(--app-primary);
+  background: var(--app-primary-soft);
+  transition: transform 200ms var(--app-ease-spring), background 160ms var(--app-ease);
+}
+
+.quick-card.ant-card:hover .quick-icon {
+  transform: scale(1.06) rotate(-3deg);
+  background: #e2e9fd;
+}
+
+/* 顶栏用户菜单的身份区块 */
+.user-menu-identity {
+  padding: 2px 0 4px;
+}
+
+.user-menu-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--app-text);
+  line-height: 19px;
+}
+
+.user-menu-role {
+  margin-top: 1px;
+  font-size: 11.5px;
+  color: var(--app-text-tertiary);
+  line-height: 16px;
 }
 
 /* 通知面板 */
@@ -1196,7 +1255,7 @@ body {
 /* ---------------------------------------------------------------- 响应式 */
 @media (max-width: 1200px) {
   .app-content {
-    padding: 14px 16px 26px;
+    padding: 16px 18px 30px;
   }
   .stat-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1208,7 +1267,7 @@ body {
     padding: 0 12px !important;
   }
   .app-content {
-    padding: 12px 12px 22px;
+    padding: 12px 12px 24px;
   }
   .page-head {
     flex-direction: column;

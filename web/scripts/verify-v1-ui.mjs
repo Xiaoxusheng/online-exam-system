@@ -2,7 +2,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'node:fs'
 
-const BASE = 'http://127.0.0.1:5174'
+const BASE = process.env.SHOT_BASE ?? 'http://127.0.0.1:5174'
 const OUT = 'D:/explame/online-exam-system/_diag/ui_shots_v6'
 mkdirSync(OUT, { recursive: true })
 
