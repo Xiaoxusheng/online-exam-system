@@ -371,7 +371,7 @@ func (s *Store) ProctorReport(ctx context.Context, orgID, examID string) ([]Proc
 		LEFT JOIN proctor_events pe ON pe.attempt_id = a.id
 		JOIN exams e ON e.id = a.exam_id
 		WHERE a.exam_id = $1::uuid AND e.org_id = $2::uuid
-		GROUP BY u.id, u.name, u.username, a.status
+		GROUP BY u.id, u.name, u.username, a.status, a.id
 		ORDER BY count(pe.id) FILTER (WHERE pe.level = 'critical') DESC, count(pe.id) DESC, u.name`,
 		examID, orgID)
 	if err != nil {

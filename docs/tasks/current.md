@@ -2,6 +2,14 @@
 
 > 唯一计划/进度文件。后续任务在本文件追加或更新，不新建任务文档。
 
+## v2.5 后端修复线上部署（2026-11-02 完成）
+
+- 背景：监考报告（M-10）线上「加载失败」。排查：接口路由/handler 均在（v2.2 已含），但 `ProctorReport` 的 SQL 有 bug——标量子查询引用 `a.id` 未入 `GROUP BY`（SQLSTATE 42803）→ 500。修复 `server/internal/store/proctor.go`（GROUP BY 补 `a.id`），本地先行验证（已结束考试 12 行数据、待开考正常空态）。
+- 部署：从工作区交叉编译 linux api+migrate（`CGO_ENABLED=0 GOOS=linux GOARCH=amd64`）→ scp 至 `incoming/be-20261101-2400` → `source .env` 后跑 migrate（幂等，`schema_migrations` 已至 0012，无新库变更）→ `bin/api.bak-2339` 备份 23:39 版 → mv 替换 → `systemctl restart online-exam`（中断约 3 秒）。
+- 复验：healthz 200；高二月考·物理 report 返回 12 行结构完整；无头浏览器登录 → 选已结束考试 → 打开监考报告抽屉无错误块；登录链路正常。
+- 回滚：`cd /opt/online-exam && cp bin/api.bak-2339 bin/api && systemctl restart online-exam`。
+- 备注：本次二进制从工作区构建（含并行线未提交改动，与 23:39 并行部署口径一致）。
+
 ## v2.2 修复线上部署（2026-11-01 完成）
 
 - 部署内容：`0de82be`（v2.2 两轮修复）——AB 卷分组满分、阅卷收尾竞态与孤儿任务、题目详情越权、`security_stamp` 令牌即时失效、JWT fail-closed、成绩发布/导出口径、考生答案不丢失、填空判分开关、保存答案与交卷互斥、更正与阅卷轮次校验、分页排序、媒体鉴权、前端加载态与成绩缓存键。
