@@ -49,6 +49,10 @@ func (a *API) Router() http.Handler {
 		// websocket, so this route authenticates its ?token= parameter itself.
 		r.Get("/proctor/exams/{examId}/ws", a.handleProctorWebSocket)
 
+		// Media content: same ?token= fallback as the websocket route, scoped to
+		// the org and with per-purpose visibility rules inside the handler.
+		r.Get("/media/{id}/content", a.handleMediaContent)
+
 		r.Group(func(r chi.Router) {
 			r.Use(a.authenticate)
 
@@ -57,6 +61,11 @@ func (a *API) Router() http.Handler {
 			r.Get("/dashboard/summary", a.handleDashboard)
 			r.Get("/notifications", a.handleListNotifications)
 			r.Patch("/notifications/{id}/read", a.handleMarkNotificationRead)
+
+			// Media uploads. GET content lives outside this group because
+			// <img>/<audio>/<video> tags authenticate via ?token= instead of a header.
+			r.Post("/media", a.handleUploadMedia)
+			r.Delete("/media/{id}", a.handleDeleteMedia)
 
 			// Organization & system administration.
 			r.Group(func(r chi.Router) {

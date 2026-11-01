@@ -1,4 +1,5 @@
 import { Tag } from 'antd'
+import { mediaContentUrl } from '../api/media'
 import { questionTypeLabel } from '../utils/labels'
 import type { QuestionContent, QuestionType } from '../types'
 
@@ -13,6 +14,7 @@ interface ContentProps {
 export function QuestionContent({ type, content, maxScore, section }: ContentProps) {
   const options = Array.isArray(content?.options) ? content.options : []
   const cases = Array.isArray(content?.cases) ? content.cases : []
+  const attachments = Array.isArray(content?.attachments) ? content.attachments : []
   return (
     <div className="question-view">
       <div className="question-view-head">
@@ -21,6 +23,22 @@ export function QuestionContent({ type, content, maxScore, section }: ContentPro
         {maxScore !== undefined && <span className="cell-meta">本题 {maxScore} 分</span>}
       </div>
       <p className="question-stem">{content?.stem || '（无题干）'}</p>
+      {content?.stem_image && (
+        <div className="question-stem-image">
+          <img src={mediaContentUrl(content.stem_image)} alt="题干配图" />
+        </div>
+      )}
+      {attachments.length > 0 && (
+        <div className="question-attachments">
+          {attachments.map((item) =>
+            item.kind === 'video' ? (
+              <video key={item.media_id} controls preload="metadata" src={mediaContentUrl(item.media_id)} />
+            ) : (
+              <audio key={item.media_id} controls preload="metadata" src={mediaContentUrl(item.media_id)} />
+            ),
+          )}
+        </div>
+      )}
       {options.length > 0 && (
         <ul className="option-list">
           {options.map((option) => (
@@ -48,6 +66,16 @@ export function QuestionContent({ type, content, maxScore, section }: ContentPro
               ))}
           </ul>
         </div>
+      )}
+      {type === 'media' && (
+        <p className="question-extra">
+          {content?.mode === 'video' ? '视频作答' : '口头作答（录音）'}
+          {typeof content?.min_seconds === 'number' && typeof content?.max_seconds === 'number' &&
+            ` · 时长 ${content.min_seconds}–${content.max_seconds} 秒`}
+          {typeof content?.retake_limit === 'number' && ` · 最多重录 ${content.retake_limit} 次`}
+          {Array.isArray(content?.dimensions) && content.dimensions.length > 0 &&
+            ` · 评分维度：${content.dimensions.map((item) => `${item.name} ${item.weight}%`).join('、')}`}
+        </p>
       )}
     </div>
   )

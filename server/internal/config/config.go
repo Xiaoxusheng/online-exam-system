@@ -26,6 +26,8 @@ type Config struct {
 	CORSOrigins       []string
 	LogLevel          string
 	MaxBodyBytes      int64
+	MaxUploadBytes    int64
+	MediaDir          string
 	SeedAdminPassword string
 	WebDir            string
 }
@@ -44,6 +46,8 @@ func Load() (Config, error) {
 		CORSOrigins:       splitTrim(getEnv("CORS_ORIGINS", "http://127.0.0.1:5174,http://localhost:5174")),
 		LogLevel:          getEnv("LOG_LEVEL", "info"),
 		MaxBodyBytes:      1 << 20,
+		MaxUploadBytes:    64 << 20,
+		MediaDir:          getEnv("MEDIA_DIR", "data/media"),
 		SeedAdminPassword: getEnv("SEED_ADMIN_PASSWORD", "Admin@123456"),
 		WebDir:            os.Getenv("WEB_DIR"),
 	}
@@ -105,6 +109,13 @@ func Load() (Config, error) {
 			return cfg, fmt.Errorf("invalid MAX_BODY_BYTES %q", v)
 		}
 		cfg.MaxBodyBytes = n
+	}
+	if v := os.Getenv("MAX_UPLOAD_BYTES"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 {
+			return cfg, fmt.Errorf("invalid MAX_UPLOAD_BYTES %q", v)
+		}
+		cfg.MaxUploadBytes = n
 	}
 	return cfg, nil
 }

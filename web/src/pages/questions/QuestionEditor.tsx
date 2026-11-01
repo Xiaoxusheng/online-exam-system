@@ -10,13 +10,21 @@ import {
   Select,
   Space,
   Switch,
+  Upload,
 } from 'antd';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  PictureOutlined,
+  PlusOutlined,
+  SoundOutlined,
+  VideoCameraOutlined,
+} from '@ant-design/icons';
 import { createQuestion, updateQuestion } from '../../api/question';
 import type { QuestionInput, QuestionPatch } from '../../api/question';
+import { uploadMedia, mediaContentUrl } from '../../api/media';
 import { difficultyLabels, questionTypeLabels } from '../../utils/labels';
 import { errorText } from '../../utils/errors';
-import type { Question, QuestionType } from '../../types';
+import type { Question, QuestionAttachment, QuestionType } from '../../types';
 
 const SUBJECTIVE: QuestionType[] = ['short', 'essay', 'programming', 'media'];
 
@@ -49,6 +57,13 @@ interface FormValues {
   partial_ratio?: boolean;
   ignore_case?: boolean;
   trim_space?: boolean;
+  stem_image?: string;
+  attachments?: QuestionAttachment[];
+  prepare_seconds?: number;
+  min_seconds?: number;
+  max_seconds?: number;
+  retake_limit?: number;
+  dimensions?: { name: string; weight: number }[];
 }
 
 function toFormValues(
@@ -93,6 +108,24 @@ function toFormValues(
     partial_ratio: rule.partial === 'ratio',
     ignore_case: rule.ignore_case !== false,
     trim_space: rule.trim_space !== false,
+    stem_image:
+      typeof content.stem_image === 'string' ? content.stem_image : undefined,
+    attachments: Array.isArray(content.attachments)
+      ? (content.attachments as QuestionAttachment[])
+      : [],
+    prepare_seconds:
+      typeof content.prepare_seconds === 'number'
+        ? content.prepare_seconds
+        : 30,
+    min_seconds:
+      typeof content.min_seconds === 'number' ? content.min_seconds : 30,
+    max_seconds:
+      typeof content.max_seconds === 'number' ? content.max_seconds : 180,
+    retake_limit:
+      typeof content.retake_limit === 'number' ? content.retake_limit : 1,
+    dimensions: Array.isArray(content.dimensions)
+      ? (content.dimensions as { name: string; weight: number }[])
+      : [{ name: '内容完整', weight: 60 }, { name: '表达清晰', weight: 40 }],
   };
 }
 
@@ -108,6 +141,11 @@ function toPayload(values: FormValues): QuestionInput {
   const content: Record<string, unknown> = { stem: values.stem };
   const answer: Record<string, unknown> = {};
   const scoreRule: Record<string, unknown> = {};
+
+  if (values.stem_image) content.stem_image = values.stem_image;
+  if (values.attachments && values.attachments.length > 0) {
+    content.attachments = values.attachments;
+  }
 
   switch (values.type) {
     case 'single':
@@ -144,6 +182,13 @@ function toPayload(values: FormValues): QuestionInput {
       break;
     case 'media':
       content.mode = values.mode ?? 'audio';
+      content.prepare_seconds = values.prepare_seconds ?? 30;
+      content.min_seconds = values.min_seconds ?? 30;
+      content.max_seconds = values.max_seconds ?? 180;
+      content.retake_limit = values.retake_limit ?? 1;
+      content.dimensions = (values.dimensions ?? []).filter(
+        (item) => item.name.trim() !== '',
+      );
       if (values.reference) answer.reference = values.reference;
       break;
     default:
@@ -189,7 +234,124 @@ const BLANK_DEFAULTS: FormValues = {
   partial_ratio: true,
   ignore_case: true,
   trim_space: true,
+  attachments: [],
+  dimensions: [
+    { name: '内容完整', weight: 60 },
+    { name: '表达清晰', weight: 40 },
+  ],
 };
+
+/** Upload one stem illustration; the stored value is the media id. */
+function StemImageField({
+  value,
+  onChange,
+}: {
+  value?: string;
+  onChange?: (value?: string) => void;
+}) {
+  const { message } = App.useApp();
+  return (
+    <div className="stem-image-field">
+      {value ? (
+        <div className="stem-image-preview">
+          <img src={mediaContentUrl(value)} alt="题干配图" />
+          <Button
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => onChange?.(undefined)}
+          >
+            移除配图
+          </Button>
+        </div>
+      ) : (
+        <Upload
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          showUploadList={false}
+          customRequest={({ file, onSuccess, onError }) => {
+            uploadMedia(file as File, 'question_asset')
+              .then((result) => {
+                onChange?.(result.id);
+                onSuccess?.(result);
+              })
+              .catch((error) => {
+                message.error(errorText(error));
+                onError?.(error as Error);
+              });
+          }}
+        >
+          <Button icon={<PictureOutlined />}>上传配图</Button>
+        </Upload>
+      )}
+    </div>
+  );
+}
+
+/** Question audio/video attachments (listening material, speech prompts...). */
+function AttachmentsField({
+  value,
+  onChange,
+}: {
+  value?: QuestionAttachment[];
+  onChange?: (value: QuestionAttachment[]) => void;
+}) {
+  const { message } = App.useApp();
+  const items = value ?? [];
+  return (
+    <div className="attachment-field">
+      <Upload
+        accept="audio/*,video/*"
+        showUploadList={false}
+        customRequest={({ file, onSuccess, onError }) => {
+          const picked = file as File;
+          const kind: QuestionAttachment['kind'] = picked.type.startsWith(
+            'video/',
+          )
+            ? 'video'
+            : 'audio';
+          uploadMedia(picked, 'question_asset')
+            .then((result) => {
+              onChange?.([
+                ...items,
+                { media_id: result.id, kind, name: result.filename },
+              ]);
+              onSuccess?.(result);
+            })
+            .catch((error) => {
+              message.error(errorText(error));
+              onError?.(error as Error);
+            });
+        }}
+      >
+        <Button icon={<SoundOutlined />}>添加音视频附件</Button>
+      </Upload>
+      {items.length > 0 && (
+        <ul className="attachment-list">
+          {items.map((item, index) => (
+            <li key={item.media_id}>
+              {item.kind === 'video' ? (
+                <VideoCameraOutlined />
+              ) : (
+                <SoundOutlined />
+              )}
+              <span>{item.name || item.media_id}</span>
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                aria-label="移除附件"
+                onClick={() =>
+                  onChange?.(items.filter((_, i) => i !== index))
+                }
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /**
  * Mounted once per drawer opening, so a previously edited question can never
@@ -331,6 +493,22 @@ function QuestionForm({
           rows={3}
           placeholder="题目正文，填空题用 ____ 标记空位"
         />
+      </Form.Item>
+
+      <Form.Item
+        name="stem_image"
+        label="题干配图"
+        tooltip="可选；支持 png / jpg / webp / gif"
+      >
+        <StemImageField />
+      </Form.Item>
+
+      <Form.Item
+        name="attachments"
+        label="音视频附件"
+        tooltip="可选；如听力材料、口试题面，作答时向考生播放"
+      >
+        <AttachmentsField />
       </Form.Item>
 
       {(type === 'single' || type === 'multiple') && (
@@ -595,14 +773,97 @@ function QuestionForm({
       )}
 
       {type === 'media' && (
-        <Form.Item name="mode" label="作答形式">
-          <Select
-            options={[
-              { value: 'audio', label: '口头作答（录音）' },
-              { value: 'video', label: '视频作答' },
-            ]}
-          />
-        </Form.Item>
+        <>
+          <div className="form-grid">
+            <Form.Item name="mode" label="作答形式">
+              <Select
+                options={[
+                  { value: 'audio', label: '口头作答（录音）' },
+                  { value: 'video', label: '视频作答' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              name="retake_limit"
+              label="重录次数上限"
+              rules={[{ required: true }]}
+            >
+              <InputNumber min={0} max={5} style={{ width: '100%' }} />
+            </Form.Item>
+          </div>
+          <div className="form-grid">
+            <Form.Item
+              name="prepare_seconds"
+              label="准备时长（秒）"
+              rules={[{ required: true }]}
+            >
+              <InputNumber min={0} max={600} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
+              name="min_seconds"
+              label="最短作答（秒）"
+              rules={[{ required: true }]}
+            >
+              <InputNumber min={5} max={600} style={{ width: '100%' }} />
+            </Form.Item>
+          </div>
+          <Form.Item
+            name="max_seconds"
+            label="最长作答（秒）"
+            rules={[{ required: true }]}
+            extra="到达上限自动停止录制并保存"
+          >
+            <InputNumber min={10} max={1800} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            label="评分维度"
+            tooltip="阅卷教师按维度打分，按权重合计为本题得分"
+          >
+            <Form.List name="dimensions">
+              {(fields, { add, remove }) => (
+                <div className="blank-editor">
+                  {fields.map((field) => (
+                    <Space
+                      key={field.key}
+                      align="baseline"
+                      className="option-row"
+                    >
+                      <Form.Item
+                        name={[field.name, 'name']}
+                        rules={[{ required: true, message: '维度名称不能为空' }]}
+                        style={{ marginBottom: 0, minWidth: 220 }}
+                      >
+                        <Input placeholder="维度名称，如：内容完整" />
+                      </Form.Item>
+                      <Form.Item
+                        name={[field.name, 'weight']}
+                        style={{ marginBottom: 0, width: 140 }}
+                      >
+                        <InputNumber min={0} max={100} addonAfter="%" />
+                      </Form.Item>
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        aria-label="删除维度"
+                        onClick={() => remove(field.name)}
+                      />
+                    </Space>
+                  ))}
+                  <Button
+                    type="dashed"
+                    size="small"
+                    icon={<PlusOutlined />}
+                    onClick={() => add({ name: '', weight: 20 })}
+                  >
+                    添加维度
+                  </Button>
+                </div>
+              )}
+            </Form.List>
+          </Form.Item>
+        </>
       )}
 
       {SUBJECTIVE.includes(type as QuestionType) && (

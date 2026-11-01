@@ -142,16 +142,22 @@ func (s *Store) ListScoresForExport(ctx context.Context, scope Scope, examID str
 	var meta ExamExportMeta
 	var rulesRaw []byte
 	err := s.pool.QueryRow(ctx, `
-		SELECT e.title, p.title, p.total_score::float8, e.rules
+		SELECT e.title, p.title, e.rules
 		FROM exams e JOIN papers p ON p.id = e.paper_id
 		WHERE e.id = $1::uuid AND e.org_id = $2`, examID, scope.OrgID).
-		Scan(&meta.ExamTitle, &meta.PaperTitle, &meta.TotalScore, &rulesRaw)
+		Scan(&meta.ExamTitle, &meta.PaperTitle, &rulesRaw)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ExamExportMeta{}, ErrNotFound
 		}
 		return nil, ExamExportMeta{}, fmt.Errorf("load exam for export: %w", err)
 	}
+	// The paper row sums every group, so the reachable full score comes from the snapshot.
+	snapshot, err := s.GetSnapshot(ctx, examID)
+	if err != nil {
+		return nil, ExamExportMeta{}, err
+	}
+	meta.TotalScore = snapshot.DisplayTotal()
 	meta.PassScore = passScoreOf(rulesRaw, meta.TotalScore)
 
 	scopeSQL, scopeArgs := scope.peopleFilter("u", 3)
@@ -186,9 +192,9 @@ func (s *Store) ListScoresForExport(ctx context.Context, scope Scope, examID str
 			&item.PublishedAt); err != nil {
 			return nil, ExamExportMeta{}, fmt.Errorf("scan exported score: %w", err)
 		}
-		item.MaxScore = meta.TotalScore
-		item.PassScore = meta.PassScore
-		item.Passed = item.Total >= meta.PassScore
+		item.MaxScore = groupTotalOf(snapshot, meta.TotalScore, item.Group)
+		item.PassScore = passScoreOf(rulesRaw, item.MaxScore)
+		item.Passed = item.Total >= item.PassScore
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -204,17 +210,37 @@ type ExamExportMeta struct {
 	PassScore  float64 `json:"pass_score"`
 }
 
-// passScoreOf resolves the pass line from exam rules, defaulting to 60% of the paper total.
+// passScoreOf resolves the pass line from exam rules, defaulting to 60% of the total.
+// An explicitly configured line is absolute and applies to every paper group.
 func passScoreOf(rulesRaw []byte, total float64) float64 {
-	var rules struct {
-		PassScore float64 `json:"pass_score"`
-	}
-	_ = json.Unmarshal(rulesRaw, &rules)
-	if rules.PassScore > 0 {
-		return rules.PassScore
+	if configured := configuredPassScore(rulesRaw); configured > 0 {
+		return configured
 	}
 	if total > 0 {
 		return math.Round(total*0.6*100) / 100
 	}
 	return 0
+}
+
+func configuredPassScore(rulesRaw []byte) float64 {
+	var rules struct {
+		PassScore float64 `json:"pass_score"`
+	}
+	_ = json.Unmarshal(rulesRaw, &rules)
+	return rules.PassScore
+}
+
+// passScoreFor is the pass line for one paper group: an explicitly configured line
+// stays absolute for every group, otherwise 60% of what that group can reach.
+func passScoreFor(rulesRaw []byte, groupMax float64) float64 {
+	return passScoreOf(rulesRaw, groupMax)
+}
+
+// groupTotalOf is the full score one paper group can reach, falling back to the exam
+// total for snapshots that carry no per-group sums.
+func groupTotalOf(snapshot PaperSnapshot, fallback float64, group string) float64 {
+	if total := snapshot.TotalFor(group); total > 0 {
+		return total
+	}
+	return fallback
 }

@@ -77,6 +77,17 @@ export interface QuestionOption {
   text: string
 }
 
+export interface QuestionAttachment {
+  media_id: string
+  kind: 'image' | 'audio' | 'video'
+  name?: string
+}
+
+export interface MediaScoringDimension {
+  name: string
+  weight: number
+}
+
 export interface QuestionContent {
   stem?: string
   options?: QuestionOption[]
@@ -85,6 +96,14 @@ export interface QuestionContent {
   languages?: string[]
   starter_code?: Record<string, string>
   cases?: { input?: string; output?: string; hidden?: boolean }[]
+  stem_image?: string
+  attachments?: QuestionAttachment[]
+  /** media question tuning: recording window and retake budget */
+  prepare_seconds?: number
+  min_seconds?: number
+  max_seconds?: number
+  retake_limit?: number
+  dimensions?: MediaScoringDimension[]
 }
 
 export interface QuestionAnswer {

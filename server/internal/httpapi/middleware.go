@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -103,33 +104,52 @@ func (a *API) cors(next http.Handler) http.Handler {
 func (a *API) bodyLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
-			r.Body = http.MaxBytesReader(w, r.Body, a.cfg.MaxBodyBytes)
+			limit := a.cfg.MaxBodyBytes
+			// Multipart uploads (media) carry their own, much larger budget.
+			if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/v1/media") {
+				limit = a.cfg.MaxUploadBytes
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
+// resolveAuth authenticates the caller and reloads the account. The access token
+// comes from the Authorization header; media routes may fall back to ?token=
+// because <img>/<audio>/<video> tags cannot attach headers.
+func (a *API) resolveAuth(w http.ResponseWriter, r *http.Request) (*auth.Claims, store.User, bool) {
+	raw := bearerToken(r)
+	if raw == "" && strings.HasPrefix(r.URL.Path, "/api/v1/media/") {
+		raw = strings.TrimSpace(r.URL.Query().Get("token"))
+	}
+	if raw == "" {
+		apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "请先登录")
+		return nil, store.User{}, false
+	}
+	claims, err := a.tokens.Parse(raw)
+	if err != nil {
+		apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "登录状态已失效，请重新登录")
+		return nil, store.User{}, false
+	}
+	// Reload the account on every request so a disabled account or a role/scope
+	// change takes effect immediately instead of when the token expires.
+	actor, err := a.store.FindUserByID(r.Context(), claims.Subject)
+	if err != nil {
+		apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "账号不存在或已停用，请重新登录")
+		return nil, store.User{}, false
+	}
+	if actor.Status != "active" {
+		apiError(w, http.StatusForbidden, "ACCOUNT_DISABLED", "账号已停用，请联系管理员")
+		return nil, store.User{}, false
+	}
+	return claims, actor, true
+}
+
 func (a *API) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw := bearerToken(r)
-		if raw == "" {
-			apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "请先登录")
-			return
-		}
-		claims, err := a.tokens.Parse(raw)
-		if err != nil {
-			apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "登录状态已失效，请重新登录")
-			return
-		}
-		// Reload the account on every request so a disabled account or a role/scope
-		// change takes effect immediately instead of when the token expires.
-		actor, err := a.store.FindUserByID(r.Context(), claims.Subject)
-		if err != nil {
-			apiError(w, http.StatusUnauthorized, "UNAUTHORIZED", "账号不存在或已停用，请重新登录")
-			return
-		}
-		if actor.Status != "active" {
-			apiError(w, http.StatusForbidden, "ACCOUNT_DISABLED", "账号已停用，请联系管理员")
+		claims, actor, ok := a.resolveAuth(w, r)
+		if !ok {
 			return
 		}
 		ctx := context.WithValue(r.Context(), claimsKey, claims)
