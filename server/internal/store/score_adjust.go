@@ -95,6 +95,19 @@ func (s *Store) AdjustScore(ctx context.Context, scope Scope, attemptID, reason 
 	if attemptStat != "graded" && attemptStat != "published" && attemptStat != "submitted" {
 		return ScoreAdjustment{}, fmt.Errorf("%w: 答卷还未交卷，无法更正", ErrInvalidState)
 	}
+	if attemptStat == "submitted" {
+		// A later review submission rewrites the same question's score, silently undoing
+		// this correction while the adjustment row still claims otherwise.
+		var pending int
+		if err := tx.QueryRow(ctx, `
+			SELECT count(*) FROM review_tasks
+			WHERE attempt_id = $1::uuid AND status IN ('pending', 'in_progress')`, attemptID).Scan(&pending); err != nil {
+			return ScoreAdjustment{}, fmt.Errorf("count pending review tasks: %w", err)
+		}
+		if pending > 0 {
+			return ScoreAdjustment{}, fmt.Errorf("%w: 该答卷还有 %d 道题待阅，阅卷会覆盖本次更正，请阅卷完成后再更正", ErrInvalidState, pending)
+		}
+	}
 
 	var detail ScoreDetail
 	if len(detailRaw) > 0 {

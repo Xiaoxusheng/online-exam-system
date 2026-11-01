@@ -403,6 +403,33 @@ func (s *Store) SubmitReview(ctx context.Context, orgID, reviewerID, taskID stri
 	if assigned != nil && *assigned != reviewerID {
 		return ReviewSubmitResult{}, ErrForbidden
 	}
+	if round > 1 {
+		// Double review only means something when a second person judges the answer.
+		// A reviewer may not take an extra round while another reviewer is still
+		// available for this exam; when the exam configured only this one person the
+		// round is effectively a single review and is allowed through.
+		var otherReviewers int
+		if err := tx.QueryRow(ctx, `
+			SELECT count(*) FROM exam_reviewers er
+			JOIN users u ON u.id = er.user_id AND u.status = 'active'
+			WHERE er.exam_id = $1::uuid AND er.user_id <> $2::uuid`, examID, reviewerID).Scan(&otherReviewers); err != nil {
+			return ReviewSubmitResult{}, fmt.Errorf("count other reviewers: %w", err)
+		}
+		if otherReviewers > 0 {
+			var judgedBefore bool
+			if err := tx.QueryRow(ctx, `
+				SELECT EXISTS(
+					SELECT 1 FROM review_tasks
+					WHERE attempt_id = $1::uuid AND question_id = $2::uuid
+						AND round < $3 AND reviewer_id = $4::uuid)`,
+				attemptID, questionID, round, reviewerID).Scan(&judgedBefore); err != nil {
+				return ReviewSubmitResult{}, fmt.Errorf("check earlier review rounds: %w", err)
+			}
+			if judgedBefore {
+				return ReviewSubmitResult{}, fmt.Errorf("%w: 同一题目不能由同一阅卷人评多轮", ErrForbidden)
+			}
+		}
+	}
 
 	var payload []byte
 	if err := tx.QueryRow(ctx, `SELECT payload FROM paper_snapshots WHERE exam_id = $1`, examID).Scan(&payload); err != nil {
@@ -460,7 +487,12 @@ func (s *Store) SubmitReview(ctx context.Context, orgID, reviewerID, taskID stri
 			result.FinalScore = &final
 			result.Finalized = true
 		} else {
-			nextID, err := s.createReviewRound(ctx, tx, examID, attemptID, questionID, 3, []string{})
+			// Arbitration must not land on either of the two judges it is arbitrating.
+			excluded, err := priorReviewers(ctx, tx, attemptID, questionID)
+			if err != nil {
+				return ReviewSubmitResult{}, err
+			}
+			nextID, err := s.createReviewRound(ctx, tx, examID, attemptID, questionID, 3, excluded)
 			if err != nil {
 				return ReviewSubmitResult{}, err
 			}
@@ -502,6 +534,31 @@ func (s *Store) SubmitReview(ctx context.Context, orgID, reviewerID, taskID stri
 		return ReviewSubmitResult{}, fmt.Errorf("commit submit review: %w", err)
 	}
 	return result, nil
+}
+
+// priorReviewers lists everyone who already judged this question, so a new round is
+// assigned to somebody who has not scored it before.
+func priorReviewers(ctx context.Context, db DBTX, attemptID, questionID string) ([]string, error) {
+	rows, err := db.Query(ctx, `
+		SELECT DISTINCT reviewer_id::text FROM review_tasks
+		WHERE attempt_id = $1::uuid AND question_id = $2::uuid AND reviewer_id IS NOT NULL`,
+		attemptID, questionID)
+	if err != nil {
+		return nil, fmt.Errorf("list prior reviewers: %w", err)
+	}
+	defer rows.Close()
+	reviewers := make([]string, 0, 2)
+	for rows.Next() {
+		var reviewerID string
+		if err := rows.Scan(&reviewerID); err != nil {
+			return nil, fmt.Errorf("scan prior reviewer: %w", err)
+		}
+		reviewers = append(reviewers, reviewerID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate prior reviewers: %w", err)
+	}
+	return reviewers, nil
 }
 
 // createReviewRound opens the next review round and auto-assigns the least loaded
