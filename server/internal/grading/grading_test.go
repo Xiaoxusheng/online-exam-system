@@ -75,6 +75,29 @@ func TestGradeFillNormalization(t *testing.T) {
 	}
 }
 
+func TestGradeFillNormalizationSwitchesComeFromScoreRule(t *testing.T) {
+	correct := raw(`{"answers":[["Beijing"]]}`)
+	answer := raw(`{"values":["beijing"]}`)
+
+	// The editor writes the switches into score_rule; turning case folding off must
+	// actually change the outcome instead of always defaulting to "ignore".
+	strict := Grade("fill", 4, raw(`{"ignore_case":false}`), correct, answer)
+	if !strict.NeedsReview {
+		t.Fatalf("expected case-sensitive mismatch to require review: %+v", strict)
+	}
+
+	relaxed := Grade("fill", 4, raw(`{"ignore_case":true}`), correct, answer)
+	if relaxed.Score != 4 || relaxed.NeedsReview {
+		t.Fatalf("expected case-insensitive match to score: %+v", relaxed)
+	}
+
+	// Rows authored before the switch moved still carry it inside answer.
+	legacy := Grade("fill", 4, nil, raw(`{"answers":[["Beijing"]],"ignore_case":false}`), answer)
+	if !legacy.NeedsReview {
+		t.Fatalf("expected legacy answer switch to be honoured: %+v", legacy)
+	}
+}
+
 func TestGradeSubjectiveNeedsReview(t *testing.T) {
 	for _, questionType := range []string{"short", "essay", "programming", "media"} {
 		got := Grade(questionType, 10, nil, raw(`{}`), raw(`{"text":"answer"}`))

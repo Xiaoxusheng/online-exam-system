@@ -29,7 +29,9 @@ type correctAnswer struct {
 }
 
 type scoreRule struct {
-	Partial string `json:"partial"`
+	Partial    string `json:"partial"`
+	IgnoreCase *bool  `json:"ignore_case"`
+	TrimSpace  *bool  `json:"trim_space"`
 }
 
 func Grade(questionType string, maxScore float64, ruleRaw, correctRaw, answerRaw json.RawMessage) Result {
@@ -41,7 +43,7 @@ func Grade(questionType string, maxScore float64, ruleRaw, correctRaw, answerRaw
 	case "multiple":
 		return gradeMultiple(result, ruleRaw, correctRaw, answerRaw)
 	case "fill":
-		return gradeFill(result, correctRaw, answerRaw)
+		return gradeFill(result, ruleRaw, correctRaw, answerRaw)
 	case "short", "essay", "programming", "media":
 		result.NeedsReview = true
 		result.Detail["reason"] = "manual_review"
@@ -133,7 +135,7 @@ func gradeMultiple(result Result, ruleRaw, correctRaw, answerRaw json.RawMessage
 	return result
 }
 
-func gradeFill(result Result, correctRaw, answerRaw json.RawMessage) Result {
+func gradeFill(result Result, ruleRaw, correctRaw, answerRaw json.RawMessage) Result {
 	var correct correctAnswer
 	if err := json.Unmarshal(correctRaw, &correct); err != nil || len(correct.Answers) == 0 {
 		result.NeedsReview = true
@@ -161,11 +163,22 @@ func gradeFill(result Result, correctRaw, answerRaw json.RawMessage) Result {
 
 	ignoreCase := true
 	trimSpace := true
+	// The question editor stores these switches in score_rule, so it has the final say;
+	// older rows kept them inside answer and are still honoured as a fallback.
 	if correct.IgnoreCase != nil {
 		ignoreCase = *correct.IgnoreCase
 	}
 	if correct.TrimSpace != nil {
 		trimSpace = *correct.TrimSpace
+	}
+	var rule scoreRule
+	if err := json.Unmarshal(ruleRaw, &rule); err == nil {
+		if rule.IgnoreCase != nil {
+			ignoreCase = *rule.IgnoreCase
+		}
+		if rule.TrimSpace != nil {
+			trimSpace = *rule.TrimSpace
+		}
 	}
 
 	for index, accepted := range correct.Answers {
