@@ -18,10 +18,10 @@ interface LoginLocationState {
 }
 
 const capabilities = [
-  '全流程闭环，考试数据统一沉淀',
-  '切屏检测、抓拍与水印，严肃考试防作弊',
-  '实时监考告警，异常 5 秒内到达监考台',
-  '成绩统计与知识点掌握度分析',
+  '全流程闭环：题库、组卷、编排、作答、阅卷、成绩',
+  '双评与仲裁率差自动流转，评分全程留痕',
+  '实时监考事件与处置，异常秒级到达监考台',
+  '逐题诊断、知识点掌握度与成绩更正申诉',
 ]
 
 export default function LoginPage() {
@@ -72,14 +72,14 @@ export default function LoginPage() {
         </div>
 
         <div className="login-brand-copy">
+          <span className="login-eyebrow">稳定 · 可信 · 可追溯</span>
           <h2 className="login-headline">
             从组卷到成绩
             <br />
-            一站式在线考试平台
+            一站式<em>在线考试平台</em>
           </h2>
           <p className="login-lead">
-            覆盖题库、组卷、考试、监考、阅卷与数据分析，支持人脸核验与 AI
-            行为检测，让每一场考试稳定、可信、可追溯。
+            覆盖题库、组卷、考试、监考、阅卷与数据分析，把每一场考试的过程与结果沉淀成可复用的教学资产。
           </p>
 
           <ul className="login-feature-list">
@@ -91,7 +91,39 @@ export default function LoginPage() {
             ))}
           </ul>
 
-          <div className="login-trust">数据加密存储 · 人脸信息单独授权 · 支持人工核验替代</div>
+          <div className="login-preview" aria-hidden="true">
+            <div className="login-preview-head">
+              <span className="login-preview-dots">
+                <span />
+                <span />
+                <span />
+              </span>
+              数据分析 · 逐题诊断
+            </div>
+            <div className="login-preview-body">
+              <div className="login-preview-stat">
+                <span className="login-preview-bar" />
+                <span className="login-preview-label" />
+              </div>
+              <div className="login-preview-stat">
+                <span className="login-preview-bar" />
+                <span className="login-preview-label" />
+              </div>
+              <div className="login-preview-stat">
+                <span className="login-preview-bar" />
+                <span className="login-preview-label" />
+              </div>
+              <div className="login-preview-chart">
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+              </div>
+            </div>
+          </div>
+
+          <div className="login-trust">数据加密存储 · 全链路审计 · 按角色与数据范围授权</div>
         </div>
 
         <div className="login-brand-footer">© 2026 在线考试系统</div>

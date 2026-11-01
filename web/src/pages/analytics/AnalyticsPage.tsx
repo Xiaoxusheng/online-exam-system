@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Alert, Card, Select, Tabs } from 'antd'
 import PageHeader from '../../components/PageHeader'
+import AnimatedNumber from '../../components/AnimatedNumber'
 import QueryError from '../../components/QueryError'
 import EmptyState from '../../components/EmptyState'
 import ItemAnalyticsPanel from './ItemAnalyticsPanel'
@@ -53,27 +54,39 @@ export default function AnalyticsPage() {
         <div className="metric-grid">
           <div className="metric-cell">
             <div className="metric-label">编排考生</div>
-            <div className="metric-value">{analytics.candidate_count}</div>
+            <div className="metric-value">
+              <AnimatedNumber value={analytics.candidate_count} />
+            </div>
           </div>
           <div className="metric-cell">
             <div className="metric-label">已判分答卷</div>
-            <div className="metric-value">{analytics.graded_count}</div>
+            <div className="metric-value">
+              <AnimatedNumber value={analytics.graded_count} />
+            </div>
           </div>
           <div className="metric-cell">
             <div className="metric-label">平均分</div>
-            <div className="metric-value">{formatScore(analytics.average, 1)}</div>
+            <div className="metric-value">
+              <AnimatedNumber value={analytics.average} decimals={1} />
+            </div>
           </div>
           <div className="metric-cell">
             <div className="metric-label">及格率</div>
-            <div className="metric-value">{formatScore(analytics.pass_rate, 1)}%</div>
+            <div className="metric-value">
+              <AnimatedNumber value={analytics.pass_rate} decimals={1} suffix="%" />
+            </div>
           </div>
           <div className="metric-cell">
             <div className="metric-label">最高分</div>
-            <div className="metric-value">{formatScore(analytics.highest, 1)}</div>
+            <div className="metric-value">
+              <AnimatedNumber value={analytics.highest} decimals={1} />
+            </div>
           </div>
           <div className="metric-cell">
             <div className="metric-label">最低分</div>
-            <div className="metric-value">{formatScore(analytics.lowest, 1)}</div>
+            <div className="metric-value">
+              <AnimatedNumber value={analytics.lowest} decimals={1} />
+            </div>
           </div>
           <div className="metric-cell">
             <div className="metric-label">满分 / 及格线</div>

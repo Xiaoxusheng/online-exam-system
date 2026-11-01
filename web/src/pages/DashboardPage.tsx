@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import { fetchDashboardSummary } from '../api/dashboard'
+import AnimatedNumber from '../components/AnimatedNumber'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
 import { useAuthStore } from '../stores/auth'
@@ -158,7 +159,7 @@ export default function DashboardPage() {
                   {isLoading ? (
                     <Skeleton.Input active size="small" style={{ width: 56 }} />
                   ) : (
-                    stat.value
+                    <AnimatedNumber value={stat.value} />
                   )}
                 </div>
                 <div className="stat-foot">{stat.foot}</div>

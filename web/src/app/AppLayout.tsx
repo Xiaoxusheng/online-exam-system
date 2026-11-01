@@ -80,6 +80,8 @@ export default function AppLayout() {
 
   const role = user?.role
   const allowedHere = canAccess(role, location.pathname)
+  // 切换账号后可能残留上一个角色的页签，渲染前按当前角色过滤掉无权访问的。
+  const visibleTabs = useMemo(() => tabs.filter((tab) => canAccess(role, tab.path)), [tabs, role])
 
   const isAttemptRoute = location.pathname.startsWith('/attempts/')
 
@@ -269,7 +271,8 @@ export default function AppLayout() {
           {menu}
           {!collapsed && (
             <div className="app-sider-footer">
-              <span className="sider-version">v0.4</span>
+              <span className="sider-version">v1.1</span>
+              <span className="sider-status">服务正常</span>
             </div>
           )}
         </Sider>
@@ -337,7 +340,7 @@ export default function AppLayout() {
         </Header>
 
         <div className="work-tabs">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <span
               key={tab.path}
               className={tab.path === location.pathname ? 'work-tab work-tab-active' : 'work-tab'}
@@ -384,8 +387,9 @@ export default function AppLayout() {
           {brand}
           {menu}
           <div className="app-sider-footer">
-            <span className="sider-version">v0.4</span>
-          </div>
+              <span className="sider-version">v1.1</span>
+              <span className="sider-status">服务正常</span>
+            </div>
         </Drawer>
       )}
     </Layout>

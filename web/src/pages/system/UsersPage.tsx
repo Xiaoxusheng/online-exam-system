@@ -25,6 +25,16 @@ const statusOptions = [
 
 const scopeOptions = ['org', 'campus', 'class', 'self'].map((value) => ({ value, label: dataScopeLabel(value) }))
 
+/** 角色用不同色系区分，扫表时不必逐字读文字。 */
+const roleTone: Record<string, string> = {
+  org_admin: 'purple',
+  exam_admin: 'blue',
+  teacher: 'cyan',
+  reviewer: 'geekblue',
+  proctor: 'gold',
+  student: 'default',
+}
+
 function UserFormModal({
   open,
   editing,
@@ -206,7 +216,7 @@ export default function UsersPage() {
       title: '角色',
       dataIndex: 'role',
       width: 120,
-      render: (value: Role) => <Tag className="soft-tag">{roleLabel(value)}</Tag>,
+      render: (value: Role) => <Tag color={roleTone[value] ?? 'default'}>{roleLabel(value)}</Tag>,
     },
     {
       title: '数据范围',
