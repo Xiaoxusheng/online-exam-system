@@ -49,6 +49,21 @@ func main() {
 	}
 	slog.Info("organization ready", "org_id", orgID)
 
+	// Notification templates are part of a usable install: 0007 could only seed the
+	// organisations that existed at migration time, so seed them for this one as well.
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO notification_templates (org_id, channel, code, title_tpl, content_tpl, enabled)
+		VALUES
+			($1, 'inapp', 'exam_publish', '考试发布：{exam}', '考试时间 {start_at} 至 {end_at}，限时 {duration} 分钟，请按时参加。', TRUE),
+			($1, 'inapp', 'score_publish', '成绩发布', '《{exam}》成绩已公布，得分 {total} 分。', TRUE),
+			($1, 'inapp', 'score_adjust', '成绩更正', '成绩已更正：当前 {total} 分（原 {before} 分）。如有疑问可在“我的成绩”提交申诉。', TRUE),
+			($1, 'inapp', 'score_appeal', '成绩申诉结果', '成绩申诉{verdict}：{note}。当前得分 {total} 分。', TRUE),
+			($1, 'inapp', 'review_pending', '有新的阅卷任务', '《{exam}》有 {count} 份答卷等待批阅，请尽快处理。', TRUE)
+		ON CONFLICT (org_id, code, channel) DO NOTHING`, orgID); err != nil {
+		slog.Error("seed notification templates failed", "error", err)
+		os.Exit(1)
+	}
+
 	var adminID string
 	err = tx.QueryRow(ctx, `SELECT id::text FROM users WHERE org_id = $1 AND username = 'admin'`, orgID).Scan(&adminID)
 	switch {
