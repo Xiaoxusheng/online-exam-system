@@ -76,14 +76,22 @@ func Load() (Config, error) {
 		return cfg, fmt.Errorf("invalid APP_ENV %q (want dev, test or release)", cfg.Env)
 	}
 
+	// The built-in secret is a development convenience only. Allowing it in test or
+	// release means one forgotten environment variable hands out forgeable org_admin
+	// tokens, so those environments fail closed instead.
 	if cfg.JWTSecret == "" {
-		if cfg.Env == "release" {
-			return cfg, fmt.Errorf("JWT_SECRET is required when APP_ENV=release")
+		if cfg.Env != "dev" {
+			return cfg, fmt.Errorf("JWT_SECRET is required when APP_ENV=%s", cfg.Env)
 		}
 		cfg.JWTSecret = DefaultDevJWTSecret
 	}
-	if len(cfg.JWTSecret) < 32 && cfg.Env == "release" {
-		return cfg, fmt.Errorf("JWT_SECRET must be at least 32 bytes in release mode")
+	if cfg.Env != "dev" {
+		if cfg.JWTSecret == DefaultDevJWTSecret {
+			return cfg, fmt.Errorf("the built-in development JWT_SECRET is not allowed when APP_ENV=%s", cfg.Env)
+		}
+		if len(cfg.JWTSecret) < 32 {
+			return cfg, fmt.Errorf("JWT_SECRET must be at least 32 bytes when APP_ENV=%s", cfg.Env)
+		}
 	}
 
 	if v := os.Getenv("JWT_TTL"); v != "" {
