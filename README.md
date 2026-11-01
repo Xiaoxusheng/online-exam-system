@@ -2,14 +2,14 @@
 
 面向教育培训机构的在线考试平台：题库 → 组卷 → 考试 → 监考 → 阅卷 → 成绩 → 分析。需求见 [exam-requirements.md](./exam-requirements.md)。
 
-当前阶段：**v0.3 后端业务闭环**（题库、组卷、考试、作答、判分、阅卷、成绩、监考事件与统计接口已实现；前端仍为展示骨架，下一步接入真实数据）。
+当前阶段：**v2.4**。题库 → 组卷 → 考试编排 → 考生作答 → 自动判分 → 人工阅卷（双评/仲裁/连续批阅）→ 成绩发布与分析 → 成绩更正与申诉 → Excel 导入导出，全链路已接入真实接口；监考中心支持实时事件与考场选择视图。未实现项（人脸核验、编程题沙箱、音视频在线评分、短信邮件投递等）见 [docs/tasks/current.md](./docs/tasks/current.md)。
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|---|
 | 前端 | React 19 · TypeScript · Vite · Ant Design 5 · React Router 7 · TanStack Query · Zustand |
-| 后端 | Go 1.27 · chi · pgx v5 · JWT · bcrypt |
+| 后端 | Go 1.27 · chi · pgx v5 · JWT · bcrypt · websocket · excelize（Excel 导入导出） |
 | 数据库 | PostgreSQL 16 |
 | 工程 | 单仓：`server/` + `web/`，文档在 `docs/` |
 

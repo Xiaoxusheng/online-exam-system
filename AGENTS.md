@@ -10,7 +10,7 @@
 ## 技术栈
 
 - 前端：React 19 + TypeScript + Vite + Ant Design 5 + React Router 7 + TanStack Query + Zustand
-- 后端：Go 1.27 + chi v5 + pgx v5 + golang-jwt v5 + bcrypt + gorilla/websocket
+- 后端：Go 1.27 + chi v5 + pgx v5 + golang-jwt v5 + bcrypt + gorilla/websocket + excelize（Excel 导入导出）
 - 数据库：PostgreSQL 16
 - 单仓：`server/`（Go）+ `web/`（React），`docs/` 存放文档
 
@@ -105,5 +105,5 @@ cd web && node scripts/verify-v1-ui.mjs  # v1.0 视觉与交互验收 + 截图�
 - 后台任务每 30 秒执行：先结束到期考试并标记未入场考生缺考，再自动提交超时答卷；交卷、阅卷提交、成绩发布均幂等或带状态校验。
 - 编程题、音视频题走人工阅卷；单选、多选、判断、填空自动判分。
 - 监考 WebSocket 用 `?token=` 传 JWT（浏览器无法为 WS 附加请求头），该路由不参与 Bearer 中间件；连接断开时前端降级为 15 秒轮询。
-- 认证：访问令牌 8h + 刷新令牌 30d 轮换（`REFRESH_TTL`），旧刷新令牌重放会吊销该用户全部刷新令牌；登录失败限流为单实例内存计数。
-- Excel 导入受三重上限约束：单文件 12 MB、解压 64 MB、单次 1000 行；生产环境如需更大批量，同步调大 `MAX_BODY_BYTES`。
+- 认证：访问令牌 8h + 刷新令牌 30d 轮换（`REFRESH_TTL`），旧刷新令牌重放会吊销该用户全部刷新令牌；登录失败限流为单实例内存计数。`users.security_stamp` 记录账号安全变更时间：改角色、改数据范围、改密、停用、登出与刷新令牌重放都会提升它，签发时间早于该值的访问令牌立即失效（含监考 WebSocket），因此登出是"全端登出"。
+- Excel 导入受四重上限约束：单文件 12 MB、解压 64 MB、单次 1000 行，以及请求体上限 `MAX_BODY_BYTES`（默认 1 MB）。默认值会先于 12 MB 拦截上传，需要批量导入时把 `MAX_BODY_BYTES` 调到 ≥16 MB（生产已按此配置）。
