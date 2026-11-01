@@ -1,8 +1,9 @@
 // Backend end-to-end smoke test.
 // Prerequisites: PostgreSQL migrated, API on :8081, seeded admin (Admin@123456).
 // Usage: node scripts/e2e_backend.mjs
+//        API_BASE=http://127.0.0.1:18081/api/v1 node scripts/e2e_backend.mjs   (isolated instance)
 // Writes records prefixed with "E2E " and an e2e_student_* account; dev databases only.
-const BASE = 'http://127.0.0.1:8081/api/v1'
+const BASE = process.env.API_BASE ?? 'http://127.0.0.1:8081/api/v1'
 
 const suffix = String(Date.now()).slice(-8)
 const results = []
@@ -720,7 +721,7 @@ check((await api('GET', wsPath)).status === 401, 'websocket requires a token')
 check((await api('GET', `${wsPath}?token=${studentToken}`)).status === 403, 'student token cannot join a proctor room')
 check((await api('GET', `${wsPath}?token=${proctorOut.token}`)).status === 403, 'unassigned proctor token cannot join the room')
 
-const wsURL = `ws://127.0.0.1:8081/api/v1${wsPath}?token=${encodeURIComponent(proctorIn.token)}`
+const wsURL = `${BASE.replace(/^http/, 'ws')}${wsPath}?token=${encodeURIComponent(proctorIn.token)}`
 const room = await connectSocket(wsURL)
 check(!!room.socket, 'assigned proctor websocket connects')
 await waitFor(() => room.messages.length > 0, 'websocket hello frame arrives', 10_000, room.messages)

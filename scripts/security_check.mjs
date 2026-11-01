@@ -1,9 +1,10 @@
 // Security regression: data scope, brute-force guard, token handling and injection.
 // Usage: node scripts/security_check.mjs   (API on :8081, seeded admin, dev DB only)
+//        API_BASE=http://127.0.0.1:18081/api/v1 node scripts/security_check.mjs   (isolated instance)
 // Creates records prefixed with "SEC " / seccheck_ and removes them at the end.
 import { inflateRawSync } from 'node:zlib'
 
-const BASE = 'http://127.0.0.1:8081/api/v1'
+const BASE = process.env.API_BASE ?? 'http://127.0.0.1:8081/api/v1'
 const suffix = String(Date.now()).slice(-8)
 const results = []
 
