@@ -1,22 +1,30 @@
 import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, DatePicker, Drawer, Flex, Form, Input, InputNumber, Select, Space, Switch, Table, Tag, Tooltip } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { App, Button, Card, Col, DatePicker, Drawer, Flex, Form, Input, InputNumber, Pagination, Row, Select, Skeleton, Space, Switch, Tag, Tooltip } from 'antd'
 import type { Dayjs } from 'dayjs'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import {
+  CalendarOutlined,
+  ClockCircleOutlined,
+  FileTextOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  RightOutlined,
+  SearchOutlined,
+  TeamOutlined,
+} from '@ant-design/icons'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
 import SectionFold from '../../components/SectionFold'
+import EmptyState from '../../components/EmptyState'
 import ExamDetail from './ExamDetail'
 import { createExam, listExams, publishExam, type ExamInput, type ExamListParams } from '../../api/exam'
 import { listPapers } from '../../api/paper'
 import { listClasses, listUsers } from '../../api/org'
 import { queryKeys } from '../../api/queryKeys'
 import { examStatusLabels, statusOf } from '../../utils/labels'
-import { formatDateTime } from '../../utils/format'
+import { formatTimeRange } from '../../utils/format'
 import { errorText } from '../../utils/errors'
-import type { Exam } from '../../types'
 
 interface CreateFormValues {
   paper_id: string
@@ -47,7 +55,11 @@ export default function ExamsPage() {
   const [form] = Form.useForm<CreateFormValues>()
   const reviewMode = Form.useWatch('review_mode', form)
 
-  const examsQuery = useQuery({ queryKey: queryKeys.exams(query), queryFn: () => listExams(query) })
+  const examsQuery = useQuery({
+    queryKey: queryKeys.exams(query),
+    queryFn: () => listExams(query),
+    placeholderData: keepPreviousData,
+  })
   const papersQuery = useQuery({
     queryKey: queryKeys.papers({ status: 'approved', page: 1, page_size: 100 }),
     queryFn: () => listPapers({ status: 'approved', page: 1, page_size: 100 }),
@@ -126,78 +138,8 @@ export default function ExamsPage() {
     setQuery({ ...draft, page: 1, page_size: query.page_size ?? 20 })
   }
 
-  const columns: ColumnsType<Exam> = [
-    {
-      title: '考试',
-      key: 'title',
-      render: (_value, record) => (
-        <div className="cell-stack">
-          <span className="cell-title">{record.title}</span>
-          <span className="cell-meta">
-            {record.paper_title} · {record.candidate_count} 名考生
-          </span>
-        </div>
-      ),
-    },
-    {
-      title: '时间窗',
-      key: 'window',
-      width: 250,
-      render: (_value, record) => (
-        <div className="cell-stack">
-          <span className="cell-title">{formatDateTime(record.start_at)} 起</span>
-          <span className="cell-meta">
-            至 {formatDateTime(record.end_at)} · 限时 {record.duration_minutes} 分钟
-          </span>
-        </div>
-      ),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      width: 110,
-      render: (value: string) => {
-        const status = statusOf(examStatusLabels, value)
-        return <Tag color={status.color}>{status.label}</Tag>
-      },
-    },
-    {
-      title: '判卷方式',
-      key: 'review',
-      width: 130,
-      render: (_value, record) =>
-        record.rules?.review_mode === 'double' ? (
-          <Tooltip title={`两评分差超过 ${record.rules?.review_threshold ?? '满分 20%'} 时进入三评仲裁`}>
-            <Tag color="purple">双评 + 仲裁</Tag>
-          </Tooltip>
-        ) : (
-          <span className="cell-meta">单评</span>
-        ),
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 150,
-      fixed: 'right',
-      render: (_value, record) => (
-        <Space size={4}>
-          <Button type="link" size="small" onClick={() => setDetailId(record.id)}>
-            详情
-          </Button>
-          {(record.status === 'draft' || record.status === 'pending_publish') && (
-            <Button
-              type="link"
-              size="small"
-              loading={publishMutation.isPending && publishMutation.variables === record.id}
-              onClick={() => publishMutation.mutate(record.id)}
-            >
-              发布
-            </Button>
-          )}
-        </Space>
-      ),
-    },
-  ]
+  const exams = examsQuery.data?.items ?? []
+  const pagination = examsQuery.data?.pagination
 
   return (
     <div>
@@ -242,27 +184,110 @@ export default function ExamsPage() {
             重置
           </Button>
         </Flex>
-
-        <QueryError error={examsQuery.error} onRetry={() => examsQuery.refetch()} />
-
-        <Table
-          rowKey="id"
-          size="middle"
-          loading={examsQuery.isFetching}
-          columns={columns}
-          dataSource={examsQuery.data?.items ?? []}
-          scroll={{ x: 1000 }}
-          pagination={{
-            current: examsQuery.data?.pagination.page ?? 1,
-            pageSize: examsQuery.data?.pagination.page_size ?? 20,
-            total: examsQuery.data?.pagination.total ?? 0,
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 场考试`,
-            onChange: (page, pageSize) => setQuery({ ...draft, page, page_size: pageSize }),
-          }}
-          locale={{ emptyText: examsQuery.isError ? ' ' : '还没有考试安排' }}
-        />
       </Card>
+
+      <QueryError error={examsQuery.error} onRetry={() => examsQuery.refetch()} />
+
+      {examsQuery.isFetching && !examsQuery.data ? (
+        <Row gutter={[12, 12]}>
+          {[0, 1, 2].map((index) => (
+            <Col key={index} xs={24} sm={12} xl={8}>
+              <Card className="panel-card room-card" variant="borderless">
+                <Skeleton active title paragraph={{ rows: 2 }} />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      ) : exams.length === 0 ? (
+        <Card className="panel-card" variant="borderless">
+          <EmptyState
+            icon={<CalendarOutlined />}
+            title="还没有考试安排"
+            description="点击右上角「新建考试」创建第一场考试；创建后可编排考生并发布。"
+          />
+        </Card>
+      ) : (
+        <>
+          <Row gutter={[12, 12]}>
+            {exams.map((exam) => {
+              const status = statusOf(examStatusLabels, exam.status)
+              const live = exam.status === 'in_progress'
+              const doubleReview = exam.rules?.review_mode === 'double'
+              return (
+                <Col key={exam.id} xs={24} sm={12} xl={8}>
+                  <Card
+                    className={`panel-card room-card is-interactive${live ? ' is-live' : ''}`}
+                    variant="borderless"
+                    onClick={() => setDetailId(exam.id)}
+                  >
+                    <div className="room-card-head">
+                      <span className="room-card-title" title={exam.title}>
+                        {exam.title}
+                      </span>
+                      {live ? (
+                        <span className="room-live-badge">
+                          <span className="room-live-dot" />
+                          进行中
+                        </span>
+                      ) : (
+                        <Tag color={status.color}>{status.label}</Tag>
+                      )}
+                    </div>
+                    <div className="room-card-schedule">
+                      <ClockCircleOutlined />
+                      <span>{formatTimeRange(exam.start_at, exam.end_at)}</span>
+                      <span className="room-card-sep">·</span>
+                      <span>限时 {exam.duration_minutes} 分钟</span>
+                    </div>
+                    <div className="room-card-paper">
+                      <FileTextOutlined />
+                      <span title={exam.paper_title}>{exam.paper_title}</span>
+                    </div>
+                    <div className="room-card-foot">
+                      <span className="room-card-meta">
+                        <TeamOutlined />
+                        {exam.candidate_count} 名考生
+                      </span>
+                      {doubleReview ? (
+                        <Tooltip title={`两评分差超过 ${exam.rules?.review_threshold ?? '满分 20%'} 时进入三评仲裁`}>
+                          <span className="room-chip room-chip-violet">双评 + 仲裁</span>
+                        </Tooltip>
+                      ) : (
+                        <span className="room-chip">单评</span>
+                      )}
+                      {(exam.status === 'draft' || exam.status === 'pending_publish') && (
+                        <Button
+                          size="small"
+                          type="primary"
+                          ghost
+                          loading={publishMutation.isPending && publishMutation.variables === exam.id}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            publishMutation.mutate(exam.id)
+                          }}
+                        >
+                          发布
+                        </Button>
+                      )}
+                      <RightOutlined className="room-card-enter" />
+                    </div>
+                  </Card>
+                </Col>
+              )
+            })}
+          </Row>
+          <Flex justify="flex-end" style={{ marginTop: 16 }}>
+            <Pagination
+              current={pagination?.page ?? 1}
+              pageSize={pagination?.page_size ?? 20}
+              total={pagination?.total ?? 0}
+              showSizeChanger
+              showTotal={(total) => `共 ${total} 场考试`}
+              onChange={(page, pageSize) => setQuery({ ...draft, page, page_size: pageSize })}
+            />
+          </Flex>
+        </>
+      )}
 
       <Drawer
         open={createOpen}

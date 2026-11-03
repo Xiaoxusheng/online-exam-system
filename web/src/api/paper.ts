@@ -46,3 +46,11 @@ export function submitPaperReview(id: string): Promise<Paper> {
 export function approvePaper(id: string): Promise<Paper> {
   return apiRequest<Paper>(`/papers/${id}/approve`, { method: 'POST' })
 }
+
+export function rejectPaper(id: string, reason: string): Promise<Paper> {
+  return apiRequest<Paper>(`/papers/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) })
+}
+
+export function copyPaper(id: string): Promise<Paper> {
+  return apiRequest<Paper>(`/papers/${id}/copy`, { method: 'POST' })
+}

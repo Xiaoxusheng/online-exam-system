@@ -22,6 +22,7 @@ const pageRoles: Record<string, Role[]> = {
   '/system/audit-logs': ['org_admin'],
   '/system/notifications': ['org_admin'],
   '/system/branding': ['org_admin'],
+  '/system/ops': ['org_admin'],
 }
 
 export function canAccess(role: Role | undefined, path: string): boolean {

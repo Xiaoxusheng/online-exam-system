@@ -1,11 +1,13 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { App, Button, Card, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { CalendarOutlined } from '@ant-design/icons'
+import { CalendarOutlined, SafetyOutlined } from '@ant-design/icons'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
 import EmptyState from '../../components/EmptyState'
+import DeviceCheckModal from '../../components/DeviceCheckModal'
 import { listMyExams, startAttempt } from '../../api/student'
 import { queryKeys } from '../../api/queryKeys'
 import { candidateStatusLabels, examStatusLabels, statusOf } from '../../utils/labels'
@@ -16,6 +18,7 @@ import type { MyExam } from '../../types'
 export default function MyExamsPage() {
   const { message } = App.useApp()
   const navigate = useNavigate()
+  const [deviceOpen, setDeviceOpen] = useState(false)
 
   const examsQuery = useQuery({ queryKey: queryKeys.myExams, queryFn: listMyExams })
 
@@ -106,7 +109,17 @@ export default function MyExamsPage() {
 
   return (
     <div>
-      <PageHeader title="我的考试" subtitle="开考时间到后即可进入；交卷前答案会自动保存。" />
+      <PageHeader
+        title="我的考试"
+        subtitle="开考时间到后即可进入；交卷前答案会自动保存。"
+        extra={
+          <Button icon={<SafetyOutlined />} onClick={() => setDeviceOpen(true)}>
+            设备检测
+          </Button>
+        }
+      />
+
+      <DeviceCheckModal open={deviceOpen} onClose={() => setDeviceOpen(false)} />
 
       <Card className="panel-card" variant="borderless">
         <QueryError error={examsQuery.error} onRetry={() => examsQuery.refetch()} />

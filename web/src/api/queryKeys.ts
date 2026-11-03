@@ -53,4 +53,6 @@ export const queryKeys = {
 
   auditLogs: (params: KeyParams) => ['system', 'audit-logs', params] as const,
   systemOverview: ['system', 'overview'] as const,
+  systemMonitor: ['system', 'monitor'] as const,
+  systemStorage: ['system', 'storage'] as const,
 }

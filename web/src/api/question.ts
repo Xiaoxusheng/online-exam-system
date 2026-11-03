@@ -52,6 +52,14 @@ export function publishQuestion(id: string): Promise<Question> {
   return apiRequest<Question>(`/questions/${id}/publish`, { method: 'POST' })
 }
 
+export function rejectQuestion(id: string, reason: string): Promise<Question> {
+  return apiRequest<Question>(`/questions/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) })
+}
+
+export function archiveQuestion(id: string): Promise<Question> {
+  return apiRequest<Question>(`/questions/${id}`, { method: 'DELETE' })
+}
+
 export interface ImportReportRow {
   line: number
   stem: string

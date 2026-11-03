@@ -152,6 +152,7 @@ export interface PaperQuestion {
   difficulty: string
   knowledge_point: string
   content: QuestionContent
+  answer?: Record<string, unknown>
 }
 
 export interface RandomSection {
@@ -192,6 +193,7 @@ export interface ExamRules {
   screen_switch_limit?: number
   snapshot_interval?: number
   show_analysis?: boolean
+  retake_of?: string
 }
 
 export interface Exam {

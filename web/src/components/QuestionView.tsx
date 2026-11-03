@@ -8,20 +8,26 @@ interface ContentProps {
   content: QuestionContent
   maxScore?: number
   section?: string
+  /** 选项已由可作答的行渲染时（试做/预览），隐藏只读选项列表，避免同一组选项出现两遍。 */
+  hideOptions?: boolean
+  /** 外层容器（试卷预览卡片头）已给出题型与分值时，不再重复渲染题头。 */
+  hideHead?: boolean
 }
 
 /** Read-only rendering of a question body, shared by review and score detail. */
-export function QuestionContent({ type, content, maxScore, section }: ContentProps) {
+export function QuestionContent({ type, content, maxScore, section, hideOptions, hideHead }: ContentProps) {
   const options = Array.isArray(content?.options) ? content.options : []
   const cases = Array.isArray(content?.cases) ? content.cases : []
   const attachments = Array.isArray(content?.attachments) ? content.attachments : []
   return (
     <div className="question-view">
-      <div className="question-view-head">
-        {section && <Tag className="soft-tag">{section}</Tag>}
-        <Tag className="soft-tag">{questionTypeLabel(type)}</Tag>
-        {maxScore !== undefined && <span className="cell-meta">本题 {maxScore} 分</span>}
-      </div>
+      {!hideHead && (
+        <div className="question-view-head">
+          {section && <Tag className="soft-tag">{section}</Tag>}
+          <Tag className="soft-tag">{questionTypeLabel(type)}</Tag>
+          {maxScore !== undefined && <span className="cell-meta">本题 {maxScore} 分</span>}
+        </div>
+      )}
       <p className="question-stem">{content?.stem || '（无题干）'}</p>
       {content?.stem_image && (
         <div className="question-stem-image">
@@ -39,7 +45,7 @@ export function QuestionContent({ type, content, maxScore, section }: ContentPro
           )}
         </div>
       )}
-      {options.length > 0 && (
+      {options.length > 0 && !hideOptions && (
         <ul className="option-list">
           {options.map((option) => (
             <li key={option.key}>

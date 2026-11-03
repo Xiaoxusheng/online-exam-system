@@ -23,6 +23,7 @@ export interface ExamInput {
   proctor_config?: Record<string, unknown>
   candidates?: CandidateInput[]
   class_ids?: string[]
+  retake_of?: string
 }
 
 export function listExams(params: ExamListParams = {}): Promise<ListResult<Exam>> {
@@ -39,6 +40,25 @@ export function createExam(input: ExamInput): Promise<Exam> {
 
 export function publishExam(id: string): Promise<Exam> {
   return apiRequest<Exam>(`/exams/${id}/publish`, { method: 'POST' })
+}
+
+export function rescheduleExam(id: string, input: { start_at: string; end_at: string; reason?: string }): Promise<Exam> {
+  return apiRequest<Exam>(`/exams/${id}/reschedule`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+export interface RetakeCandidate {
+  user_id: string
+  name: string
+  username: string
+  candidate_status: string
+  attempt_id: string | null
+  total: number | null
+  pass_score: number
+  eligibility: 'failed' | 'absent' | 'not_graded'
+}
+
+export function listRetakeCandidates(examId: string): Promise<RetakeCandidate[]> {
+  return apiRequest<RetakeCandidate[]>(`/exams/${examId}/retake-candidates`)
 }
 
 export function listCandidates(examId: string, page = 1, pageSize = 50): Promise<ListResult<ExamCandidate>> {

@@ -2,17 +2,20 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Button, Card, Flex, Form, Input, Modal, Select, Space, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { DownloadOutlined, ImportOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { DownloadOutlined, EyeOutlined, ImportOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
 import QuestionEditor from './QuestionEditor'
 import QuestionImportModal from '../../components/QuestionImportModal'
+import { QuestionTryIt } from '../../components/QuestionTryIt'
 import {
+  archiveQuestion,
   createBank,
   exportQuestions,
   listBanks,
   listQuestions,
   publishQuestion,
+  rejectQuestion,
   type QuestionListParams,
 } from '../../api/question'
 import { queryKeys } from '../../api/queryKeys'
@@ -39,10 +42,11 @@ function stemOf(question: Question): string {
 }
 
 export default function QuestionsPage() {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
   const role = useAuthStore((state) => state.user?.role)
   const canPublish = role === 'teacher' || role === 'org_admin'
+  const canReview = role === 'exam_admin' || role === 'org_admin'
 
   const [draft, setDraft] = useState<Omit<QuestionListParams, 'page' | 'page_size'>>({})
   const [query, setQuery] = useState<QuestionListParams>({ page: 1, page_size: 20 })
@@ -77,6 +81,39 @@ export default function QuestionsPage() {
     },
     onError: (error) => message.error(errorText(error)),
   })
+
+  const archiveMutation = useMutation({
+    mutationFn: archiveQuestion,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['question'] })
+      message.success('题目已归档下架，历史试卷不受影响')
+    },
+    onError: (error) => message.error(errorText(error)),
+  })
+
+  const [rejectTarget, setRejectTarget] = useState<Question | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [preview, setPreview] = useState<Question | null>(null)
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectQuestion(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['question'] })
+      setRejectTarget(null)
+      setRejectReason('')
+      message.success('已驳回，命题人可修改后重新提交')
+    },
+    onError: (error) => message.error(errorText(error)),
+  })
+
+  function confirmArchive(record: Question) {
+    modal.confirm({
+      title: `归档题目？`,
+      content: '归档后题目下架，不再出现在可选列表；已包含它的历史试卷与快照不受影响。',
+      okText: '确认归档',
+      cancelText: '取消',
+      onOk: () => archiveMutation.mutate(record.id),
+    })
+  }
 
   const exportMutation = useMutation({
     mutationFn: () =>
@@ -128,10 +165,13 @@ export default function QuestionsPage() {
     {
       title: '操作',
       key: 'actions',
-      width: 130,
+      width: 180,
       fixed: 'right',
       render: (_value, record) => (
         <Space size={4}>
+          <Tooltip title="预览与试答">
+            <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setPreview(record)} />
+          </Tooltip>
           <Button
             type="link"
             size="small"
@@ -142,8 +182,12 @@ export default function QuestionsPage() {
           >
             编辑
           </Button>
-          {record.status !== 'published' &&
-            (canPublish ? (
+          {record.status !== 'published' && record.status !== 'archived' &&
+            (record.status === 'pending_review' && canReview ? (
+              <Button type="link" size="small" danger onClick={() => setRejectTarget(record)}>
+                驳回
+              </Button>
+            ) : canPublish ? (
               <Button
                 type="link"
                 size="small"
@@ -157,6 +201,11 @@ export default function QuestionsPage() {
                 <Tag className="soft-tag">待发布</Tag>
               </Tooltip>
             ))}
+          {record.status !== 'archived' && (
+            <Button type="link" size="small" danger onClick={() => confirmArchive(record)}>
+              归档
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -332,6 +381,54 @@ export default function QuestionsPage() {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        open={Boolean(preview)}
+        title={preview ? `题目预览与试答 · v${preview.version}` : '题目预览'}
+        footer={null}
+        width={640}
+        onCancel={() => setPreview(null)}
+        destroyOnHidden
+      >
+        {preview && (
+          <QuestionTryIt
+            type={preview.type}
+            content={preview.content}
+            answer={preview.answer as unknown as Record<string, unknown>}
+            score={preview.default_score}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(rejectTarget)}
+        title="驳回题目"
+        okText="确认驳回"
+        okButtonProps={{ danger: true }}
+        cancelText="取消"
+        confirmLoading={rejectMutation.isPending}
+        onOk={() => {
+          const reason = rejectReason.trim()
+          if (!reason) {
+            message.warning('请填写驳回理由')
+            return
+          }
+          if (rejectTarget) rejectMutation.mutate({ id: rejectTarget.id, reason })
+        }}
+        onCancel={() => {
+          setRejectTarget(null)
+          setRejectReason('')
+        }}
+      >
+        <Input.TextArea
+          rows={4}
+          maxLength={500}
+          showCount
+          value={rejectReason}
+          onChange={(event) => setRejectReason(event.target.value)}
+          placeholder="驳回理由（必填）：例如 答案与题干不符、知识点标注错误"
+        />
       </Modal>
     </div>
   )

@@ -26,6 +26,59 @@ export function getSystemOverview(): Promise<SystemOverview> {
   return apiRequest<SystemOverview>('/system/overview')
 }
 
+export interface MonitorStats {
+  overview: SystemOverview
+  attempts_submitted_24h: number
+  proctor_events_24h: number
+  unhandled_proctor_events: number
+  notifications_failed_24h: number
+  failed_logins_24h: number
+  storage_active_count: number
+  storage_active_bytes: number
+  storage_deleted_pending: number
+}
+
+export function getMonitorStats(): Promise<MonitorStats> {
+  return apiRequest<MonitorStats>('/system/monitor')
+}
+
+export interface StorageBucket {
+  purpose: string
+  count: number
+  size_bytes: number
+}
+
+export interface StorageStatsResult {
+  buckets: StorageBucket[]
+  active_count: number
+  deleted_pending: number
+}
+
+export function getStorageStats(): Promise<StorageStatsResult> {
+  return apiRequest<StorageStatsResult>('/system/storage/stats')
+}
+
+export function cleanupStorage(): Promise<{ candidates: number; purged: number }> {
+  return apiRequest<{ candidates: number; purged: number }>('/system/storage/cleanup', { method: 'POST' })
+}
+
+export interface UserDataExport {
+  exported_at: string
+  user: Record<string, unknown>
+  attempts: unknown[]
+  scores: unknown[]
+  notifications: unknown[]
+  audit_logs: unknown[]
+}
+
+export function exportUserData(userId: string): Promise<UserDataExport> {
+  return apiRequest<UserDataExport>(`/system/compliance/users/${userId}/export`)
+}
+
+export function anonymizeUser(userId: string): Promise<{ anonymized: boolean }> {
+  return apiRequest<{ anonymized: boolean }>(`/system/compliance/users/${userId}/anonymize`, { method: 'POST' })
+}
+
 export function listNotificationTemplates(): Promise<NotificationTemplate[]> {
   return apiRequest<NotificationTemplate[]>('/notification-templates')
 }
