@@ -33,6 +33,7 @@ type PaperQuestion struct {
 	Difficulty     string          `json:"difficulty"`
 	KnowledgePoint string          `json:"knowledge_point"`
 	Content        json.RawMessage `json:"content"`
+	Answer         json.RawMessage `json:"answer"`
 }
 
 type PaperDetail struct {
@@ -126,7 +127,7 @@ func (s *Store) GetPaper(ctx context.Context, orgID, paperID string) (PaperDetai
 
 	rows, err := s.pool.Query(ctx, `
 		SELECT pq.question_id::text, pq.section, pq.paper_group, pq.score::float8,
-			q.type, q.difficulty, q.knowledge_point, q.content
+			q.type, q.difficulty, q.knowledge_point, q.content, q.answer
 		FROM paper_questions pq
 		JOIN questions q ON q.id = pq.question_id
 		WHERE pq.paper_id = $1
@@ -139,7 +140,7 @@ func (s *Store) GetPaper(ctx context.Context, orgID, paperID string) (PaperDetai
 	questions := make([]PaperQuestion, 0)
 	for rows.Next() {
 		var q PaperQuestion
-		if err := rows.Scan(&q.QuestionID, &q.Section, &q.PaperGroup, &q.Score, &q.Type, &q.Difficulty, &q.KnowledgePoint, &q.Content); err != nil {
+		if err := rows.Scan(&q.QuestionID, &q.Section, &q.PaperGroup, &q.Score, &q.Type, &q.Difficulty, &q.KnowledgePoint, &q.Content, &q.Answer); err != nil {
 			return PaperDetail{}, fmt.Errorf("scan paper question: %w", err)
 		}
 		questions = append(questions, q)
@@ -260,6 +261,49 @@ func (s *Store) ApprovePaper(ctx context.Context, orgID, paperID string) (PaperD
 		return PaperDetail{}, ErrInvalidState
 	}
 	return s.GetPaper(ctx, orgID, paperID)
+}
+
+// RejectPaper 退回待审核试卷：审核人给出理由，状态回到草稿，命题人可修改后重新提审。
+func (s *Store) RejectPaper(ctx context.Context, orgID, paperID, reason string) (PaperDetail, error) {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE papers SET status = 'draft'
+		WHERE id = $1 AND org_id = $2 AND status = 'pending_review'`, paperID, orgID)
+	if err != nil {
+		return PaperDetail{}, fmt.Errorf("reject paper: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		if _, err := s.GetPaper(ctx, orgID, paperID); err != nil {
+			return PaperDetail{}, err
+		}
+		return PaperDetail{}, ErrInvalidState
+	}
+	return s.GetPaper(ctx, orgID, paperID)
+}
+
+// CopyPaper 深拷贝一份试卷为新草稿（标题加「副本」），复制者成为创建人。
+// 题目引用按当前 question 状态校验，与手工新建同一套规则。
+func (s *Store) CopyPaper(ctx context.Context, orgID, paperID, actorID string) (PaperDetail, error) {
+	detail, err := s.GetPaper(ctx, orgID, paperID)
+	if err != nil {
+		return PaperDetail{}, err
+	}
+	if detail.Status != "approved" && detail.Status != "pending_review" && detail.Status != "draft" {
+		return PaperDetail{}, fmt.Errorf("only active papers can be copied: %w", ErrInvalidState)
+	}
+	questions := make([]PaperQuestionInput, 0, len(detail.Questions))
+	for _, q := range detail.Questions {
+		questions = append(questions, PaperQuestionInput{
+			QuestionID: q.QuestionID, Section: q.Section, PaperGroup: q.PaperGroup, Score: q.Score,
+		})
+	}
+	title := detail.Title
+	if !strings.Contains(title, "副本") {
+		title += "（副本）"
+	}
+	return s.CreatePaper(ctx, CreatePaperParams{
+		OrgID: orgID, Type: detail.Type, Title: title,
+		Rules: detail.Rules, Questions: questions, CreatedBy: actorID,
+	})
 }
 
 func (s *Store) preparePaper(ctx context.Context, orgID, paperType string, rules json.RawMessage, questions []PaperQuestionInput) (float64, error) {

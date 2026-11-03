@@ -321,6 +321,56 @@ func (s *Store) PublishQuestion(ctx context.Context, scope Scope, id, actorID st
 	return s.GetQuestion(ctx, scope, id)
 }
 
+// RejectQuestion 审核退回：pending_review 回到 draft，理由通过站内通知与审计传达给命题人。
+func (s *Store) RejectQuestion(ctx context.Context, scope Scope, id, reason string) (Question, error) {
+	visSQL, visArgs := scope.bankVisibility("b", 3)
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE questions SET status = 'draft'
+		WHERE id = $1 AND org_id = $2 AND status = 'pending_review'
+			AND EXISTS (SELECT 1 FROM question_banks b WHERE b.id = questions.bank_id`+visSQL+`)`,
+		append([]any{id, scope.OrgID}, visArgs...)...)
+	if err != nil {
+		return Question{}, fmt.Errorf("reject question: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		if _, err := s.GetQuestion(ctx, scope, id); err != nil {
+			return Question{}, err
+		}
+		return Question{}, ErrInvalidState
+	}
+	return s.GetQuestion(ctx, scope, id)
+}
+
+// ArchiveQuestion 归档题目（软删）：仍在草稿/待审核/已通过试卷中的题目不允许归档，
+// 已归档幂等返回。已发布且无在用引用的题目可归档下架。
+func (s *Store) ArchiveQuestion(ctx context.Context, scope Scope, id string) (Question, error) {
+	visSQL, visArgs := scope.bankVisibility("b", 3)
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE questions SET status = 'archived'
+		WHERE id = $1 AND org_id = $2 AND status <> 'archived'
+			AND NOT EXISTS (
+				SELECT 1 FROM paper_questions pq
+				JOIN papers p ON p.id = pq.paper_id
+				WHERE pq.question_id = questions.id AND p.status IN ('draft', 'pending_review', 'approved')
+			)
+			AND EXISTS (SELECT 1 FROM question_banks b WHERE b.id = questions.bank_id`+visSQL+`)`,
+		append([]any{id, scope.OrgID}, visArgs...)...)
+	if err != nil {
+		return Question{}, fmt.Errorf("archive question: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		q, err := s.GetQuestion(ctx, scope, id)
+		if err != nil {
+			return Question{}, err
+		}
+		if q.Status == "archived" {
+			return q, nil
+		}
+		return Question{}, fmt.Errorf("question is referenced by an active paper: %w", ErrInvalidState)
+	}
+	return s.GetQuestion(ctx, scope, id)
+}
+
 func insertQuestionRevision(ctx context.Context, db DBTX, q Question, actorID string) error {
 	payload, err := json.Marshal(struct {
 		Content      json.RawMessage `json:"content"`

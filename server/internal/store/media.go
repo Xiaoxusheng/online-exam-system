@@ -97,3 +97,83 @@ func (s *Store) MarkMediaDeleted(ctx context.Context, orgID, id, actorID string,
 	}
 	return nil
 }
+
+// StorageStatsBucket 按用途聚合的媒体用量（A-06）。
+type StorageStatsBucket struct {
+	Purpose   string `json:"purpose"`
+	Count     int64  `json:"count"`
+	SizeBytes int64  `json:"size_bytes"`
+}
+
+// StorageStats 媒体用量统计：active 按用途分组，另带软删待清理量。
+func (s *Store) StorageStats(ctx context.Context, orgID string) ([]StorageStatsBucket, int64, int64, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT purpose, count(*), COALESCE(sum(size_bytes), 0)::bigint
+		FROM media_files
+		WHERE org_id = $1::uuid AND status = 'active'
+		GROUP BY purpose ORDER BY purpose`, orgID)
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("media storage stats: %w", err)
+	}
+	defer rows.Close()
+
+	buckets := make([]StorageStatsBucket, 0)
+	var activeCount, activeBytes int64
+	for rows.Next() {
+		var bucket StorageStatsBucket
+		if err := rows.Scan(&bucket.Purpose, &bucket.Count, &bucket.SizeBytes); err != nil {
+			return nil, 0, 0, fmt.Errorf("scan media storage stats: %w", err)
+		}
+		buckets = append(buckets, bucket)
+		activeCount += bucket.Count
+		activeBytes += bucket.SizeBytes
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, 0, fmt.Errorf("iterate media storage stats: %w", err)
+	}
+
+	var deletedCount int64
+	if err := s.pool.QueryRow(ctx, `
+		SELECT count(*) FROM media_files WHERE org_id = $1::uuid AND status = 'deleted'`, orgID,
+	).Scan(&deletedCount); err != nil {
+		return nil, 0, 0, fmt.Errorf("count deleted media: %w", err)
+	}
+	return buckets, activeCount, deletedCount, nil
+}
+
+// DeletedMediaKeys 返回软删媒体的 storage_key（物理清理候选）。
+func (s *Store) DeletedMediaKeys(ctx context.Context, orgID string, limit int) ([]string, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT storage_key FROM media_files
+		WHERE org_id = $1::uuid AND status = 'deleted'
+		ORDER BY created_at LIMIT $2`, orgID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list deleted media keys: %w", err)
+	}
+	defer rows.Close()
+
+	keys := make([]string, 0)
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, fmt.Errorf("scan deleted media key: %w", err)
+		}
+		keys = append(keys, key)
+	}
+	return keys, rows.Err()
+}
+
+// PurgeDeletedMedia 物理清理完成后的收尾：删除这些 storage_key 对应的元数据行。
+func (s *Store) PurgeDeletedMedia(ctx context.Context, orgID string, keys []string) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	tag, err := s.pool.Exec(ctx, `
+		DELETE FROM media_files
+		WHERE org_id = $1::uuid AND status = 'deleted' AND storage_key = ANY($2::text[])`,
+		orgID, keys)
+	if err != nil {
+		return 0, fmt.Errorf("purge deleted media: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}

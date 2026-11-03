@@ -2,9 +2,12 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -322,10 +325,23 @@ func (s *Store) GetAttemptState(ctx context.Context, userID, attemptID string) (
 		}
 		rows.Close()
 
+		groupQuestions := make([]SnapshotQuestion, 0, len(snapshot.Questions))
 		for _, question := range snapshot.Questions {
-			if question.PaperGroup != row.PaperGroup {
-				continue
+			if question.PaperGroup == row.PaperGroup {
+				groupQuestions = append(groupQuestions, question)
 			}
+		}
+		// P-03 稳定随机卷：随机卷按「场次+考生」种子派生确定性题序，
+		// 刷新、断线重连后顺序不变；固定卷/AB 卷保持快照原序。
+		if snapshot.PaperType == "random" && len(groupQuestions) > 1 {
+			order := seededOrder(row.ExamID, row.UserID, len(groupQuestions))
+			shuffled := make([]SnapshotQuestion, len(groupQuestions))
+			for pos, idx := range order {
+				shuffled[pos] = groupQuestions[idx]
+			}
+			groupQuestions = shuffled
+		}
+		for _, question := range groupQuestions {
 			answer := answers[question.QuestionID]
 			content := answer.Content
 			if len(content) == 0 {
@@ -695,8 +711,23 @@ func showScore(rules json.RawMessage) bool {
 	return *parsed.ShowScore
 }
 
-func sanitizeQuestionContent(question SnapshotQuestion) json.RawMessage {
-	if question.Type != "programming" {
+// seededOrder 按「场次+考生」种子派生确定性的题序（P-03 稳定随机卷）。
+// 同一对 (exam, user) 永远得到同一顺序：刷新、断线重连、重新进入都不会洗牌。
+func seededOrder(examID, userID string, count int) []int {
+	sum := sha256.Sum256([]byte(examID + ":" + userID))
+	rng := rand.New(rand.NewSource(int64(binary.BigEndian.Uint64(sum[:8]))))
+	order := make([]int, count)
+	for i := range order {
+		order[i] = i
+	}
+	for i := count - 1; i > 0; i-- {
+		j := rng.Intn(i + 1)
+		order[i], order[j] = order[j], order[i]
+	}
+	return order
+}
+
+func sanitizeQuestionContent(question SnapshotQuestion) json.RawMessage {	if question.Type != "programming" {
 		return question.Content
 	}
 	var content map[string]any

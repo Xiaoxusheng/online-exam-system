@@ -105,7 +105,7 @@ func (s *Store) ListScores(ctx context.Context, scope Scope, f ScoreFilter) ([]S
 		SELECT a.id::text, u.id::text, u.name, u.username, e.id::text, e.title,
 			sr.total::float8, sr.status, a.status, a.submitted_at, sr.published_at
 		`+base+`
-		ORDER BY a.submitted_at DESC NULLS LAST
+		ORDER BY a.submitted_at DESC NULLS LAST, a.id DESC
 		LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list scores: %w", err)
@@ -311,7 +311,11 @@ func (s *Store) PublishScores(ctx context.Context, orgID, examID string) (int64,
 	}
 	if _, err := tx.Exec(ctx, `
 		UPDATE attempts SET status = 'published'
-		WHERE exam_id = $1 AND status = 'graded'`, examID); err != nil {
+		WHERE exam_id = $1 AND status = 'graded'
+			AND id NOT IN (
+				SELECT latest.attempt_id FROM score_records latest
+				WHERE latest.status = 'withheld'
+			)`, examID); err != nil {
 		return 0, fmt.Errorf("mark attempts published: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `

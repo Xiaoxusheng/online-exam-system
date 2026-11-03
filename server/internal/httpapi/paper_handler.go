@@ -191,3 +191,50 @@ func (a *API) handleApprovePaper(w http.ResponseWriter, r *http.Request) {
 	})
 	data(w, http.StatusOK, paper)
 }
+
+func (a *API) handleRejectPaper(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	paperID, ok := parseUUIDParam(w, pathParam(r, "id"), "试卷 ID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	req.Reason = strings.TrimSpace(req.Reason)
+	if req.Reason == "" || utf8.RuneCountInString(req.Reason) > 500 {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "驳回理由不能为空且不超过 500 个字符")
+		return
+	}
+	paper, err := a.store.RejectPaper(r.Context(), claims.OrgID, paperID, req.Reason)
+	if err != nil {
+		a.storeError(w, r, err, "试卷不存在")
+		return
+	}
+	a.audit(r, store.AuditEntry{
+		OrgID: claims.OrgID, ActorID: claims.Subject, Action: "paper.rejected",
+		TargetType: "paper", TargetID: paper.ID, Detail: map[string]any{"reason": req.Reason},
+	})
+	data(w, http.StatusOK, paper)
+}
+
+func (a *API) handleCopyPaper(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	paperID, ok := parseUUIDParam(w, pathParam(r, "id"), "试卷 ID")
+	if !ok {
+		return
+	}
+	paper, err := a.store.CopyPaper(r.Context(), claims.OrgID, paperID, claims.Subject)
+	if err != nil {
+		a.storeError(w, r, err, "试卷不存在")
+		return
+	}
+	a.audit(r, store.AuditEntry{
+		OrgID: claims.OrgID, ActorID: claims.Subject, Action: "paper.copied",
+		TargetType: "paper", TargetID: paper.ID, Detail: map[string]any{"source_id": paperID},
+	})
+	data(w, http.StatusCreated, paper)
+}

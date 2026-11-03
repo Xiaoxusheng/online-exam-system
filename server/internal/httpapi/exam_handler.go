@@ -20,6 +20,7 @@ type createExamRequest struct {
 	ProctorConfig   json.RawMessage        `json:"proctor_config"`
 	Candidates      []store.CandidateInput `json:"candidates"`
 	ClassIDs        []string               `json:"class_ids"`
+	RetakeOf        string                 `json:"retake_of"`
 }
 
 func validateCandidateInputs(w http.ResponseWriter, candidates []store.CandidateInput, classIDs []string) bool {
@@ -104,12 +105,18 @@ func (a *API) handleCreateExam(w http.ResponseWriter, r *http.Request) {
 	if !validateCandidateInputs(w, req.Candidates, req.ClassIDs) {
 		return
 	}
+	if req.RetakeOf != "" {
+		if _, ok := parseUUIDParam(w, req.RetakeOf, "关联的原考试 ID"); !ok {
+			return
+		}
+	}
 
 	exam, err := a.store.CreateExam(r.Context(), store.CreateExamParams{
 		OrgID: claims.OrgID, PaperID: req.PaperID, Title: req.Title,
 		StartAt: req.StartAt, EndAt: req.EndAt, DurationMinutes: req.DurationMinutes,
 		Rules: req.Rules, ProctorConfig: req.ProctorConfig,
 		Candidates: req.Candidates, ClassIDs: req.ClassIDs, CreatedBy: claims.Subject,
+		RetakeOf: req.RetakeOf,
 	})
 	if err != nil {
 		a.storeError(w, r, err, "试卷不存在")
@@ -117,7 +124,8 @@ func (a *API) handleCreateExam(w http.ResponseWriter, r *http.Request) {
 	}
 	a.audit(r, store.AuditEntry{
 		OrgID: claims.OrgID, ActorID: claims.Subject, Action: "exam.created",
-		TargetType: "exam", TargetID: exam.ID, Detail: map[string]any{"title": exam.Title},
+		TargetType: "exam", TargetID: exam.ID,
+		Detail: map[string]any{"title": exam.Title, "retake_of": req.RetakeOf},
 	})
 	data(w, http.StatusCreated, exam)
 }
@@ -170,6 +178,44 @@ func (a *API) handlePublishExam(w http.ResponseWriter, r *http.Request) {
 	data(w, http.StatusOK, exam)
 }
 
+func (a *API) handleRescheduleExam(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	examID, ok := parseUUIDParam(w, pathParam(r, "id"), "考试 ID")
+	if !ok {
+		return
+	}
+	var req struct {
+		StartAt time.Time `json:"start_at"`
+		EndAt   time.Time `json:"end_at"`
+		Reason  string    `json:"reason"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.StartAt.IsZero() || req.EndAt.IsZero() {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "请提供新的开始与结束时间")
+		return
+	}
+	req.Reason = strings.TrimSpace(req.Reason)
+	if utf8.RuneCountInString(req.Reason) > 500 {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "调整原因不超过 500 个字符")
+		return
+	}
+	exam, err := a.store.RescheduleExam(r.Context(), claims.OrgID, examID, store.RescheduleExamParams{
+		StartAt: req.StartAt, EndAt: req.EndAt, Reason: req.Reason,
+	})
+	if err != nil {
+		a.storeError(w, r, err, "考试不存在")
+		return
+	}
+	a.audit(r, store.AuditEntry{
+		OrgID: claims.OrgID, ActorID: claims.Subject, Action: "exam.rescheduled",
+		TargetType: "exam", TargetID: exam.ID,
+		Detail: map[string]any{"start_at": req.StartAt, "end_at": req.EndAt, "reason": req.Reason},
+	})
+	data(w, http.StatusOK, exam)
+}
+
 func (a *API) handleListExamCandidates(w http.ResponseWriter, r *http.Request) {
 	claims, _ := claimsFrom(r.Context())
 	examID, ok := parseUUIDParam(w, pathParam(r, "id"), "考试 ID")
@@ -183,6 +229,21 @@ func (a *API) handleListExamCandidates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	listData(w, candidates, page, pageSize, total)
+}
+
+// handleListRetakeCandidates 补考候选名单（E-03/S-06）。
+func (a *API) handleListRetakeCandidates(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	examID, ok := parseUUIDParam(w, pathParam(r, "id"), "考试 ID")
+	if !ok {
+		return
+	}
+	candidates, err := a.store.ListRetakeCandidates(r.Context(), claims.OrgID, examID)
+	if err != nil {
+		a.storeError(w, r, err, "考试不存在")
+		return
+	}
+	data(w, http.StatusOK, candidates)
 }
 
 type addCandidatesRequest struct {

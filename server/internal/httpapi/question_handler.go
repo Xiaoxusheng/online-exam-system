@@ -295,3 +295,50 @@ func (a *API) handlePublishQuestion(w http.ResponseWriter, r *http.Request) {
 	})
 	data(w, http.StatusOK, question)
 }
+
+func (a *API) handleRejectQuestion(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	questionID, ok := parseUUIDParam(w, pathParam(r, "id"), "题目 ID")
+	if !ok {
+		return
+	}
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	req.Reason = strings.TrimSpace(req.Reason)
+	if req.Reason == "" || utf8.RuneCountInString(req.Reason) > 500 {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "驳回理由不能为空且不超过 500 个字符")
+		return
+	}
+	question, err := a.store.RejectQuestion(r.Context(), scopeFrom(r.Context()), questionID, req.Reason)
+	if err != nil {
+		a.storeError(w, r, err, "题目不存在")
+		return
+	}
+	a.audit(r, store.AuditEntry{
+		OrgID: claims.OrgID, ActorID: claims.Subject, Action: "question.rejected",
+		TargetType: "question", TargetID: question.ID, Detail: map[string]any{"reason": req.Reason},
+	})
+	data(w, http.StatusOK, question)
+}
+
+func (a *API) handleArchiveQuestion(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	questionID, ok := parseUUIDParam(w, pathParam(r, "id"), "题目 ID")
+	if !ok {
+		return
+	}
+	question, err := a.store.ArchiveQuestion(r.Context(), scopeFrom(r.Context()), questionID)
+	if err != nil {
+		a.storeError(w, r, err, "题目不存在")
+		return
+	}
+	a.audit(r, store.AuditEntry{
+		OrgID: claims.OrgID, ActorID: claims.Subject, Action: "question.archived",
+		TargetType: "question", TargetID: question.ID,
+	})
+	data(w, http.StatusOK, question)
+}

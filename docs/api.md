@@ -395,9 +395,42 @@
 
 ## 5. 明确未实现
 
-- 编程题隔离沙箱执行与用例判题；当前编程题只走人工阅卷。
-- 音视频题的媒体文件上传与播放存储；抓拍 `snapshot_url` 仅接受前端传入的字符串，对象存储未接入。
-- 短信 / 邮件真实投递（模板与发送记录已支持，通道仅站内消息落地）。
-- 人脸核验、AI 行为检测、双机位、证书发放。
-- 试卷与题库的删除/归档接口（当前只能新建与状态流转）。
-- 多机构自助注册与计费；当前机构由种子数据创建。
+- 编程题隔离沙箱执行与用例判题；当前编程题一律人工阅卷，考生端也没有代码编辑器（多行纯文本输入）。
+- 人脸核验、AI 行为检测（多人脸/离座/使用手机等）、双机位、证书发放与成绩验真。
+- 对象存储（OSS/S3）：媒体与抓拍只落服务器本地磁盘（`MEDIA_DIR`），无 CDN、无跨实例共享。
+- 富文本与 LaTeX 公式编辑渲染；题干正文是纯文本（配图与音视频附件走 media 接口）。
+- 真实短信 / 邮件服务商绑定：通道抽象与投递台账已就位，未配置服务商时自动降级为站内消息 + 模拟投递。
+- 分布式限流与分布式收卷：登录失败限流为单实例内存计数；到期收卷与超时自动交卷依赖 30 秒轮询，最大延迟约 30 秒。
+- 多机构自助注册与计费、自定义角色与权限点（当前为 6 个固定角色 + 四级数据范围）。
+- 准考证号自定义规则、多场次编排、候考入场时间窗、练习模式与错题本、双人监考交接班、巡考视图、阅卷质检抽查、班级横向对比看板、i18n。
+
+## 6. v2.3–v2.8 补充接口登记
+
+以下接口已实现并注册在 `internal/httpapi/router.go`，前文各模块表未逐条重复列出，在此集中登记（角色为路由级中间件要求，数据范围在 handler 内二次收敛）。
+
+| 方法 | 路径 | 角色 | 说明 |
+|---|---|---|---|
+| GET | `/healthz` `/readyz` | 公开 | 存活与就绪探测（不带 `/api/v1` 前缀），`/readyz` 会实际 Ping 一次数据库 |
+| POST | `/auth/sms-code` | 公开 | 向已存在且启用的考生手机号下发验证码；内存态、5 分钟有效、一次性消费，按手机号 60 秒重发限制与按 IP 每小时限流 |
+| POST | `/auth/login-sms` | 公开 | 手机号 + 验证码登录，与密码登录返回同结构的令牌 |
+| GET | `/branding` | 公开 | 登录页需要的机构名称/标语/Logo，登录前即可读取 |
+| GET / PUT | `/system/branding` | org_admin | 品牌配置读取与更新（Logo 走 media 上传后回填 `logo_media_id`） |
+| POST | `/media` | 登录用户 | 上传媒体（题干配图、音视频附件、作答附件），multipart，受 `MAX_BODY_BYTES` 约束 |
+| GET | `/media/{id}/content` | `?token=` 自校验 | `<img>/<audio>/<video>` 无法附加请求头，此路由用查询参数令牌鉴权并按用途收敛可见范围 |
+| DELETE | `/media/{id}` | 登录用户 | 媒体软删除（保留台账，供存储清理与合规统计） |
+| DELETE | `/questions/{id}` | teacher / exam_admin | 题目归档（`status → archived`）；仍被试卷引用时拒绝归档，写审计 |
+| POST | `/papers/{id}/reject` | exam_admin | 试卷审核驳回，理由必填（≤500 字），试卷状态回退为草稿并写审计。当前不推送站内通知 |
+| POST | `/papers/{id}/copy` | teacher / exam_admin | 试卷深拷贝为新草稿（题目引用重新校验） |
+| POST | `/exams/{id}/reschedule` | exam_admin | 考务改期 / 开考后统一延时，理由必填；变更后向名单内考生推送站内通知并写审计 |
+| GET | `/exams/{id}/retake-candidates` | exam_admin | 返回原考试全体考生与可补考判定 `eligibility`（`failed` 未及格 / `absent` 缺考或未入场 / `not_graded` 未判分）及及格线（配置值优先，缺省按分组满分 60%）。创建补考场次时在 `rules.retake_of` 填原考试 ID |
+| GET | `/proctor/exams/{examId}/report` | proctor / exam_admin | 考后监考报告：逐考生事件时间轴、处置与成绩汇总（数据源为 `attempts` / `proctor_events` / `score_records`；抓拍图片需按 media 接口另取） |
+| GET | `/notification-channels` | org_admin | 邮件/短信通道当前状态（未配置服务商时返回降级口径，如 `email: 未配置`、`sms: 模拟`） |
+| POST | `/notification-channels/test` | org_admin | 发送测试通知并记录投递台账 |
+| GET | `/system/monitor` | org_admin | 运行监控：在考答卷、进行中场次、活跃账号，24 小时已交卷 / 新增告警 / 未处置告警 / 登录失败 / 通知失败，以及存储在用文件数与字节数、待清理数。全部为数据库计数，**不含 WS 连接数、接口延迟分位与错误率** |
+| GET | `/system/storage/stats` | org_admin | 存储用量：按 `purpose` 分组的文件数与字节数，加在用总数与软删待清理数 |
+| POST | `/system/storage/cleanup` | org_admin | 清理孤儿与到期软删媒体文件（幂等，写审计） |
+| GET | `/system/compliance/users/{id}/export` | org_admin | 导出该用户的全部个人数据（账号、答卷、成绩、审计关联），响应为 JSON 附件 |
+| POST | `/system/compliance/users/{id}/anonymize` | org_admin | 匿名化 / 注销脱敏：抹除身份字段并写审计 |
+
+> 编程题（`programming`）与音视频题（`media`）一律进入人工阅卷队列；音视频题的评分按维度加权（`MediaScoringDimension`），维度与权重在试卷题目分值配置里给出。
+

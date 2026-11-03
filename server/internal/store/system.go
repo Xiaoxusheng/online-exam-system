@@ -50,6 +50,138 @@ func (s *Store) GetSystemOverview(ctx context.Context, orgID string) (SystemOver
 	return overview, nil
 }
 
+// MonitorStats 运行监控（A-08）：概览 + 最近 24 小时活动 + 媒体用量。
+type MonitorStats struct {
+	Overview                SystemOverview `json:"overview"`
+	AttemptsSubmitted24h    int64          `json:"attempts_submitted_24h"`
+	ProctorEvents24h        int64          `json:"proctor_events_24h"`
+	UnhandledProctorEvents  int64          `json:"unhandled_proctor_events"`
+	NotificationsFailed24h  int64          `json:"notifications_failed_24h"`
+	FailedLogins24h         int64          `json:"failed_logins_24h"`
+	StorageActiveCount      int64          `json:"storage_active_count"`
+	StorageActiveBytes      int64          `json:"storage_active_bytes"`
+	StorageDeletedPending   int64          `json:"storage_deleted_pending"`
+}
+
+func (s *Store) GetMonitorStats(ctx context.Context, orgID string) (MonitorStats, error) {
+	stats := MonitorStats{}
+	overview, err := s.GetSystemOverview(ctx, orgID)
+	if err != nil {
+		return stats, err
+	}
+	stats.Overview = overview
+
+	err = s.pool.QueryRow(ctx, `
+		SELECT
+			(SELECT count(*) FROM attempts a JOIN exams e ON e.id = a.exam_id
+				WHERE e.org_id = $1 AND a.submitted_at >= now() - interval '24 hours'),
+			(SELECT count(*) FROM proctor_events pe JOIN exams e ON e.id = pe.exam_id
+				WHERE e.org_id = $1 AND pe.occurred_at >= now() - interval '24 hours'),
+			(SELECT count(*) FROM proctor_events pe JOIN exams e ON e.id = pe.exam_id
+				WHERE e.org_id = $1 AND pe.handled_by IS NULL),
+			(SELECT count(*) FROM notifications
+				WHERE org_id = $1::uuid AND status = 'failed' AND created_at >= now() - interval '24 hours'),
+			(SELECT count(*) FROM audit_logs
+				WHERE org_id = $1::uuid AND action = 'auth.login_failed' AND created_at >= now() - interval '24 hours')`,
+		orgID,
+	).Scan(&stats.AttemptsSubmitted24h, &stats.ProctorEvents24h, &stats.UnhandledProctorEvents,
+		&stats.NotificationsFailed24h, &stats.FailedLogins24h)
+	if err != nil {
+		return stats, fmt.Errorf("load monitor activity: %w", err)
+	}
+
+	if err := s.pool.QueryRow(ctx, `
+		SELECT COALESCE(sum(size_bytes), 0)::bigint, count(*)
+		FROM media_files WHERE org_id = $1::uuid AND status = 'active'`,
+		orgID,
+	).Scan(&stats.StorageActiveBytes, &stats.StorageActiveCount); err != nil {
+		return stats, fmt.Errorf("load monitor storage: %w", err)
+	}
+	if err := s.pool.QueryRow(ctx, `
+		SELECT count(*) FROM media_files WHERE org_id = $1::uuid AND status = 'deleted'`,
+		orgID,
+	).Scan(&stats.StorageDeletedPending); err != nil {
+		return stats, fmt.Errorf("load monitor storage pending: %w", err)
+	}
+	return stats, nil
+}
+
+// UserDataExport 个人数据导出（A-07）：账号、答卷、成绩、通知与相关审计的单文件 JSON。
+type UserDataExport struct {
+	ExportedAt    time.Time       `json:"exported_at"`
+	User          json.RawMessage `json:"user"`
+	Attempts      json.RawMessage `json:"attempts"`
+	Scores        json.RawMessage `json:"scores"`
+	Notifications json.RawMessage `json:"notifications"`
+	AuditLogs     json.RawMessage `json:"audit_logs"`
+}
+
+func (s *Store) ExportUserData(ctx context.Context, orgID, userID string) (UserDataExport, error) {
+	export := UserDataExport{ExportedAt: time.Now()}
+	scan := func(dest *json.RawMessage, query string) error {
+		return s.pool.QueryRow(ctx, query, orgID, userID).Scan(dest)
+	}
+	if err := scan(&export.User, `
+		SELECT COALESCE((SELECT row_to_json(t) FROM (
+			SELECT id::text, name, username, phone, email, role, data_scope, status, created_at, last_login_at
+			FROM users WHERE org_id = $1 AND id = $2::uuid) t), '{}'::jsonb)`); err != nil {
+		return export, fmt.Errorf("export user: %w", err)
+	}
+	if err := scan(&export.Attempts, `
+		SELECT COALESCE(json_agg(t), '[]'::jsonb) FROM (
+			SELECT a.id::text, e.title AS exam_title, a.status, a.paper_group,
+				a.score::float8, a.started_at, a.submitted_at
+			FROM attempts a JOIN exams e ON e.id = a.exam_id
+			WHERE e.org_id = $1 AND a.user_id = $2::uuid
+			ORDER BY a.started_at) t`); err != nil {
+		return export, fmt.Errorf("export attempts: %w", err)
+	}
+	if err := scan(&export.Scores, `
+		SELECT COALESCE(json_agg(t), '[]'::jsonb) FROM (
+			SELECT sr.attempt_id::text, sr.total::float8, sr.status, sr.published_at
+			FROM score_records sr
+			JOIN attempts a ON a.id = sr.attempt_id
+			JOIN exams e ON e.id = a.exam_id
+			WHERE e.org_id = $1 AND a.user_id = $2::uuid
+			ORDER BY sr.created_at) t`); err != nil {
+		return export, fmt.Errorf("export scores: %w", err)
+	}
+	if err := scan(&export.Notifications, `
+		SELECT COALESCE(json_agg(t), '[]'::jsonb) FROM (
+			SELECT title, content, source_type, source_id::text, status, created_at
+			FROM notifications WHERE org_id = $1 AND user_id = $2::uuid
+			ORDER BY created_at DESC LIMIT 200) t`); err != nil {
+		return export, fmt.Errorf("export notifications: %w", err)
+	}
+	if err := scan(&export.AuditLogs, `
+		SELECT COALESCE(json_agg(t), '[]'::jsonb) FROM (
+			SELECT action, target_type, target_id::text, detail, ip, created_at
+			FROM audit_logs WHERE org_id = $1 AND (actor_id = $2::uuid OR target_id = $2::uuid)
+			ORDER BY created_at DESC LIMIT 500) t`); err != nil {
+		return export, fmt.Errorf("export audit logs: %w", err)
+	}
+	return export, nil
+}
+
+// AnonymizeUser 数据合规注销（A-07）：停用账号并抹除个人身份信息，
+// 考试与成绩记录按教育数据保留要求原样保留，动作写审计。
+func (s *Store) AnonymizeUser(ctx context.Context, orgID, userID, actorID string) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE users
+		SET status = 'disabled', name = '已注销用户',
+			username = 'anonymized_' || substring(id::text, 1, 8),
+			phone = '', email = '', security_stamp = now()
+		WHERE id = $1::uuid AND org_id = $2::uuid AND role = 'student' AND status <> 'anonymized'`,
+		userID, orgID)
+	if err != nil {
+		return fmt.Errorf("anonymize user: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrInvalidState
+	}
+	return nil
+}
+
 type AuditLogItem struct {
 	ID         int64           `json:"id"`
 	ActorID    *string         `json:"actor_id"`

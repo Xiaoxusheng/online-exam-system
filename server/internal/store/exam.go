@@ -46,6 +46,35 @@ type CreateExamParams struct {
 	Candidates      []CandidateInput
 	ClassIDs        []string
 	CreatedBy       string
+	RetakeOf        string
+}
+
+// mergeRulesField 往 rules JSON 合并一个顶层字段（E-03 补考关联）。
+func mergeRulesField(rules json.RawMessage, field, value string) (json.RawMessage, error) {
+	base := map[string]any{}
+	if len(rules) > 0 {
+		if err := json.Unmarshal(rules, &base); err != nil {
+			return nil, fmt.Errorf("parse exam rules: %w: %v", ErrInvalidState, err)
+		}
+	}
+	base[field] = value
+	merged, err := json.Marshal(base)
+	if err != nil {
+		return nil, fmt.Errorf("merge exam rules: %w", err)
+	}
+	return merged, nil
+}
+
+// RetakeCandidate 补考候选考生（E-03/S-06）：不及格、缺考或未交卷者。
+type RetakeCandidate struct {
+	UserID      string   `json:"user_id"`
+	Name        string   `json:"name"`
+	Username    string   `json:"username"`
+	CandidateSt string   `json:"candidate_status"`
+	AttemptID   *string  `json:"attempt_id"`
+	Total       *float64 `json:"total"`
+	PassScore   float64  `json:"pass_score"`
+	Eligibility string   `json:"eligibility"`
 }
 
 type ExamCandidate struct {
@@ -155,6 +184,26 @@ func (s *Store) GetExam(ctx context.Context, orgID, examID string) (Exam, error)
 func (s *Store) CreateExam(ctx context.Context, p CreateExamParams) (Exam, error) {
 	if p.DurationMinutes <= 0 || !p.EndAt.After(p.StartAt) {
 		return Exam{}, fmt.Errorf("invalid exam time window: %w", ErrInvalidState)
+	}
+
+	// E-03 补考场次：retake_of 指向关联的原考试，写入 rules 供详情页关联展示。
+	if p.RetakeOf != "" {
+		var retakeStatus string
+		if err := s.pool.QueryRow(ctx, `SELECT status FROM exams WHERE id = $1::uuid AND org_id = $2`, p.RetakeOf, p.OrgID).
+			Scan(&retakeStatus); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return Exam{}, ErrNotFound
+			}
+			return Exam{}, fmt.Errorf("load retake source exam: %w", err)
+		}
+		if retakeStatus == "draft" || retakeStatus == "pending_publish" {
+			return Exam{}, fmt.Errorf("retake source exam is not published: %w", ErrInvalidState)
+		}
+		merged, err := mergeRulesField(normalizeRaw(p.Rules), "retake_of", p.RetakeOf)
+		if err != nil {
+			return Exam{}, err
+		}
+		p.Rules = merged
 	}
 
 	var paperStatus, paperType string
@@ -316,6 +365,159 @@ func listCandidateUserIDs(ctx context.Context, db DBTX, examID string) ([]string
 		return nil, fmt.Errorf("iterate exam candidate ids: %w", err)
 	}
 	return ids, nil
+}
+
+// RescheduleExamParams 考务时间调整：开考前可整体改期，开考后只允许顺延结束时间。
+type RescheduleExamParams struct {
+	StartAt time.Time
+	EndAt   time.Time
+	Reason  string
+}
+
+// RescheduleExam 统一调整考试时间窗并通知全部考生（E-07）。
+// 已开考（in_progress）的场次开始时间不可变动，只允许把结束时间向后顺延；
+// 待开考场次可整体改期。已归档/已结束场次不可调整。
+func (s *Store) RescheduleExam(ctx context.Context, orgID, examID string, p RescheduleExamParams) (Exam, error) {
+	if !p.EndAt.After(p.StartAt) {
+		return Exam{}, fmt.Errorf("end time must be after start time: %w", ErrInvalidState)
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Exam{}, fmt.Errorf("begin reschedule exam: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	var (
+		status   string
+		title    string
+		startAt  time.Time
+		endAt    time.Time
+		duration int
+	)
+	err = tx.QueryRow(ctx, `
+		SELECT status, title, start_at, end_at, duration_minutes
+		FROM exams WHERE id = $1 AND org_id = $2 FOR UPDATE`, examID, orgID,
+	).Scan(&status, &title, &startAt, &endAt, &duration)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Exam{}, ErrNotFound
+		}
+		return Exam{}, fmt.Errorf("load exam for reschedule: %w", err)
+	}
+
+	switch status {
+	case "pending_publish", "pending_start":
+		if !p.StartAt.After(time.Now()) {
+			return Exam{}, fmt.Errorf("new start time must be in the future: %w", ErrInvalidState)
+		}
+	case "in_progress":
+		if !p.StartAt.Equal(startAt) {
+			return Exam{}, fmt.Errorf("started exam cannot move its start time: %w", ErrInvalidState)
+		}
+		if !p.EndAt.After(endAt) {
+			return Exam{}, fmt.Errorf("started exam can only extend its end time: %w", ErrInvalidState)
+		}
+	default:
+		return Exam{}, fmt.Errorf("exam status %s cannot be rescheduled: %w", status, ErrInvalidState)
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE exams SET start_at = $1, end_at = $2 WHERE id = $3`, p.StartAt, p.EndAt, examID); err != nil {
+		return Exam{}, fmt.Errorf("update exam window: %w", err)
+	}
+
+	candidates, err := listCandidateUserIDs(ctx, tx, examID)
+	if err != nil {
+		return Exam{}, err
+	}
+	notice := fmt.Sprintf("考试时间调整：%s 时间窗调整为 %s 至 %s，限时 %d 分钟不变。",
+		title, p.StartAt.Format("2006-01-02 15:04"), p.EndAt.Format("2006-01-02 15:04"), duration)
+	if p.Reason != "" {
+		notice += " 调整原因：" + p.Reason
+	}
+	if err := s.notifyMany(ctx, tx, orgID, candidates,
+		fmt.Sprintf("考试时间调整：%s", title), notice, "exam_reschedule", examID, map[string]string{
+			"exam":     title,
+			"start_at": p.StartAt.Format("2006-01-02 15:04"),
+			"end_at":   p.EndAt.Format("2006-01-02 15:04"),
+			"reason":   p.Reason,
+		}); err != nil {
+		return Exam{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Exam{}, fmt.Errorf("commit reschedule exam: %w", err)
+	}
+	s.emit(RealtimeEvent{
+		Type:   EventExamPublished,
+		ExamID: examID,
+		Detail: map[string]any{"exam_title": title, "rescheduled": true, "start_at": p.StartAt, "end_at": p.EndAt},
+	})
+	return s.GetExam(ctx, orgID, examID)
+}
+
+// ListRetakeCandidates 补考候选名单（E-03/S-06）：按最新成绩与及格线判定。
+// eligibility: failed 未及格 / absent 缺考或未进入 / not_graded 已交卷未出分（仅供参考）。
+func (s *Store) ListRetakeCandidates(ctx context.Context, orgID, examID string) ([]RetakeCandidate, error) {
+	var rulesRaw json.RawMessage
+	var examStatus string
+	if err := s.pool.QueryRow(ctx, `SELECT rules, status FROM exams WHERE id = $1::uuid AND org_id = $2`, examID, orgID).
+		Scan(&rulesRaw, &examStatus); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("load exam for retake: %w", err)
+	}
+	if examStatus == "draft" || examStatus == "pending_publish" {
+		return nil, fmt.Errorf("exam is not published: %w", ErrInvalidState)
+	}
+	snapshot, err := s.GetSnapshot(ctx, examID)
+	if err != nil {
+		return nil, fmt.Errorf("load snapshot for retake: %w", err)
+	}
+
+	// 及格线与导出口径一致：配置值优先，缺省按分组满分 60%（缺考考生按 A 组口径评估）。
+	passScore := passScoreOf(rulesRaw, snapshot.TotalFor("A"))
+
+	rows, err := s.pool.Query(ctx, `
+		WITH latest_score AS (
+			SELECT DISTINCT ON (sr.attempt_id) sr.attempt_id, sr.total::float8 AS total
+			FROM score_records sr ORDER BY sr.attempt_id, sr.created_at DESC
+		)
+		SELECT ec.user_id::text, u.name, u.username, ec.status, ec.attempt_id::text, ls.total
+		FROM exam_candidates ec
+		JOIN users u ON u.id = ec.user_id
+		JOIN exams e ON e.id = ec.exam_id
+		LEFT JOIN attempts a ON a.id = ec.attempt_id
+		LEFT JOIN latest_score ls ON ls.attempt_id = a.id
+		WHERE ec.exam_id = $1::uuid AND e.org_id = $2::uuid
+		ORDER BY u.name, ec.user_id`, examID, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("list retake candidates: %w", err)
+	}
+	defer rows.Close()
+
+	candidates := make([]RetakeCandidate, 0)
+	for rows.Next() {
+		var item RetakeCandidate
+		if err := rows.Scan(&item.UserID, &item.Name, &item.Username, &item.CandidateSt,
+			&item.AttemptID, &item.Total); err != nil {
+			return nil, fmt.Errorf("scan retake candidate: %w", err)
+		}
+		item.PassScore = passScore
+		switch {
+		case item.Total != nil && *item.Total < passScore:
+			item.Eligibility = "failed"
+		case item.AttemptID == nil || item.CandidateSt == "absent":
+			item.Eligibility = "absent"
+		default:
+			item.Eligibility = "not_graded"
+		}
+		candidates = append(candidates, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate retake candidates: %w", err)
+	}
+	return candidates, nil
 }
 
 func (s *Store) buildSnapshot(ctx context.Context, tx pgx.Tx, orgID, paperID, paperTitle, paperType string, rules json.RawMessage) (PaperSnapshot, error) {

@@ -1,7 +1,11 @@
 package httpapi
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -239,4 +243,107 @@ func (a *API) handleSystemOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data(w, http.StatusOK, overview)
+}
+
+// handleMonitorStats 运行监控（A-08）。
+func (a *API) handleMonitorStats(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	stats, err := a.store.GetMonitorStats(r.Context(), claims.OrgID)
+	if err != nil {
+		a.storeError(w, r, err, "监控数据不可用")
+		return
+	}
+	data(w, http.StatusOK, stats)
+}
+
+// handleStorageStats 媒体用量统计（A-06）。
+func (a *API) handleStorageStats(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	buckets, activeCount, deletedCount, err := a.store.StorageStats(r.Context(), claims.OrgID)
+	if err != nil {
+		a.storeError(w, r, err, "存储统计不可用")
+		return
+	}
+	data(w, http.StatusOK, map[string]any{
+		"buckets": buckets, "active_count": activeCount, "deleted_pending": deletedCount,
+	})
+}
+
+// handleStorageCleanup 物理清理软删媒体：删磁盘文件（MEDIA_DIR/key），再删元数据行（A-06）。
+func (a *API) handleStorageCleanup(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	const batchLimit = 500
+	keys, err := a.store.DeletedMediaKeys(r.Context(), claims.OrgID, batchLimit)
+	if err != nil {
+		a.storeError(w, r, err, "存储清理不可用")
+		return
+	}
+	purged := int64(0)
+	if len(keys) > 0 {
+		for _, key := range keys {
+			// storage_key 由服务端生成（org/purpose/date/rand.ext），无客户端可控成分；
+			// 文件不存在视为已清理，跳过即可。
+			_ = os.Remove(filepath.Join(a.cfg.MediaDir, filepath.FromSlash(key)))
+		}
+		purged, err = a.store.PurgeDeletedMedia(r.Context(), claims.OrgID, keys)
+		if err != nil {
+			a.storeError(w, r, err, "存储清理不可用")
+			return
+		}
+	}
+	a.audit(r, store.AuditEntry{
+		OrgID: claims.OrgID, ActorID: claims.Subject, Action: "storage.cleaned",
+		TargetType: "media", Detail: map[string]any{"candidates": len(keys), "purged": purged},
+	})
+	data(w, http.StatusOK, map[string]any{"candidates": len(keys), "purged": purged})
+}
+
+// handleExportUserData 个人数据导出（A-07）。
+func (a *API) handleExportUserData(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	userID, ok := parseUUIDParam(w, pathParam(r, "id"), "用户 ID")
+	if !ok {
+		return
+	}
+	exportData, err := a.store.ExportUserData(r.Context(), claims.OrgID, userID)
+	if err != nil {
+		a.storeError(w, r, err, "用户数据导出失败")
+		return
+	}
+	a.audit(r, store.AuditEntry{
+		OrgID: claims.OrgID, ActorID: claims.Subject, Action: "compliance.user_exported",
+		TargetType: "user", TargetID: userID,
+	})
+	payload, err := json.Marshal(exportData)
+	if err != nil {
+		apiError(w, http.StatusInternalServerError, "INTERNAL", "导出数据序列化失败")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=user-%s-export.json", userID))
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(payload)
+}
+
+// handleAnonymizeUser 个人数据注销（A-07）：脱敏 + 停用，考试成绩记录保留。
+func (a *API) handleAnonymizeUser(w http.ResponseWriter, r *http.Request) {
+	claims, _ := claimsFrom(r.Context())
+	userID, ok := parseUUIDParam(w, pathParam(r, "id"), "用户 ID")
+	if !ok {
+		return
+	}
+	if userID == claims.Subject {
+		apiError(w, http.StatusBadRequest, "INVALID_REQUEST", "不能对自己执行注销操作")
+		return
+	}
+	if err := a.store.AnonymizeUser(r.Context(), claims.OrgID, userID, claims.Subject); err != nil {
+		a.storeError(w, r, err, "注销操作失败")
+		return
+	}
+	a.audit(r, store.AuditEntry{
+		OrgID: claims.OrgID, ActorID: claims.Subject, Action: "compliance.user_anonymized",
+		TargetType: "user", TargetID: userID,
+	})
+	data(w, http.StatusOK, map[string]any{"anonymized": true})
 }
