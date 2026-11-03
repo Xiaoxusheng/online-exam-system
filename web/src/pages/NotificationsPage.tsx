@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Badge, Button, Card, Flex, List, Pagination, Skeleton, Space, Tag } from 'antd'
+import { App, Button, Card, Pagination, Skeleton } from 'antd'
 import { BellOutlined } from '@ant-design/icons'
 import PageHeader from '../components/PageHeader'
 import QueryError from '../components/QueryError'
@@ -9,11 +9,6 @@ import { listNotifications, markNotificationRead } from '../api/notification'
 import { queryKeys } from '../api/queryKeys'
 import { formatDateTime } from '../utils/format'
 import { errorText } from '../utils/errors'
-
-const sourceLabels: Record<string, string> = {
-  exam_publish: '考试发布',
-  score_publish: '成绩发布',
-}
 
 export default function NotificationsPage() {
   const { message } = App.useApp()
@@ -37,7 +32,7 @@ export default function NotificationsPage() {
 
   return (
     <div>
-      <PageHeader title="我的通知" subtitle="考试安排、阅卷任务与成绩发布提醒。" />
+      <PageHeader title="我的通知" />
 
       <Card className="panel-card" variant="borderless">
         <QueryError error={notificationsQuery.error} onRetry={() => notificationsQuery.refetch()} />
@@ -51,48 +46,35 @@ export default function NotificationsPage() {
             description="考试发布、成绩发布等关键节点会自动给你发送站内通知。"
           />
         ) : (
-          <List
-            className="notice-feed"
-            dataSource={items}
-            renderItem={(item) => (
-              <List.Item
-                className={item.status !== 'read' ? 'notice-feed-item notice-unread' : 'notice-feed-item'}
-                actions={
-                  item.status !== 'read'
-                    ? [
-                        <Button
-                          key="read"
-                          type="link"
-                          size="small"
-                          loading={readMutation.isPending && readMutation.variables === item.id}
-                          onClick={() => readMutation.mutate(item.id)}
-                        >
-                          标记已读
-                        </Button>,
-                      ]
-                    : []
-                }
-              >
-                <List.Item.Meta
-                  title={
-                    <Flex align="center" gap={8}>
-                      {item.status !== 'read' && <Badge status="processing" />}
-                      <span>{item.title}</span>
-                    </Flex>
-                  }
-                  description={
-                    <Space direction="vertical" size={2}>
-                      <span className="notice-feed-body">{item.content}</span>
-                      <span className="notice-feed-time">{formatDateTime(item.created_at)}</span>
-                    </Space>
-                  }
-                />
-                {sourceLabels[item.source_type] && (
-                  <Tag className="soft-tag">{sourceLabels[item.source_type]}</Tag>
-                )}
-              </List.Item>
-            )}
-          />
+          <div className="notice-list">
+            {items.map((item) => {
+              const unread = item.status !== 'read'
+              return (
+                <div key={item.id} className={unread ? 'notice-card is-unread' : 'notice-card'}>
+                  <div className="notice-card-head">
+                    {unread && <span className="notice-dot" />}
+                    <span className="notice-card-title" title={item.title}>
+                      {item.title}
+                    </span>
+                    <span className="notice-card-time">{formatDateTime(item.created_at)}</span>
+                    {unread ? (
+                      <Button
+                        type="link"
+                        size="small"
+                        loading={readMutation.isPending && readMutation.variables === item.id}
+                        onClick={() => readMutation.mutate(item.id)}
+                      >
+                        标记已读
+                      </Button>
+                    ) : (
+                      <span className="notice-read-state">已读</span>
+                    )}
+                  </div>
+                  <p className="notice-card-body">{item.content}</p>
+                </div>
+              )
+            })}
+          </div>
         )}
 
         {total > pageSize && (

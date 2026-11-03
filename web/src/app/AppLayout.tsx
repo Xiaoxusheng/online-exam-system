@@ -210,7 +210,28 @@ export default function AppLayout() {
       {branding.logoUrl ? (
         <img className="app-brand-logo" src={branding.logoUrl} alt={branding.name} />
       ) : (
-        <span className="app-brand-mark">考</span>
+        <svg className="app-brand-mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+          <defs>
+            <linearGradient id="brand-mark-grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#3d8bff" />
+              <stop offset="1" stopColor="#1b5fe0" />
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="9" fill="url(#brand-mark-grad)" />
+          <path
+            d="M11.2 7h8.3a1.6 1.6 0 0 1 1.13.47l4.1 4.1A1.6 1.6 0 0 1 25.2 12.7v12.1a1.6 1.6 0 0 1-1.6 1.6H11.2a1.6 1.6 0 0 1-1.6-1.6V8.6A1.6 1.6 0 0 1 11.2 7z"
+            fill="#ffffff"
+          />
+          <path d="M20.6 7v5.6h5.6" fill="#cfe2ff" />
+          <path
+            d="M12.4 19.6l2.7 2.7 6-6.3"
+            stroke="#1b5fe0"
+            strokeWidth="2.4"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       )}
       {!collapsed && (
         <div className="app-brand-text">
@@ -291,7 +312,7 @@ export default function AppLayout() {
           {menu}
           {!collapsed && (
             <div className="app-sider-footer">
-              <span className="sider-version">v2.1</span>
+              <span className="sider-version">v2.8</span>
               <span className="sider-status">服务正常</span>
             </div>
           )}
@@ -405,7 +426,7 @@ export default function AppLayout() {
           {brand}
           {menu}
           <div className="app-sider-footer">
-              <span className="sider-version">v2.1</span>
+              <span className="sider-version">v2.8</span>
               <span className="sider-status">服务正常</span>
             </div>
         </Drawer>

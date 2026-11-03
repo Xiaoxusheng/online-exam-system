@@ -4,96 +4,107 @@ const fontFamily =
   'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif'
 
 /**
- * 「墨砚」设计基座 v2.1 —— 对齐参考风格的亮蓝配色与高信息密度。
+ * v3.0 设计基座 —— Light SaaS Dashboard + Soft Mint + Clean Enterprise Admin。
  *
- * 三条主线：
- * 1. 纯白画布：全站铺白，层次只靠 1px 细边框与极轻投影，干净通透；
- * 2. 亮蓝语言：#2175FF 主色 + 鲜亮语义色，数字层级突出；
- * 3. 紧凑密度：小圆角、窄行距、密排卡片，信息密度高但保持呼吸感。
+ * 四条主线（详见 docs/ui-design-spec.md）：
+ * 1. 分层画布：灰底 #F4F6FA + 白卡 + 1px 描边，卡片真正「浮」起来；
+ * 2. 品牌克制：主色仍是亮蓝 #2175FF，薄荷 #17A67C 只承担成功/在线/完成度；
+ * 3. 近黑侧栏：#0A0A0C + 层级描边，用亮度而非色彩做层级；
+ * 4. 动效只服务于状态：120/160/240ms 三档，ease-out，reduced-motion 下只留 opacity。
  */
 const baseToken: ThemeConfig['token'] = {
   // 品牌与语义
   colorPrimary: '#2175FF',
   colorInfo: '#2175FF',
   colorLink: '#2175FF',
-  colorSuccess: '#16A34A',
-  colorWarning: '#F59E0B',
-  colorError: '#EF4444',
+  colorSuccess: '#17A67C',
+  colorWarning: '#E8930C',
+  colorError: '#DC4B4B',
   colorTextBase: '#111A2E',
-  colorTextSecondary: '#55607A',
-  colorTextTertiary: '#8B94AB',
+  colorTextSecondary: '#5B6579',
+  colorTextTertiary: '#8C96A9',
 
-  // 描边与表面：画布纯白，边框极淡
+  // 中性层：画布下沉一档，白卡靠描边与极轻投影分层
   colorBorder: '#E6EAF1',
-  colorBorderSecondary: '#EFF2F7',
-  colorFillAlter: '#F8FAFC',
-  colorFillSecondary: '#F2F5FA',
-  colorFillTertiary: '#F6F8FB',
-  colorBgLayout: '#FFFFFF',
+  colorBorderSecondary: '#EEF1F6',
+  colorFillAlter: '#FAFBFD',
+  colorFillSecondary: '#F1F4F9',
+  colorFillTertiary: '#F5F8FE',
+  colorBgLayout: '#F4F6FA',
   colorBgContainer: '#FFFFFF',
   colorBgElevated: '#FFFFFF',
+  colorBgSpotlight: 'rgba(17, 26, 46, 0.92)',
 
-  // 形状：小圆角，接近参考稿的紧凑卡片
+  // 形状：圆角分级，控件 7 / 卡片 10 / 浮层 12
   borderRadius: 7,
   borderRadiusLG: 10,
-  borderRadiusSM: 5,
-  borderRadiusXS: 3,
+  borderRadiusSM: 6,
+  borderRadiusXS: 4,
 
-  // 尺度：紧凑，适配高频录入
+  // 尺度：紧凑但不挤
   controlHeight: 32,
   controlHeightSM: 26,
-  controlHeightLG: 38,
+  controlHeightLG: 40,
   fontSize: 13,
   lineHeight: 1.5715,
   fontFamily,
   wireframe: false,
 
-  // 层次：边框为主，投影为辅
-  boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-  boxShadowSecondary: '0 16px 48px -20px rgba(15, 23, 42, 0.24)',
-  boxShadowTertiary: '0 1px 2px rgba(15, 23, 42, 0.04)',
+  // 层次：边框为主，投影克制
+  boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
+  boxShadowSecondary: '0 12px 32px -16px rgba(16, 24, 40, 0.18)',
+  boxShadowTertiary: '0 6px 18px -10px rgba(16, 24, 40, 0.14)',
 }
 
 const baseComponents: ThemeConfig['components'] = {
   Layout: {
-    siderBg: '#FFFFFF',
+    siderBg: '#0A0A0C',
     headerBg: '#FFFFFF',
-    bodyBg: '#FFFFFF',
-    headerHeight: 52,
-    headerPadding: '0 18px',
+    bodyBg: '#F4F6FA',
+    headerHeight: 56,
+    headerPadding: '0 20px',
   },
+  // 侧栏为近黑底，菜单走暗色层级
   Menu: {
-    itemBorderRadius: 7,
-    itemHeight: 34,
-    itemMarginInline: 8,
+    darkItemBg: 'transparent',
+    darkPopupBg: '#101014',
+    darkItemColor: '#A7ADBA',
+    darkItemHoverBg: 'rgba(255, 255, 255, 0.055)',
+    darkItemHoverColor: '#EAECF0',
+    darkItemDisabledColor: '#5C6270',
+    darkSubMenuItemBg: 'transparent',
+    itemBorderRadius: 8,
+    itemHeight: 36,
+    itemMarginInline: 10,
     itemMarginBlock: 2,
-    itemSelectedBg: '#EAF2FF',
-    itemSelectedColor: '#2175FF',
-    itemColor: '#55607A',
-    itemHoverBg: '#F5F7FB',
-    itemHoverColor: '#111A2E',
+    itemSelectedBg: 'rgba(33, 117, 255, 0.18)',
+    itemSelectedColor: '#FFFFFF',
+    itemColor: '#A7ADBA',
+    itemHoverBg: 'rgba(255, 255, 255, 0.055)',
+    itemHoverColor: '#EAECF0',
     subMenuItemBg: 'transparent',
-    iconSize: 15,
+    iconSize: 16,
     activeBarWidth: 0,
-    collapsedIconSize: 17,
+    collapsedIconSize: 18,
   },
   Card: {
     borderRadiusLG: 10,
     paddingLG: 16,
-    colorBorderSecondary: '#EFF2F7',
+    colorBorderSecondary: '#EEF1F6',
     headerHeight: 44,
     headerFontSize: 13.5,
+    headerBg: 'transparent',
   },
   Statistic: {
     titleFontSize: 12,
-    contentFontSize: 30,
+    contentFontSize: 26,
     fontFamily,
   },
   Button: {
     fontWeight: 500,
     borderRadius: 7,
     controlHeight: 32,
-    primaryShadow: '0 1px 2px rgba(33, 117, 255, 0.24)',
+    primaryShadow: '0 1px 2px rgba(33, 117, 255, 0.22)',
     defaultShadow: 'none',
     dangerShadow: 'none',
     paddingInline: 12,
@@ -115,7 +126,7 @@ const baseComponents: ThemeConfig['components'] = {
     borderRadius: 7,
     controlHeight: 32,
     optionSelectedBg: '#EAF2FF',
-    optionSelectedColor: '#2175FF',
+    optionSelectedColor: '#1B5FE0',
   },
   DatePicker: {
     borderRadius: 7,
@@ -123,34 +134,34 @@ const baseComponents: ThemeConfig['components'] = {
     activeShadow: '0 0 0 3px rgba(33, 117, 255, 0.10)',
   },
   Table: {
-    headerBg: '#F9FAFC',
-    headerColor: '#55607A',
+    headerBg: '#FAFBFD',
+    headerColor: '#5B6579',
     headerSplitColor: 'transparent',
-    rowHoverBg: '#F5F9FF',
-    borderColor: '#EFF2F7',
-    cellPaddingBlock: 9,
-    cellPaddingInline: 12,
+    rowHoverBg: '#F5F8FE',
+    borderColor: '#EEF1F6',
+    cellPaddingBlock: 13,
+    cellPaddingInline: 16,
     footerBg: '#FAFBFD',
-    stickyScrollBarBg: '#D6DDE8',
+    stickyScrollBarBg: '#D7DEE9',
     headerSortActiveBg: '#EAF2FF',
-    headerSortHoverBg: '#F2F5FA',
+    headerSortHoverBg: '#F1F4F9',
   },
   Tabs: {
     inkBarColor: '#2175FF',
     itemSelectedColor: '#111A2E',
-    itemColor: '#8B94AB',
+    itemColor: '#8C96A9',
     itemHoverColor: '#111A2E',
     titleFontSize: 13,
     horizontalItemGutter: 24,
     horizontalItemPadding: '10px 0',
-    horizontalMargin: '0 0 14px 0',
+    horizontalMargin: '0 0 16px 0',
     cardPadding: '5px 12px',
     cardGutter: 6,
   },
   Tag: {
-    borderRadiusSM: 5,
-    defaultBg: '#F4F6FA',
-    defaultColor: '#55607A',
+    borderRadiusSM: 6,
+    defaultBg: '#F1F4F9',
+    defaultColor: '#5B6579',
   },
   Modal: {
     borderRadiusLG: 12,
@@ -158,15 +169,19 @@ const baseComponents: ThemeConfig['components'] = {
     contentBg: '#FFFFFF',
     headerBg: '#FFFFFF',
   },
+  Drawer: {
+    colorBgElevated: '#FFFFFF',
+  },
   Dropdown: {
-    borderRadiusLG: 10,
-    controlItemBgHover: '#F2F6FE',
+    borderRadiusLG: 12,
+    paddingBlock: 4,
+    controlItemBgHover: '#F1F4F9',
   },
   Popover: {
-    borderRadiusLG: 10,
+    borderRadiusLG: 12,
   },
   Notification: {
-    borderRadiusLG: 10,
+    borderRadiusLG: 12,
   },
   Message: {
     borderRadiusLG: 8,
@@ -181,24 +196,24 @@ const baseComponents: ThemeConfig['components'] = {
   },
   Breadcrumb: {
     fontSize: 12,
-    itemColor: '#8B94AB',
+    itemColor: '#8C96A9',
     lastItemColor: '#111A2E',
     separatorColor: '#C7CEDB',
   },
   Segmented: {
     borderRadius: 7,
     itemSelectedBg: '#FFFFFF',
-    trackBg: '#EFF2F7',
+    trackBg: '#EEF1F6',
     itemSelectedColor: '#111A2E',
   },
   Descriptions: {
-    labelBg: '#F9FAFC',
+    labelBg: '#FAFBFD',
     titleMarginBottom: 12,
     itemPaddingBottom: 10,
   },
   Progress: {
     defaultColor: '#2175FF',
-    remainingColor: '#EFF2F7',
+    remainingColor: '#EEF1F6',
     lineBorderRadius: 3,
   },
   Timeline: {
@@ -207,10 +222,10 @@ const baseComponents: ThemeConfig['components'] = {
     itemPaddingBottom: 16,
   },
   Empty: {
-    colorTextDescription: '#8B94AB',
+    colorTextDescription: '#8C96A9',
   },
   Result: {
-    titleFontSize: 22,
+    titleFontSize: 20,
     subtitleFontSize: 13,
   },
   Alert: {
@@ -218,7 +233,7 @@ const baseComponents: ThemeConfig['components'] = {
     withDescriptionPadding: '14px 16px',
   },
   Divider: {
-    colorSplit: '#EFF2F7',
+    colorSplit: '#EEF1F6',
   },
   Badge: {
     textFontSize: 12,
@@ -234,7 +249,10 @@ export const theme: ThemeConfig = {
   components: baseComponents,
 }
 
-/** 深色主题：同一套语义，换成墨色容器与降低饱和的强调色。 */
+/**
+ * 暗黑模式：重新分层而非反色。
+ * 靠描边与亮度分层（阴影几乎无效），语义色降饱和但保持可辨，表头比行亮一档。
+ */
 export const darkTheme: ThemeConfig = {
   algorithm: antdTheme.darkAlgorithm,
   token: {
@@ -242,53 +260,52 @@ export const darkTheme: ThemeConfig = {
     colorPrimary: '#6D9AFF',
     colorInfo: '#6D9AFF',
     colorLink: '#6D9AFF',
-    colorSuccess: '#3DDB9E',
+    colorSuccess: '#34C79A',
     colorWarning: '#F5B04C',
     colorError: '#F87A7A',
     colorTextBase: '#E6EAF2',
     colorTextSecondary: '#9AA5B8',
     colorTextTertiary: '#6F7A8D',
     colorBorder: '#232B3A',
-    colorBorderSecondary: '#1D2431',
-    colorFillAlter: '#151C27',
-    colorFillSecondary: '#19212E',
-    colorFillTertiary: '#1A2230',
-    colorBgLayout: '#0D1119',
-    colorBgContainer: '#141A25',
-    colorBgElevated: '#1B2330',
+    colorBorderSecondary: '#1B2230',
+    colorFillAlter: '#101722',
+    colorFillSecondary: '#18212E',
+    colorFillTertiary: '#18212E',
+    colorBgLayout: '#0B0F16',
+    colorBgContainer: '#131A25',
+    colorBgElevated: '#18212E',
+    colorBgSpotlight: 'rgba(230, 234, 242, 0.16)',
     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.4)',
-    boxShadowSecondary: '0 20px 48px -22px rgba(0, 0, 0, 0.8)',
-    boxShadowTertiary: '0 1px 2px rgba(0, 0, 0, 0.4)',
+    boxShadowSecondary: '0 16px 40px -20px rgba(0, 0, 0, 0.8)',
+    boxShadowTertiary: '0 6px 18px -10px rgba(0, 0, 0, 0.6)',
   },
   components: {
     ...baseComponents,
     Layout: {
       ...baseComponents?.Layout,
-      siderBg: '#141A25',
-      headerBg: '#141A25',
-      bodyBg: '#0D1119',
+      siderBg: '#0A0A0C',
+      headerBg: '#131A25',
+      bodyBg: '#0B0F16',
     },
     Menu: {
       ...baseComponents?.Menu,
-      itemSelectedBg: 'rgba(109, 154, 255, 0.16)',
-      itemSelectedColor: '#A9C4FF',
-      itemColor: '#9AA5B8',
-      itemHoverBg: '#1A2230',
-      itemHoverColor: '#E6EAF2',
+      darkPopupBg: '#101014',
+      itemSelectedBg: 'rgba(109, 154, 255, 0.20)',
+      itemHoverBg: 'rgba(255, 255, 255, 0.06)',
     },
     Card: {
       ...baseComponents?.Card,
-      colorBorderSecondary: '#1D2431',
+      colorBorderSecondary: '#1B2230',
     },
     Table: {
       ...baseComponents?.Table,
-      headerBg: '#182030',
+      headerBg: '#101722',
       headerColor: '#9AA5B8',
-      rowHoverBg: '#1B2333',
-      borderColor: '#1D2431',
-      footerBg: '#141A25',
+      rowHoverBg: '#18212E',
+      borderColor: '#1B2230',
+      footerBg: '#131A25',
       headerSortActiveBg: 'rgba(109, 154, 255, 0.16)',
-      headerSortHoverBg: '#1A2230',
+      headerSortHoverBg: '#18212E',
     },
     Tabs: {
       ...baseComponents?.Tabs,
@@ -299,12 +316,12 @@ export const darkTheme: ThemeConfig = {
     },
     Descriptions: {
       ...baseComponents?.Descriptions,
-      labelBg: '#182030',
+      labelBg: '#101722',
     },
     Segmented: {
       ...baseComponents?.Segmented,
       itemSelectedBg: '#1F2A3B',
-      trackBg: '#182030',
+      trackBg: '#101722',
     },
     Progress: {
       ...baseComponents?.Progress,
@@ -316,7 +333,7 @@ export const darkTheme: ThemeConfig = {
     },
     Tag: {
       ...baseComponents?.Tag,
-      defaultBg: '#1A2230',
+      defaultBg: '#18212E',
       defaultColor: '#9AA5B8',
     },
     Breadcrumb: {
@@ -325,9 +342,14 @@ export const darkTheme: ThemeConfig = {
       lastItemColor: '#E6EAF2',
       separatorColor: '#39424F',
     },
-    Tooltip: {
-      ...baseComponents?.Tooltip,
-      colorBgSpotlight: 'rgba(230, 234, 242, 0.16)',
+    Select: {
+      ...baseComponents?.Select,
+      optionSelectedBg: 'rgba(109, 154, 255, 0.16)',
+      optionSelectedColor: '#A9C4FF',
+    },
+    Pagination: {
+      ...baseComponents?.Pagination,
+      itemActiveBg: 'rgba(109, 154, 255, 0.16)',
     },
   },
 }

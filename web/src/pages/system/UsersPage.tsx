@@ -1,17 +1,24 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, Flex, Form, Input, Modal, Select, Table, Tabs, Tag } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { App, Button, Card, Col, Flex, Form, Input, Modal, Pagination, Row, Select, Skeleton, Tabs, Tag } from 'antd'
+import {
+  ApartmentOutlined,
+  PhoneOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  RightOutlined,
+  SearchOutlined,
+} from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
+import EmptyState from '../../components/EmptyState'
 import { createUser, listCampuses, listClasses, listRoles, listUsers, updateUser } from '../../api/org'
 import type { UserInput, UserListParams, UserPatch } from '../../api/org'
 import { queryKeys } from '../../api/queryKeys'
 import { dataScopeLabel, roleLabel } from '../../utils/labels'
 import { formatDateTime } from '../../utils/format'
 import { errorText } from '../../utils/errors'
-import type { Role, User } from '../../types'
+import type { RoleDescriptor, User } from '../../types'
 
 interface UserFilter extends UserListParams {
   page?: number
@@ -193,7 +200,11 @@ export default function UsersPage() {
   const rolesQuery = useQuery({ queryKey: queryKeys.roles, queryFn: listRoles })
   const campusesQuery = useQuery({ queryKey: queryKeys.campuses, queryFn: listCampuses })
   const classesQuery = useQuery({ queryKey: queryKeys.classes(), queryFn: () => listClasses() })
-  const usersQuery = useQuery({ queryKey: queryKeys.users(filters), queryFn: () => listUsers(filters) })
+  const usersQuery = useQuery({
+    queryKey: queryKeys.users(filters),
+    queryFn: () => listUsers(filters),
+    placeholderData: keepPreviousData,
+  })
 
   const roleOptions = (rolesQuery.data ?? []).map((role) => ({ value: role.code, label: role.name }))
   const campusOptions = (campusesQuery.data ?? []).map((campus) => ({ value: campus.id, label: campus.name }))
@@ -201,80 +212,8 @@ export default function UsersPage() {
   const campusNames = new Map((campusesQuery.data ?? []).map((campus) => [campus.id, campus.name]))
   const classNames = new Map((classesQuery.data ?? []).map((item) => [item.id, item.name]))
 
-  const columns: ColumnsType<User> = [
-    {
-      title: '姓名',
-      dataIndex: 'name',
-      render: (_value, record) => (
-        <div className="cell-stack">
-          <span className="cell-title">{record.name}</span>
-          <span className="cell-meta">{record.username}</span>
-        </div>
-      ),
-    },
-    {
-      title: '角色',
-      dataIndex: 'role',
-      width: 120,
-      render: (value: Role) => <Tag color={roleTone[value] ?? 'default'}>{roleLabel(value)}</Tag>,
-    },
-    {
-      title: '数据范围',
-      dataIndex: 'data_scope',
-      width: 110,
-      render: (value: string) => dataScopeLabel(value),
-    },
-    {
-      title: '归属',
-      key: 'membership',
-      render: (_value, record) => {
-        const campus = record.campus_id ? campusNames.get(record.campus_id) : undefined
-        const klass = record.class_id ? classNames.get(record.class_id) : undefined
-        if (!campus && !klass) return <span className="cell-meta">未分配</span>
-        return (
-          <div className="cell-stack">
-            <span className="cell-title">{campus ?? '—'}</span>
-            <span className="cell-meta">{klass ?? '无班级'}</span>
-          </div>
-        )
-      },
-    },
-    {
-      title: '联系方式',
-      key: 'contact',
-      width: 170,
-      render: (_value, record) => (
-        <div className="cell-stack">
-          <span className="cell-title">{record.phone || '—'}</span>
-          <span className="cell-meta">{record.email || '无邮箱'}</span>
-        </div>
-      ),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      width: 96,
-      render: (value: string) => (value === 'active' ? <Tag color="green">启用</Tag> : <Tag>已停用</Tag>),
-    },
-    {
-      title: '最近登录',
-      dataIndex: 'last_login_at',
-      width: 160,
-      render: (value?: string) => <span className="cell-meta">{formatDateTime(value)}</span>,
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 80,
-      fixed: 'right',
-      render: (_value, record) => (
-        <Button type="link" size="small" onClick={() => setEditing(record)}>
-          编辑
-        </Button>
-      ),
-    },
-  ]
-
+  const users = usersQuery.data?.items ?? []
+  const roles = rolesQuery.data ?? []
   const pagination = usersQuery.data?.pagination
 
   return (
@@ -362,23 +301,75 @@ export default function UsersPage() {
                     emptyHint="若刚创建账号，请稍后重试。"
                   />
 
-                  <Table
-                    rowKey="id"
-                    size="middle"
-                    loading={usersQuery.isFetching}
-                    columns={columns}
-                    dataSource={usersQuery.data?.items ?? []}
-                    scroll={{ x: 1080 }}
-                    pagination={{
-                      current: pagination?.page ?? 1,
-                      pageSize: pagination?.page_size ?? 20,
-                      total: pagination?.total ?? 0,
-                      showSizeChanger: true,
-                      showTotal: (total) => `共 ${total} 个账号`,
-                      onChange: (page, pageSize) => setFilters({ ...draft, page, page_size: pageSize }),
-                    }}
-                    locale={{ emptyText: usersQuery.isError ? ' ' : '没有符合条件的账号' }}
-                  />
+                  {usersQuery.isFetching && users.length === 0 ? (
+                    <Row gutter={[12, 12]}>
+                      {[0, 1, 2].map((index) => (
+                        <Col key={index} xs={24} sm={12} xl={8}>
+                          <Card className="panel-card room-card" variant="borderless">
+                            <Skeleton active title paragraph={{ rows: 2 }} />
+                          </Card>
+                        </Col>
+                      ))}
+                    </Row>
+                  ) : users.length === 0 ? (
+                    <Card className="panel-card" variant="borderless">
+                      <EmptyState
+                        icon={<ApartmentOutlined />}
+                        title="没有符合条件的账号"
+                        description="调整筛选条件，或点击右上角「新建账号」。"
+                      />
+                    </Card>
+                  ) : (
+                    <>
+                      <Row gutter={[12, 12]}>
+                        {users.map((user) => {
+                          const campus = user.campus_id ? campusNames.get(user.campus_id) : undefined
+                          const klass = user.class_id ? classNames.get(user.class_id) : undefined
+                          return (
+                            <Col key={user.id} xs={24} sm={12} xl={8}>
+                              <Card
+                                className="panel-card room-card is-interactive"
+                                variant="borderless"
+                                onClick={() => setEditing(user)}
+                              >
+                                <div className="room-card-head">
+                                  <div className="cell-stack">
+                                    <span className="room-card-title">{user.name}</span>
+                                    <span className="cell-meta">@{user.username}</span>
+                                  </div>
+                                  <Tag color={roleTone[user.role] ?? 'default'}>{roleLabel(user.role)}</Tag>
+                                </div>
+                                <div className="room-card-schedule">
+                                  <ApartmentOutlined />
+                                  <span>{campus ?? '未分配校区'}{klass ? ` · ${klass}` : ''}</span>
+                                </div>
+                                <div className="room-card-schedule">
+                                  <PhoneOutlined />
+                                  <span>{user.phone || '未留手机号'}{user.email ? ` · ${user.email}` : ''}</span>
+                                </div>
+                                <div className="room-card-foot">
+                                  <span className="room-chip">{dataScopeLabel(user.data_scope)}</span>
+                                  {user.status === 'active' ? <Tag color="green">启用</Tag> : <Tag>已停用</Tag>}
+                                  <span className="cell-meta">登录 {formatDateTime(user.last_login_at)}</span>
+                                  <RightOutlined className="room-card-enter" />
+                                </div>
+                              </Card>
+                            </Col>
+                          )
+                        })}
+                      </Row>
+                      <Flex justify="flex-end" style={{ marginTop: 16 }}>
+                        <Pagination
+                          current={pagination?.page ?? 1}
+                          pageSize={pagination?.page_size ?? 20}
+                          total={pagination?.total ?? 0}
+                          showSizeChanger
+                          showTotal={(total) => `共 ${total} 个账号`}
+                          onChange={(page, pageSize) => setFilters({ ...draft, page, page_size: pageSize })}
+                        />
+                      </Flex>
+                    </>
+                  )}
                 </>
               ),
             },
@@ -386,19 +377,25 @@ export default function UsersPage() {
               key: 'roles',
               label: '角色与数据范围',
               children: (
-                <Table
-                  rowKey="code"
-                  size="middle"
-                  loading={rolesQuery.isFetching}
-                  columns={[
-                    { title: '角色', dataIndex: 'name', width: 140 },
-                    { title: '标识', dataIndex: 'code', width: 140, render: (value: string) => <code>{value}</code> },
-                    { title: '默认数据范围', dataIndex: 'data_scope', width: 130, render: (value: string) => dataScopeLabel(value) },
-                    { title: '职责', dataIndex: 'description' },
-                  ]}
-                  dataSource={rolesQuery.data ?? []}
-                  pagination={false}
-                />
+                <Row gutter={[12, 12]}>
+                  {roles.map((role: RoleDescriptor) => (
+                    <Col key={role.code} xs={24} sm={12} xl={8}>
+                      <Card className="panel-card room-card" variant="borderless">
+                        <div className="room-card-head">
+                          <span className="room-card-title">{role.name}</span>
+                          <span className="room-chip">{role.code}</span>
+                        </div>
+                        <div className="room-card-schedule">
+                          <ApartmentOutlined />
+                          <span>默认数据范围：{dataScopeLabel(role.data_scope)}</span>
+                        </div>
+                        <div className="room-card-paper">
+                          <span title={role.description}>{role.description}</span>
+                        </div>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
               ),
             },
           ]}

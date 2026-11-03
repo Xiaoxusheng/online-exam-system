@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, Descriptions, Drawer, Flex, Input, InputNumber, Select, Space, Table, Tabs, Tag, Tooltip } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { HistoryOutlined, DownloadOutlined, ReloadOutlined, SearchOutlined, SendOutlined } from '@ant-design/icons'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { App, Button, Card, Col, Descriptions, Drawer, Flex, Input, InputNumber, Pagination, Row, Select, Skeleton, Space, Table, Tabs, Tag, Tooltip } from 'antd'
+import { ClockCircleOutlined, FileTextOutlined, HistoryOutlined, DownloadOutlined, ReloadOutlined, RightOutlined, SearchOutlined, SendOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/PageHeader'
 import QueryError from '../../components/QueryError'
+import EmptyState from '../../components/EmptyState'
 import AppealsPanel from './AppealsPanel'
 import {
   adjustScore,
@@ -24,56 +24,6 @@ import { attemptStatusLabels, questionTypeLabel, scoreStatusLabels, statusOf } f
 import { errorText } from '../../utils/errors'
 import type { ScoreListItem } from '../../types'
 
-const scoreColumns = (onOpen: (row: ScoreListItem) => void): ColumnsType<ScoreListItem> => [
-  {
-    title: '考生',
-    key: 'candidate',
-    render: (_value, record) => (
-      <div className="cell-stack">
-        <span className="cell-title">{record.user_name}</span>
-        <span className="cell-meta">{record.username}</span>
-      </div>
-    ),
-  },
-  { title: '考试', dataIndex: 'exam_title', width: 240, ellipsis: true },
-  {
-    title: '总分',
-    dataIndex: 'total',
-    width: 92,
-    render: (value: number) => <span className="score-value">{formatScore(value, 2)}</span>,
-  },
-  {
-    title: '答卷状态',
-    dataIndex: 'attempt_status',
-    width: 110,
-    render: (value: string) => {
-      const status = statusOf(attemptStatusLabels, value)
-      return <Tag color={status.color}>{status.label}</Tag>
-    },
-  },
-  {
-    title: '成绩状态',
-    dataIndex: 'score_status',
-    width: 110,
-    render: (value: string) => {
-      const status = statusOf(scoreStatusLabels, value)
-      return <Tag color={status.color}>{status.label}</Tag>
-    },
-  },
-  { title: '提交时间', dataIndex: 'submitted_at', width: 170, render: (value: string | null) => formatDateTime(value) },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 92,
-    fixed: 'right',
-    render: (_value, record) => (
-      <Button type="link" size="small" onClick={() => onOpen(record)}>
-        明细
-      </Button>
-    ),
-  },
-]
-
 export default function ScoresPage() {
   const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
@@ -89,7 +39,11 @@ export default function ScoresPage() {
     queryKey: queryKeys.exams({ page: 1, page_size: 100 }),
     queryFn: () => listExams({ page: 1, page_size: 100 }),
   })
-  const scoresQuery = useQuery({ queryKey: queryKeys.scores(query), queryFn: () => listScores(query) })
+  const scoresQuery = useQuery({
+    queryKey: queryKeys.scores(query),
+    queryFn: () => listScores(query),
+    placeholderData: keepPreviousData,
+  })
   const recordQuery = useQuery({
     queryKey: queryKeys.scoreRecord(detailAttempt ?? ''),
     queryFn: () => getScoreRecord(detailAttempt ?? ''),
@@ -204,9 +158,11 @@ export default function ScoresPage() {
   const examOptions = (examsQuery.data?.items ?? []).map((exam) => ({ value: exam.id, label: exam.title }))
   const record = recordQuery.data
   const pendingCount = appealsSummary.data?.pagination.total ?? 0
+  const scoreItems = scoresQuery.data?.items ?? []
 
   const listCard = (
-    <Card className="panel-card" variant="borderless">
+    <>
+      <Card className="panel-card" variant="borderless">
         <Flex className="filter-bar" gap={12} wrap align="flex-end">
           <Select
             allowClear
@@ -250,27 +206,79 @@ export default function ScoresPage() {
             重置
           </Button>
         </Flex>
+      </Card>
 
-        <QueryError error={scoresQuery.error} onRetry={() => scoresQuery.refetch()} />
+      <QueryError error={scoresQuery.error} onRetry={() => scoresQuery.refetch()} />
 
-        <Table
-          rowKey="attempt_id"
-          size="middle"
-          loading={scoresQuery.isFetching}
-          columns={scoreColumns(openDetail)}
-          dataSource={scoresQuery.data?.items ?? []}
-          scroll={{ x: 980 }}
-          pagination={{
-            current: scoresQuery.data?.pagination.page ?? 1,
-            pageSize: scoresQuery.data?.pagination.page_size ?? 20,
-            total: scoresQuery.data?.pagination.total ?? 0,
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 份答卷`,
-            onChange: (page, pageSize) => setQuery({ ...draft, page, page_size: pageSize }),
-          }}
-          locale={{ emptyText: scoresQuery.isError ? ' ' : '还没有可管理的成绩（考生交卷后生成）' }}
-        />
-    </Card>
+      {scoresQuery.isFetching && scoreItems.length === 0 ? (
+        <Row gutter={[12, 12]}>
+          {[0, 1, 2].map((index) => (
+            <Col key={index} xs={24} sm={12} xl={8}>
+              <Card className="panel-card room-card" variant="borderless">
+                <Skeleton active title paragraph={{ rows: 2 }} />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      ) : scoreItems.length === 0 ? (
+        <Card className="panel-card" variant="borderless">
+          <EmptyState
+            icon={<FileTextOutlined />}
+            title="还没有可管理的成绩"
+            description="考生交卷并完成判分后，答卷会出现在这里。"
+          />
+        </Card>
+      ) : (
+        <>
+          <Row gutter={[12, 12]}>
+            {scoreItems.map((row) => {
+              const attemptStatus = statusOf(attemptStatusLabels, row.attempt_status)
+              const scoreStatus = statusOf(scoreStatusLabels, row.score_status)
+              return (
+                <Col key={row.attempt_id} xs={24} sm={12} xl={8}>
+                  <Card
+                    className="panel-card room-card is-interactive"
+                    variant="borderless"
+                    onClick={() => openDetail(row)}
+                  >
+                    <div className="room-card-head">
+                      <div className="cell-stack">
+                        <span className="room-card-title">{row.user_name}</span>
+                        <span className="cell-meta">{row.username}</span>
+                      </div>
+                      <span className="score-value room-score">{formatScore(row.total, 2)} 分</span>
+                    </div>
+                    <div className="room-card-schedule">
+                      <FileTextOutlined />
+                      <span title={row.exam_title}>{row.exam_title}</span>
+                    </div>
+                    <div className="room-card-schedule">
+                      <ClockCircleOutlined />
+                      <span>提交于 {formatDateTime(row.submitted_at)}</span>
+                    </div>
+                    <div className="room-card-foot">
+                      <Tag color={attemptStatus.color}>{attemptStatus.label}</Tag>
+                      <Tag color={scoreStatus.color}>{scoreStatus.label}</Tag>
+                      <RightOutlined className="room-card-enter" />
+                    </div>
+                  </Card>
+                </Col>
+              )
+            })}
+          </Row>
+          <Flex justify="flex-end" style={{ marginTop: 16 }}>
+            <Pagination
+              current={scoresQuery.data?.pagination.page ?? 1}
+              pageSize={scoresQuery.data?.pagination.page_size ?? 20}
+              total={scoresQuery.data?.pagination.total ?? 0}
+              showSizeChanger
+              showTotal={(total) => `共 ${total} 份答卷`}
+              onChange={(page, pageSize) => setQuery({ ...draft, page, page_size: pageSize })}
+            />
+          </Flex>
+        </>
+      )}
+    </>
   )
 
   const tabItems = [
